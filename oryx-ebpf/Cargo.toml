@@ -1,0 +1,37 @@
+[package]
+name = "oryx-ebpf"
+version = "0.1.0"
+description = "oryx eBPF"
+license = "GPL-3.0"
+edition = "2021"
+repository = "https://github.com/pythops/oryx"
+homepage = "https://github.com/pythops/oryx"
+
+[dependencies]
+aya-ebpf = "0.1.0"
+aya-log-ebpf = "0.1.0"
+oryx-common = { path = "../oryx-common" }
+network-types = "0.0.6"
+
+[[bin]]
+name = "oryx"
+path = "src/main.rs"
+
+[profile.dev]
+opt-level = 3
+debug = false
+debug-assertions = false
+overflow-checks = false
+lto = true
+panic = "abort"
+incremental = false
+codegen-units = 1
+rpath = false
+
+[profile.release]
+lto = "fat"
+panic = "abort"
+codegen-units = 1
+
+[workspace]
+members = []
