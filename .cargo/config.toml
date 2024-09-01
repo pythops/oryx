@@ -1,0 +1,5 @@
+[alias]
+xtask = "run --package xtask --"
+
+[build]
+target-dir = "target"
