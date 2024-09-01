@@ -1,0 +1,28 @@
+[package]
+name = "oryx-tui"
+version = "0.1.0"
+description.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+edition.workspace = true
+
+[dependencies]
+ratatui = "0.28"
+tui-big-text = "0.6"
+tui-input = "0.10"
+libc = "0.2"
+aya = "0.12"
+oryx-common = { path = "../oryx-common" }
+mio = { version = "1", features = ["os-poll", "os-ext"] }
+itertools = "0.13"
+dirs = "5"
+dns-lookup = "2"
+kanal = "0.1.0-pre8"
+mimalloc = "0.1"
+clap = { version = "4", features = ["derive", "cargo"] }
+
+[[bin]]
+name = "oryx"
+path = "src/main.rs"
