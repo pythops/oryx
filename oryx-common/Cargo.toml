@@ -1,0 +1,13 @@
+[package]
+name = "oryx-common"
+version = "0.1.0"
+description = "oryx common"
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+edition.workspace = true
+
+
+[lib]
+path = "src/lib.rs"
