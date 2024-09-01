@@ -1,0 +1,49 @@
+---
+name: Release
+on:
+  push:
+    tags:
+      - "*"
+jobs:
+  build:
+    permissions:
+      contents: write
+    continue-on-error: false
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - uses: cargo-bins/cargo-binstall@main
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: nightly
+          components: clippy rustfmt
+
+      - name: Install the dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y podman binutils-aarch64-linux-gnu musl-tools
+          cargo binstall -y cross
+          cargo binstall -y bpf-linker
+
+      - name: Build oryx-ebpf
+        run: cargo xtask build-ebpf --release
+
+      - name: Build for arm64 musl
+        run: |
+          CROSS_CONTAINER_ENGINE=podman cross build --target aarch64-unknown-linux-musl --release
+          cp target/aarch64-unknown-linux-musl/release/oryx oryx-aarch64-unknown-linux-musl
+
+      - name: Build for x86_64 musl
+        run: |
+          CROSS_CONTAINER_ENGINE=podman cross build --target x86_64-unknown-linux-musl --release
+          cp target/x86_64-unknown-linux-musl/release/oryx oryx-x86_64-unknown-linux-musl
+
+      - name: Upload Binary
+        uses: softprops/action-gh-release@v2
+        with:
+          files: "oryx*"
+          body: |
+            [Release.md](${{ github.server_url }}/${{ github.repository }}/blob/main/Release.md)

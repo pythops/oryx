@@ -1,0 +1,32 @@
+---
+name: CI
+on:
+  pull_request:
+  push:
+    branches:
+      - "*"
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cargo-bins/cargo-binstall@main
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: nightly
+          components: clippy rustfmt
+      - run: cargo binstall -y bpf-linker
+
+      - name: Build oryx-ebpf
+        run: cargo xtask build-ebpf
+
+      - name: Build oryx-tui
+        run: cargo build
+
+      - name: Linting
+        run: |
+          cargo clippy --workspace --all-features -- -D warnings
+          cargo fmt --all -- --check
+          cd oryx-ebpf
+          cargo clippy --workspace --all-features -- -D warnings
+          cargo fmt --all -- --check
