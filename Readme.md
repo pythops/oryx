@@ -4,6 +4,8 @@
 
 ## 📸 Demo
 
+![](https://github.com/user-attachments/assets/437dcfbd-62a5-4505-909b-0410f2378f67)
+
 ## ✨ Features
 
 - Real-time traffic inspection and visualization.
