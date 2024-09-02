@@ -25,6 +25,14 @@ A Linux based OS.
 
 You can download the pre-built binaries from the release page [release page](https://github.com/pythops/oryx/releases)
 
+### 🐧Arch Linux
+
+You can install `oryx` from the [AUR](https://aur.archlinux.org/packages/oryx) with using an [AUR helper](https://wiki.archlinux.org/title/AUR_helpers).
+
+```bash
+paru -S oryx
+```
+
 ### ⚒️ Build from source
 
 To build `oryx`:
