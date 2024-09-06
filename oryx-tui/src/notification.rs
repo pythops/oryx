@@ -61,15 +61,15 @@ impl Notification {
         frame.render_widget(block, area);
     }
 
-    pub fn send(
-        message: String,
+    pub fn send<T: ToString>(
+        message: T,
         level: NotificationLevel,
         sender: kanal::Sender<Event>,
     ) -> AppResult<()> {
         let notif = Notification {
-            message,
+            message: message.to_string(),
             level,
-            ttl: 8,
+            ttl: 16,
         };
 
         sender.send(Event::Notification(notif))?;

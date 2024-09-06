@@ -13,6 +13,7 @@ use mio::{Events, Interest, Poll, Registry, Token};
 use oryx_common::IpPacket;
 
 use crate::event::Event;
+use crate::notification::{Notification, NotificationLevel};
 use mio::event::Source;
 use mio::unix::SourceFd;
 
@@ -72,23 +73,67 @@ impl Ebpf {
                 unsafe { libc::setrlimit(libc::RLIMIT_MEMLOCK, &rlim) };
 
                 #[cfg(debug_assertions)]
-                let mut bpf = Bpf::load(include_bytes_aligned!(
+                let mut bpf = match Bpf::load(include_bytes_aligned!(
                     "../../target/bpfel-unknown-none/debug/oryx"
-                ))
-                .unwrap();
+                )) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        Notification::send(
+                            format!("Failed to load the ingress eBPF bytecode\n {}", e),
+                            NotificationLevel::Error,
+                            sender,
+                        )
+                        .unwrap();
+                        return;
+                    }
+                };
 
                 #[cfg(not(debug_assertions))]
-                let mut bpf = Bpf::load(include_bytes_aligned!(
+                let mut bpf = match Bpf::load(include_bytes_aligned!(
                     "../../target/bpfel-unknown-none/release/oryx"
-                ))
-                .unwrap();
+                )) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        Notification::send(
+                            format!("Failed to load the ingress eBPF bytecode\n {}", e),
+                            NotificationLevel::Error,
+                            sender,
+                        )
+                        .unwrap();
+                        return;
+                    }
+                };
 
                 let _ = tc::qdisc_add_clsact(&iface);
+
                 let program: &mut SchedClassifier =
                     bpf.program_mut("oryx").unwrap().try_into().unwrap();
-                program.load().unwrap();
 
-                program.attach(&iface, TcAttachType::Ingress).unwrap();
+                if let Err(e) = program.load() {
+                    Notification::send(
+                        format!(
+                            "Failed to load the ingress eBPF program to the kernel\n{}",
+                            e
+                        ),
+                        NotificationLevel::Error,
+                        sender,
+                    )
+                    .unwrap();
+                    return;
+                };
+
+                if let Err(e) = program.attach(&iface, TcAttachType::Ingress) {
+                    Notification::send(
+                        format!(
+                            "Failed to attach the ingress eBPF program to the interface\n{}",
+                            e
+                        ),
+                        NotificationLevel::Error,
+                        sender,
+                    )
+                    .unwrap();
+                    return;
+                };
 
                 let mut poll = Poll::new().unwrap();
                 let mut events = Events::with_capacity(128);
@@ -149,23 +194,63 @@ impl Ebpf {
                 unsafe { libc::setrlimit(libc::RLIMIT_MEMLOCK, &rlim) };
 
                 #[cfg(debug_assertions)]
-                let mut bpf = Bpf::load(include_bytes_aligned!(
+                let mut bpf = match Bpf::load(include_bytes_aligned!(
                     "../../target/bpfel-unknown-none/debug/oryx"
-                ))
-                .unwrap();
+                )) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        Notification::send(
+                            format!("Fail to load the egress eBPF bytecode\n {}", e),
+                            NotificationLevel::Error,
+                            sender,
+                        )
+                        .unwrap();
+                        return;
+                    }
+                };
 
                 #[cfg(not(debug_assertions))]
-                let mut bpf = Bpf::load(include_bytes_aligned!(
+                let mut bpf = match Bpf::load(include_bytes_aligned!(
                     "../../target/bpfel-unknown-none/release/oryx"
-                ))
-                .unwrap();
+                )) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        Notification::send(
+                            format!("Failed to load the egress eBPF bytecode\n {}", e),
+                            NotificationLevel::Error,
+                            sender,
+                        )
+                        .unwrap();
+                        return;
+                    }
+                };
 
                 let _ = tc::qdisc_add_clsact(&iface);
                 let program: &mut SchedClassifier =
                     bpf.program_mut("oryx").unwrap().try_into().unwrap();
-                program.load().unwrap();
 
-                program.attach(&iface, TcAttachType::Egress).unwrap();
+                if let Err(e) = program.load() {
+                    Notification::send(
+                        format!("Fail to load the egress eBPF program to the kernel\n{}", e),
+                        NotificationLevel::Error,
+                        sender,
+                    )
+                    .unwrap();
+                    return;
+                };
+
+                if let Err(e) = program.attach(&iface, TcAttachType::Egress) {
+                    Notification::send(
+                        format!(
+                            "Failed to attach the egress eBPF program to the interface\n{}",
+                            e
+                        ),
+                        NotificationLevel::Error,
+                        sender,
+                    )
+                    .unwrap();
+                    return;
+                };
 
                 let mut poll = Poll::new().unwrap();
                 let mut events = Events::with_capacity(128);
