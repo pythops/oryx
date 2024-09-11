@@ -11,3 +11,6 @@ edition.workspace = true
 
 [lib]
 path = "src/lib.rs"
+
+[dependencies]
+network-types = { git = "https://github.com/vadorovsky/network-types.git", rev = "e0ee8d5" }
