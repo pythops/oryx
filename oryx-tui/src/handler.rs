@@ -5,6 +5,7 @@ use crate::{
     app::{App, AppResult, FocusedBlock, Mode},
     ebpf::Ebpf,
     event::Event,
+    export::export,
     filters::{
         direction::TrafficDirection,
         link::{LinkProtocol, NB_LINK_PROTOCOL},
@@ -386,23 +387,22 @@ pub fn handle_key_events(
                             sender,
                         )?;
                     } else {
-                        // match export(&app.packets) {
-                        //TODO: later
-                        // Ok(_) => {
-                        //     Notification::send(
-                        //         "Packets exported to ~/oryx/capture file".to_string(),
-                        //         NotificationLevel::Info,
-                        //         sender,
-                        //     )?;
-                        // }
-                        // Err(e) => {
-                        //     Notification::send(
-                        //         e.to_string(),
-                        //         NotificationLevel::Error,
-                        //         sender,
-                        //     )?;
-                        // }
-                        // }
+                        match export(&app.packets) {
+                            Ok(_) => {
+                                Notification::send(
+                                    "Packets exported to ~/oryx/capture file".to_string(),
+                                    NotificationLevel::Info,
+                                    sender,
+                                )?;
+                            }
+                            Err(e) => {
+                                Notification::send(
+                                    e.to_string(),
+                                    NotificationLevel::Error,
+                                    sender,
+                                )?;
+                            }
+                        }
                     }
                 }
             }
