@@ -2,7 +2,7 @@ use dns_lookup::lookup_addr;
 use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr};
 
-use oryx_common::IpPacket;
+use oryx_common::ip::IpPacket;
 
 use ratatui::layout::{Alignment, Constraint, Direction, Flex, Layout, Margin, Rect};
 use ratatui::style::{Color, Style, Stylize};

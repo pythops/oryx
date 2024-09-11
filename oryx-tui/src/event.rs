@@ -1,19 +1,18 @@
 use crate::app::AppResult;
 use crate::notification::Notification;
-use oryx_common::IpPacket;
 use ratatui::crossterm::event::{
     self, Event as CrosstermEvent, KeyEvent, KeyEventKind, MouseEvent,
 };
 use std::thread;
 use std::time::{Duration, Instant};
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub enum Event {
     Tick,
     Key(KeyEvent),
     Mouse(MouseEvent),
     Resize(u16, u16),
-    Packet(IpPacket),
+    Packet([u8; 48]),
     Notification(Notification),
     Reset,
 }

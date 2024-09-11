@@ -5,9 +5,9 @@ use crate::{
     app::{App, AppResult, FocusedBlock, Mode},
     ebpf::Ebpf,
     event::Event,
-    export::export,
     filters::{
         direction::TrafficDirection,
+        link::{LinkProtocol, NB_LINK_PROTOCOL},
         network::{NetworkProtocol, NB_NETWORK_PROTOCOL},
         transport::{TransportProtocol, NB_TRANSPORT_PROTOCOL},
     },
@@ -59,13 +59,20 @@ pub fn handle_key_events(
                     match &app.focused_block {
                         FocusedBlock::NetworkFilter => {
                             app.focused_block = FocusedBlock::TransportFilter;
-                            app.transort_filter.state.select(Some(0));
+                            app.transport_filter.state.select(Some(0));
                             app.network_filter.state.select(None);
                         }
+
                         FocusedBlock::TransportFilter => {
+                            app.focused_block = FocusedBlock::LinkFilter;
+                            app.traffic_direction_filter.state.select(None);
+                            app.link_filter.state.select(Some(0));
+                        }
+
+                        FocusedBlock::LinkFilter => {
                             app.focused_block = FocusedBlock::TrafficDirection;
                             app.traffic_direction_filter.state.select(Some(0));
-                            app.transort_filter.state.select(None);
+                            app.link_filter.state.select(None);
                         }
 
                         FocusedBlock::TrafficDirection => {
@@ -105,12 +112,18 @@ pub fn handle_key_events(
                             FocusedBlock::TransportFilter => {
                                 app.focused_block = FocusedBlock::NetworkFilter;
                                 app.network_filter.state.select(Some(0));
-                                app.transort_filter.state.select(None);
+                                app.transport_filter.state.select(None);
+                            }
+
+                            FocusedBlock::LinkFilter => {
+                                app.focused_block = FocusedBlock::TransportFilter;
+                                app.transport_filter.state.select(Some(0));
+                                app.link_filter.state.select(None);
                             }
 
                             FocusedBlock::TrafficDirection => {
-                                app.focused_block = FocusedBlock::TransportFilter;
-                                app.transort_filter.state.select(Some(0));
+                                app.focused_block = FocusedBlock::LinkFilter;
+                                app.link_filter.state.select(Some(0));
                                 app.traffic_direction_filter.state.select(None);
                             }
 
@@ -150,8 +163,8 @@ pub fn handle_key_events(
                                 app.focused_block = FocusedBlock::NetworkFilter;
                                 app.network_filter.selected_protocols =
                                     app.network_filter.applied_protocols.clone();
-                                app.transort_filter.selected_protocols =
-                                    app.transort_filter.applied_protocols.clone();
+                                app.transport_filter.selected_protocols =
+                                    app.transport_filter.applied_protocols.clone();
                                 app.traffic_direction_filter.selected_direction =
                                     app.traffic_direction_filter.applied_direction.clone();
                                 app.network_filter.state = TableState::default().with_selected(0);
@@ -201,7 +214,7 @@ pub fn handle_key_events(
                                     }
 
                                     FocusedBlock::TransportFilter => {
-                                        let i = match app.transort_filter.state.selected() {
+                                        let i = match app.transport_filter.state.selected() {
                                             Some(i) => {
                                                 if i < (NB_TRANSPORT_PROTOCOL - 1).into() {
                                                     i + 1
@@ -212,7 +225,7 @@ pub fn handle_key_events(
                                             None => 0,
                                         };
 
-                                        app.transort_filter.state.select(Some(i));
+                                        app.transport_filter.state.select(Some(i));
                                     }
 
                                     FocusedBlock::TrafficDirection => {
@@ -266,7 +279,7 @@ pub fn handle_key_events(
                                     }
 
                                     FocusedBlock::TransportFilter => {
-                                        let i = match app.transort_filter.state.selected() {
+                                        let i = match app.transport_filter.state.selected() {
                                             Some(i) => {
                                                 if i > 1 {
                                                     i - 1
@@ -277,7 +290,7 @@ pub fn handle_key_events(
                                             None => 0,
                                         };
 
-                                        app.transort_filter.state.select(Some(i));
+                                        app.transport_filter.state.select(Some(i));
                                     }
 
                                     FocusedBlock::TrafficDirection => {
@@ -352,8 +365,8 @@ pub fn handle_key_events(
                     app.focused_block = FocusedBlock::NetworkFilter;
                     app.network_filter.selected_protocols =
                         app.network_filter.applied_protocols.clone();
-                    app.transort_filter.selected_protocols =
-                        app.transort_filter.applied_protocols.clone();
+                    app.transport_filter.selected_protocols =
+                        app.transport_filter.applied_protocols.clone();
                     app.traffic_direction_filter.selected_direction =
                         app.traffic_direction_filter.applied_direction.clone();
                     app.network_filter.state = TableState::default().with_selected(0);
@@ -373,22 +386,23 @@ pub fn handle_key_events(
                             sender,
                         )?;
                     } else {
-                        match export(&app.packets) {
-                            Ok(_) => {
-                                Notification::send(
-                                    "Packets exported to ~/oryx/capture file".to_string(),
-                                    NotificationLevel::Info,
-                                    sender,
-                                )?;
-                            }
-                            Err(e) => {
-                                Notification::send(
-                                    e.to_string(),
-                                    NotificationLevel::Error,
-                                    sender,
-                                )?;
-                            }
-                        }
+                        // match export(&app.packets) {
+                        //TODO: later
+                        // Ok(_) => {
+                        //     Notification::send(
+                        //         "Packets exported to ~/oryx/capture file".to_string(),
+                        //         NotificationLevel::Info,
+                        //         sender,
+                        //     )?;
+                        // }
+                        // Err(e) => {
+                        //     Notification::send(
+                        //         e.to_string(),
+                        //         NotificationLevel::Error,
+                        //         sender,
+                        //     )?;
+                        // }
+                        // }
                     }
                 }
             }
@@ -424,7 +438,8 @@ pub fn handle_key_events(
                     let iface = app.interface.selected_interface.name.clone();
 
                     app.network_filter.apply();
-                    app.transort_filter.apply();
+                    app.transport_filter.apply();
+                    app.link_filter.apply();
                     app.traffic_direction_filter.apply();
 
                     if app
@@ -520,7 +535,8 @@ pub fn handle_key_events(
                         );
                     }
                     app.network_filter.apply();
-                    app.transort_filter.apply();
+                    app.transport_filter.apply();
+                    app.link_filter.apply();
                     app.traffic_direction_filter.apply();
 
                     thread::sleep(Duration::from_millis(150));
@@ -545,13 +561,18 @@ pub fn handle_key_events(
                         match &app.focused_block {
                             FocusedBlock::NetworkFilter => {
                                 app.focused_block = FocusedBlock::TransportFilter;
-                                app.transort_filter.state.select(Some(0));
+                                app.transport_filter.state.select(Some(0));
                                 app.network_filter.state.select(None);
                             }
                             FocusedBlock::TransportFilter => {
+                                app.focused_block = FocusedBlock::LinkFilter;
+                                app.link_filter.state.select(Some(0));
+                                app.transport_filter.state.select(None);
+                            }
+                            FocusedBlock::LinkFilter => {
                                 app.focused_block = FocusedBlock::TrafficDirection;
                                 app.traffic_direction_filter.state.select(Some(0));
-                                app.transort_filter.state.select(None);
+                                app.link_filter.state.select(None);
                             }
 
                             FocusedBlock::TrafficDirection => {
@@ -584,14 +605,20 @@ pub fn handle_key_events(
                         FocusedBlock::NetworkFilter => {
                             app.focused_block = FocusedBlock::TransportFilter;
                             app.previous_focused_block = app.focused_block;
-                            app.transort_filter.state.select(Some(0));
+                            app.transport_filter.state.select(Some(0));
                             app.network_filter.state.select(None);
                         }
                         FocusedBlock::TransportFilter => {
+                            app.focused_block = FocusedBlock::LinkFilter;
+                            app.previous_focused_block = app.focused_block;
+                            app.link_filter.state.select(Some(0));
+                            app.transport_filter.state.select(None);
+                        }
+                        FocusedBlock::LinkFilter => {
                             app.focused_block = FocusedBlock::TrafficDirection;
                             app.previous_focused_block = app.focused_block;
                             app.traffic_direction_filter.state.select(Some(0));
-                            app.transort_filter.state.select(None);
+                            app.link_filter.state.select(None);
                         }
 
                         FocusedBlock::TrafficDirection => {
@@ -626,12 +653,18 @@ pub fn handle_key_events(
                             FocusedBlock::TransportFilter => {
                                 app.focused_block = FocusedBlock::NetworkFilter;
                                 app.network_filter.state.select(Some(0));
-                                app.transort_filter.state.select(None);
+                                app.transport_filter.state.select(None);
+                            }
+
+                            FocusedBlock::LinkFilter => {
+                                app.focused_block = FocusedBlock::TransportFilter;
+                                app.transport_filter.state.select(Some(0));
+                                app.link_filter.state.select(None);
                             }
 
                             FocusedBlock::TrafficDirection => {
-                                app.focused_block = FocusedBlock::TransportFilter;
-                                app.transort_filter.state.select(Some(0));
+                                app.focused_block = FocusedBlock::LinkFilter;
+                                app.link_filter.state.select(Some(0));
                                 app.traffic_direction_filter.state.select(None);
                             }
 
@@ -664,12 +697,18 @@ pub fn handle_key_events(
                         FocusedBlock::TransportFilter => {
                             app.focused_block = FocusedBlock::NetworkFilter;
                             app.network_filter.state.select(Some(0));
-                            app.transort_filter.state.select(None);
+                            app.transport_filter.state.select(None);
+                        }
+
+                        FocusedBlock::LinkFilter => {
+                            app.focused_block = FocusedBlock::TransportFilter;
+                            app.transport_filter.state.select(Some(0));
+                            app.link_filter.state.select(None);
                         }
 
                         FocusedBlock::TrafficDirection => {
-                            app.focused_block = FocusedBlock::TransportFilter;
-                            app.transort_filter.state.select(Some(0));
+                            app.focused_block = FocusedBlock::LinkFilter;
+                            app.link_filter.state.select(Some(0));
                             app.traffic_direction_filter.state.select(None);
                         }
 
@@ -712,18 +751,31 @@ pub fn handle_key_events(
                             }
                         }
                         FocusedBlock::TransportFilter => {
-                            if let Some(i) = app.transort_filter.state.selected() {
+                            if let Some(i) = app.transport_filter.state.selected() {
                                 let protocol = match i {
                                     0 => TransportProtocol::TCP,
                                     _ => TransportProtocol::UDP,
                                 };
 
-                                if app.transort_filter.selected_protocols.contains(&protocol) {
-                                    app.transort_filter
+                                if app.transport_filter.selected_protocols.contains(&protocol) {
+                                    app.transport_filter
                                         .selected_protocols
                                         .retain(|&p| p != protocol);
                                 } else {
-                                    app.transort_filter.selected_protocols.push(protocol);
+                                    app.transport_filter.selected_protocols.push(protocol);
+                                }
+                            }
+                        }
+
+                        FocusedBlock::LinkFilter => {
+                            if app.link_filter.state.selected().is_some() {
+                                let protocol = LinkProtocol::Arp;
+                                if app.link_filter.selected_protocols.contains(&protocol) {
+                                    app.link_filter
+                                        .selected_protocols
+                                        .retain(|&p| p != protocol);
+                                } else {
+                                    app.link_filter.selected_protocols.push(protocol);
                                 }
                             }
                         }
@@ -818,7 +870,7 @@ pub fn handle_key_events(
                         }
 
                         FocusedBlock::TransportFilter => {
-                            let i = match app.transort_filter.state.selected() {
+                            let i = match app.transport_filter.state.selected() {
                                 Some(i) => {
                                     if i < (NB_TRANSPORT_PROTOCOL - 1).into() {
                                         i + 1
@@ -829,7 +881,22 @@ pub fn handle_key_events(
                                 None => 0,
                             };
 
-                            app.transort_filter.state.select(Some(i));
+                            app.transport_filter.state.select(Some(i));
+                        }
+
+                        FocusedBlock::LinkFilter => {
+                            let i = match app.link_filter.state.selected() {
+                                Some(i) => {
+                                    if i < (NB_LINK_PROTOCOL - 1).into() {
+                                        i + 1
+                                    } else {
+                                        i
+                                    }
+                                }
+                                None => 0,
+                            };
+
+                            app.link_filter.state.select(Some(i));
                         }
 
                         FocusedBlock::TrafficDirection => {
@@ -902,7 +969,7 @@ pub fn handle_key_events(
                         }
 
                         FocusedBlock::TransportFilter => {
-                            let i = match app.transort_filter.state.selected() {
+                            let i = match app.transport_filter.state.selected() {
                                 Some(i) => {
                                     if i > 1 {
                                         i - 1
@@ -913,7 +980,22 @@ pub fn handle_key_events(
                                 None => 0,
                             };
 
-                            app.transort_filter.state.select(Some(i));
+                            app.transport_filter.state.select(Some(i));
+                        }
+
+                        FocusedBlock::LinkFilter => {
+                            let i = match app.link_filter.state.selected() {
+                                Some(i) => {
+                                    if i > 1 {
+                                        i - 1
+                                    } else {
+                                        0
+                                    }
+                                }
+                                None => 0,
+                            };
+
+                            app.link_filter.state.select(Some(i));
                         }
 
                         FocusedBlock::TrafficDirection => {

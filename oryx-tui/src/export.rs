@@ -2,7 +2,7 @@ use std::fs::{create_dir, OpenOptions};
 use std::io::prelude::*;
 use std::os::unix::fs::chown;
 
-use oryx_common::IpPacket;
+use oryx_common::ip::IpPacket;
 
 use crate::app::AppResult;
 

@@ -1,4 +1,5 @@
-use oryx_common::IpPacket;
+use oryx_common::ip::IpPacket;
+use oryx_common::AppPacket;
 use ratatui::layout::{Alignment, Constraint, Direction, Flex, Layout, Margin, Rect};
 use ratatui::style::{Color, Style, Stylize};
 use ratatui::text::{Line, Span};
@@ -16,6 +17,7 @@ use tui_big_text::{BigText, PixelSize};
 
 use crate::filters::direction::TrafficDirectionFilter;
 use crate::filters::fuzzy::{self, Fuzzy};
+use crate::filters::link::{LinkFilter, NB_LINK_PROTOCOL};
 use crate::filters::network::{NetworkFilter, NetworkProtocol, NB_NETWORK_PROTOCOL};
 use crate::filters::transport::{TransportFilter, TransportProtocol, NB_TRANSPORT_PROTOCOL};
 use crate::help::Help;
@@ -30,6 +32,7 @@ pub enum FocusedBlock {
     Interface,
     TransportFilter,
     NetworkFilter,
+    LinkFilter,
     TrafficDirection,
     Start,
     Help,
@@ -51,10 +54,11 @@ pub struct App {
     pub previous_focused_block: FocusedBlock,
     pub interface: Interface,
     pub network_filter: NetworkFilter,
-    pub transort_filter: TransportFilter,
+    pub transport_filter: TransportFilter,
+    pub link_filter: LinkFilter,
     pub traffic_direction_filter: TrafficDirectionFilter,
     pub start_sniffing: bool,
-    pub packets: Vec<IpPacket>,
+    pub packets: Vec<AppPacket>,
     pub packets_table_state: TableState,
     pub fuzzy: Fuzzy,
     pub notifications: Vec<Notification>,
@@ -81,10 +85,11 @@ impl App {
             previous_focused_block: FocusedBlock::Interface,
             interface: Interface::default(),
             network_filter: NetworkFilter::default(),
-            transort_filter: TransportFilter::default(),
+            transport_filter: TransportFilter::default(),
+            link_filter: LinkFilter::default(),
             traffic_direction_filter: TrafficDirectionFilter::default(),
             start_sniffing: false,
-            packets: Vec::with_capacity(40 * 1024 * 1024),
+            packets: Vec::with_capacity(AppPacket::LEN * 1024 * 1024),
             packets_table_state: TableState::default(),
             fuzzy: Fuzzy::default(),
             notifications: Vec::new(),
@@ -104,6 +109,7 @@ impl App {
                 interface_block,
                 network_filter_block,
                 transport_filter_block,
+                link_filter_block,
                 traffic_direction_block,
                 start_block,
             ) = {
@@ -113,13 +119,16 @@ impl App {
                         Constraint::Length(self.interface.interfaces.len() as u16 + 6),
                         Constraint::Length(NB_NETWORK_PROTOCOL + 4),
                         Constraint::Length(NB_TRANSPORT_PROTOCOL + 4),
+                        Constraint::Length(NB_LINK_PROTOCOL + 4),
                         Constraint::Length(6),
                         Constraint::Length(4),
                     ])
                     .margin(1)
                     .flex(Flex::SpaceAround)
                     .split(frame.area());
-                (chunks[0], chunks[1], chunks[2], chunks[3], chunks[4])
+                (
+                    chunks[0], chunks[1], chunks[2], chunks[3], chunks[4], chunks[5],
+                )
             };
 
             // interfaces
@@ -130,8 +139,11 @@ impl App {
             self.network_filter
                 .render(frame, network_filter_block, &self.focused_block);
 
-            self.transort_filter
+            self.transport_filter
                 .render(frame, transport_filter_block, &self.focused_block);
+
+            self.link_filter
+                .render(frame, link_filter_block, &self.focused_block);
 
             self.traffic_direction_filter.render(
                 frame,
@@ -236,7 +248,7 @@ impl App {
                 Row::new(vec![
                     Span::styled("Transport", Style::new().bold()),
                     Span::from(
-                        self.transort_filter
+                        self.transport_filter
                             .applied_protocols
                             .iter()
                             .map(|filter| filter.to_string())
@@ -285,7 +297,7 @@ impl App {
                     .direction(Direction::Vertical)
                     .constraints([
                         Constraint::Fill(1),
-                        Constraint::Length(32),
+                        Constraint::Length(40),
                         Constraint::Fill(1),
                     ])
                     .flex(ratatui::layout::Flex::SpaceBetween)
@@ -304,6 +316,7 @@ impl App {
                 let (
                     network_filter_block,
                     transport_filter_block,
+                    link_filter_block,
                     traffic_direction_block,
                     apply_block,
                 ) = {
@@ -312,13 +325,14 @@ impl App {
                         .constraints([
                             Constraint::Length(NB_NETWORK_PROTOCOL + 4),
                             Constraint::Length(NB_TRANSPORT_PROTOCOL + 4),
+                            Constraint::Length(NB_LINK_PROTOCOL + 4),
                             Constraint::Length(6),
                             Constraint::Length(4),
                         ])
                         .margin(1)
                         .flex(Flex::SpaceBetween)
                         .split(block);
-                    (chunks[0], chunks[1], chunks[2], chunks[3])
+                    (chunks[0], chunks[1], chunks[2], chunks[3], chunks[4])
                 };
 
                 frame.render_widget(Clear, block);
@@ -332,8 +346,11 @@ impl App {
                 self.network_filter
                     .render(frame, network_filter_block, &self.focused_block);
 
-                self.transort_filter
+                self.transport_filter
                     .render(frame, transport_filter_block, &self.focused_block);
+
+                self.link_filter
+                    .render(frame, link_filter_block, &self.focused_block);
 
                 self.traffic_direction_filter.render(
                     frame,
@@ -435,67 +452,97 @@ impl App {
         let packets: Vec<Row> = if self.fuzzy.is_enabled() & !self.fuzzy.filter.value().is_empty() {
             packets_to_display
                 .iter()
-                .map(|packet| match packet {
-                    IpPacket::Tcp(p) => Row::new(vec![
-                        fuzzy::highlight(self.fuzzy.filter.value(), p.src_ip.to_string()).blue(),
-                        fuzzy::highlight(self.fuzzy.filter.value(), p.src_port.to_string())
-                            .yellow(),
-                        fuzzy::highlight(self.fuzzy.filter.value(), p.dst_ip.to_string()).blue(),
-                        fuzzy::highlight(self.fuzzy.filter.value(), p.dst_port.to_string())
-                            .yellow(),
-                        fuzzy::highlight(self.fuzzy.filter.value(), "TCP".to_string()).cyan(),
-                    ]),
-                    IpPacket::Udp(p) => Row::new(vec![
-                        fuzzy::highlight(self.fuzzy.filter.value(), p.src_ip.to_string()).blue(),
-                        fuzzy::highlight(self.fuzzy.filter.value(), p.src_port.to_string())
-                            .yellow(),
-                        fuzzy::highlight(self.fuzzy.filter.value(), p.dst_ip.to_string()).blue(),
-                        fuzzy::highlight(self.fuzzy.filter.value(), p.dst_port.to_string())
-                            .yellow(),
-                        fuzzy::highlight(self.fuzzy.filter.value(), "UDP".to_string()).cyan(),
-                    ]),
-                    IpPacket::Icmp(p) => Row::new(vec![
-                        fuzzy::highlight(self.fuzzy.filter.value(), p.src_ip.to_string()).blue(),
+                .map(|app_packet| match app_packet {
+                    AppPacket::Arp(packet) => Row::new(vec![
+                        fuzzy::highlight(self.fuzzy.filter.value(), packet.src_mac.to_string())
+                            .blue(),
                         Cell::from(Line::from("-").centered()).yellow(),
-                        fuzzy::highlight(self.fuzzy.filter.value(), p.dst_ip.to_string()).blue(),
+                        fuzzy::highlight(self.fuzzy.filter.value(), packet.dst_mac.to_string())
+                            .blue(),
                         Cell::from(Line::from("-").centered()).yellow(),
-                        fuzzy::highlight(self.fuzzy.filter.value(), "ICMP".to_string()).cyan(),
+                        fuzzy::highlight(self.fuzzy.filter.value(), "ARP".to_string()).cyan(),
                     ]),
+                    AppPacket::Ip(packet) => match packet {
+                        IpPacket::Tcp(p) => Row::new(vec![
+                            fuzzy::highlight(self.fuzzy.filter.value(), p.src_ip.to_string())
+                                .blue(),
+                            fuzzy::highlight(self.fuzzy.filter.value(), p.src_port.to_string())
+                                .yellow(),
+                            fuzzy::highlight(self.fuzzy.filter.value(), p.dst_ip.to_string())
+                                .blue(),
+                            fuzzy::highlight(self.fuzzy.filter.value(), p.dst_port.to_string())
+                                .yellow(),
+                            fuzzy::highlight(self.fuzzy.filter.value(), "TCP".to_string()).cyan(),
+                        ]),
+                        IpPacket::Udp(p) => Row::new(vec![
+                            fuzzy::highlight(self.fuzzy.filter.value(), p.src_ip.to_string())
+                                .blue(),
+                            fuzzy::highlight(self.fuzzy.filter.value(), p.src_port.to_string())
+                                .yellow(),
+                            fuzzy::highlight(self.fuzzy.filter.value(), p.dst_ip.to_string())
+                                .blue(),
+                            fuzzy::highlight(self.fuzzy.filter.value(), p.dst_port.to_string())
+                                .yellow(),
+                            fuzzy::highlight(self.fuzzy.filter.value(), "UDP".to_string()).cyan(),
+                        ]),
+                        IpPacket::Icmp(p) => Row::new(vec![
+                            fuzzy::highlight(self.fuzzy.filter.value(), p.src_ip.to_string())
+                                .blue(),
+                            Cell::from(Line::from("-").centered()).yellow(),
+                            fuzzy::highlight(self.fuzzy.filter.value(), p.dst_ip.to_string())
+                                .blue(),
+                            Cell::from(Line::from("-").centered()).yellow(),
+                            fuzzy::highlight(self.fuzzy.filter.value(), "ICMP".to_string()).cyan(),
+                        ]),
+                    },
                 })
                 .collect()
         } else {
             packets_to_display
                 .iter()
-                .map(|packet| match packet {
-                    IpPacket::Tcp(p) => Row::new(vec![
-                        Span::from(p.src_ip.to_string()).into_centered_line().blue(),
-                        Span::from(p.src_port.to_string())
+                .map(|app_packet| match app_packet {
+                    AppPacket::Arp(packet) => Row::new(vec![
+                        Span::from(packet.src_mac.to_string())
                             .into_centered_line()
-                            .yellow(),
-                        Span::from(p.dst_ip.to_string()).into_centered_line().blue(),
-                        Span::from(p.dst_port.to_string())
-                            .into_centered_line()
-                            .yellow(),
-                        Span::from("TCP".to_string()).into_centered_line().cyan(),
-                    ]),
-                    IpPacket::Udp(p) => Row::new(vec![
-                        Span::from(p.src_ip.to_string()).into_centered_line().blue(),
-                        Span::from(p.src_port.to_string())
-                            .into_centered_line()
-                            .yellow(),
-                        Span::from(p.dst_ip.to_string()).into_centered_line().blue(),
-                        Span::from(p.dst_port.to_string())
-                            .into_centered_line()
-                            .yellow(),
-                        Span::from("UDP".to_string()).into_centered_line().cyan(),
-                    ]),
-                    IpPacket::Icmp(p) => Row::new(vec![
-                        Span::from(p.src_ip.to_string()).into_centered_line().blue(),
+                            .blue(),
                         Span::from("-").into_centered_line().yellow(),
-                        Span::from(p.dst_ip.to_string()).into_centered_line().blue(),
+                        Span::from(packet.dst_mac.to_string())
+                            .into_centered_line()
+                            .blue(),
                         Span::from("-").into_centered_line().yellow(),
-                        Span::from("ICMP".to_string()).into_centered_line().cyan(),
+                        Span::from("ARP".to_string()).into_centered_line().cyan(),
                     ]),
+                    AppPacket::Ip(packet) => match packet {
+                        IpPacket::Tcp(p) => Row::new(vec![
+                            Span::from(p.src_ip.to_string()).into_centered_line().blue(),
+                            Span::from(p.src_port.to_string())
+                                .into_centered_line()
+                                .yellow(),
+                            Span::from(p.dst_ip.to_string()).into_centered_line().blue(),
+                            Span::from(p.dst_port.to_string())
+                                .into_centered_line()
+                                .yellow(),
+                            Span::from("TCP".to_string()).into_centered_line().cyan(),
+                        ]),
+                        IpPacket::Udp(p) => Row::new(vec![
+                            Span::from(p.src_ip.to_string()).into_centered_line().blue(),
+                            Span::from(p.src_port.to_string())
+                                .into_centered_line()
+                                .yellow(),
+                            Span::from(p.dst_ip.to_string()).into_centered_line().blue(),
+                            Span::from(p.dst_port.to_string())
+                                .into_centered_line()
+                                .yellow(),
+                            Span::from("UDP".to_string()).into_centered_line().cyan(),
+                        ]),
+                        IpPacket::Icmp(p) => Row::new(vec![
+                            Span::from(p.src_ip.to_string()).into_centered_line().blue(),
+                            Span::from("-").into_centered_line().yellow(),
+                            Span::from(p.dst_ip.to_string()).into_centered_line().blue(),
+                            Span::from("-").into_centered_line().yellow(),
+                            Span::from("ICMP".to_string()).into_centered_line().cyan(),
+                        ]),
+                    },
                 })
                 .collect()
         };
@@ -637,79 +684,90 @@ impl App {
             .render(frame, stats_block, &self.interface.selected_interface.name);
     }
 
-    pub fn process(&mut self, packet: IpPacket) {
+    pub fn process(&mut self, app_packet: AppPacket) {
         if self.packets.len() == self.packets.capacity() {
             self.packets.reserve(1024 * 1024);
         }
-        match packet {
-            IpPacket::Tcp(p) => {
+        match app_packet {
+            AppPacket::Arp(_) => {
                 if self
-                    .transort_filter
+                    .link_filter
                     .applied_protocols
-                    .contains(&TransportProtocol::TCP)
+                    .contains(&crate::filters::link::LinkProtocol::Arp)
                 {
-                    match p.src_ip {
-                        core::net::IpAddr::V6(_) => {
-                            if self
-                                .network_filter
-                                .applied_protocols
-                                .contains(&NetworkProtocol::Ipv6)
-                            {
-                                self.packets.push(packet);
+                    self.packets.push(app_packet);
+                }
+            }
+            AppPacket::Ip(packet) => match packet {
+                IpPacket::Tcp(p) => {
+                    if self
+                        .transport_filter
+                        .applied_protocols
+                        .contains(&TransportProtocol::TCP)
+                    {
+                        match p.src_ip {
+                            core::net::IpAddr::V6(_) => {
+                                if self
+                                    .network_filter
+                                    .applied_protocols
+                                    .contains(&NetworkProtocol::Ipv6)
+                                {
+                                    self.packets.push(app_packet);
+                                }
                             }
-                        }
-                        core::net::IpAddr::V4(_) => {
-                            if self
-                                .network_filter
-                                .applied_protocols
-                                .contains(&NetworkProtocol::Ipv4)
-                            {
-                                self.packets.push(packet);
+                            core::net::IpAddr::V4(_) => {
+                                if self
+                                    .network_filter
+                                    .applied_protocols
+                                    .contains(&NetworkProtocol::Ipv4)
+                                {
+                                    self.packets.push(app_packet);
+                                }
                             }
                         }
                     }
                 }
-            }
-            IpPacket::Udp(p) => {
-                if self
-                    .transort_filter
-                    .applied_protocols
-                    .contains(&TransportProtocol::UDP)
-                {
-                    match p.src_ip {
-                        core::net::IpAddr::V6(_) => {
-                            if self
-                                .network_filter
-                                .applied_protocols
-                                .contains(&NetworkProtocol::Ipv6)
-                            {
-                                self.packets.push(packet);
+                IpPacket::Udp(p) => {
+                    if self
+                        .transport_filter
+                        .applied_protocols
+                        .contains(&TransportProtocol::UDP)
+                    {
+                        match p.src_ip {
+                            core::net::IpAddr::V6(_) => {
+                                if self
+                                    .network_filter
+                                    .applied_protocols
+                                    .contains(&NetworkProtocol::Ipv6)
+                                {
+                                    self.packets.push(app_packet);
+                                }
                             }
-                        }
-                        core::net::IpAddr::V4(_) => {
-                            if self
-                                .network_filter
-                                .applied_protocols
-                                .contains(&NetworkProtocol::Ipv4)
-                            {
-                                self.packets.push(packet);
+                            core::net::IpAddr::V4(_) => {
+                                if self
+                                    .network_filter
+                                    .applied_protocols
+                                    .contains(&NetworkProtocol::Ipv4)
+                                {
+                                    self.packets.push(app_packet);
+                                }
                             }
                         }
                     }
                 }
-            }
-            IpPacket::Icmp(_) => {
-                if self
-                    .network_filter
-                    .applied_protocols
-                    .contains(&NetworkProtocol::Icmp)
-                {
-                    self.packets.push(packet);
+                IpPacket::Icmp(_) => {
+                    if self
+                        .network_filter
+                        .applied_protocols
+                        .contains(&NetworkProtocol::Icmp)
+                    {
+                        self.packets.push(app_packet);
+                    }
                 }
-            }
+            },
         }
 
-        self.stats.refresh(&packet);
+        // self.stats.refresh(&packet);
     }
 
     pub fn tick(&mut self) {
