@@ -33,15 +33,20 @@ pub struct MacAddr(pub [u8; 6]);
 
 impl Display for MacAddr {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(
-            f,
-            "{:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x}",
-            self.0[0].to_be(),
-            self.0[1].to_be(),
-            self.0[2].to_be(),
-            self.0[3].to_be(),
-            self.0[4].to_be(),
-            self.0[5].to_be()
-        )
+        //FIX: workaround for the moment
+        if self.0.iter().all(|x| *x == 0) {
+            write!(f, "ff:ff:ff:ff:ff:ff",)
+        } else {
+            write!(
+                f,
+                "{:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x}",
+                self.0[0].to_be(),
+                self.0[1].to_be(),
+                self.0[2].to_be(),
+                self.0[3].to_be(),
+                self.0[4].to_be(),
+                self.0[5].to_be()
+            )
+        }
     }
 }
