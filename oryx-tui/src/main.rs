@@ -27,7 +27,7 @@ fn main() -> AppResult<()> {
 
     let backend = CrosstermBackend::new(io::stdout());
     let terminal = Terminal::new(backend)?;
-    let events = EventHandler::new(250);
+    let events = EventHandler::new(1_000);
     let mut tui = Tui::new(terminal, events);
     tui.init()?;
 
