@@ -767,7 +767,7 @@ impl App {
             },
         }
 
-        // self.stats.refresh(&packet);
+        self.stats.refresh(&app_packet);
     }
 
     pub fn tick(&mut self) {
