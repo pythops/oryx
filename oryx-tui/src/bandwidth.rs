@@ -18,7 +18,6 @@ pub struct BandwidthBuffer {
     incoming_max: usize,
     outgoing_max: usize,
     data: VecDeque<(usize, usize)>,
-    capacity: usize,
 }
 
 impl BandwidthBuffer {
@@ -27,12 +26,11 @@ impl BandwidthBuffer {
             incoming_max: 0,
             outgoing_max: 0,
             data: VecDeque::with_capacity(capacity),
-            capacity,
         }
     }
 
     fn push(&mut self, item: (usize, usize)) {
-        if self.data.len() == self.capacity {
+        if self.data.len() == self.data.capacity() {
             self.data.pop_back();
         }
         self.data.push_front(item);
@@ -69,17 +67,17 @@ impl Bandwidth {
         for line in lines {
             let splits: Vec<&str> = line.split_whitespace().collect();
 
-            let mut name = splits[0].to_string();
-            name.pop();
+            let mut interface_name = splits[0].to_string();
+            interface_name.pop();
 
-            let ring_buffer = BandwidthBuffer::new(20);
+            let bandwidth_buffer = BandwidthBuffer::new(20);
 
             let received: usize = splits[1].parse()?;
             let sent: usize = splits[9].parse()?;
 
-            current.insert(name.clone(), (received, sent));
+            current.insert(interface_name.clone(), (received, sent));
 
-            map.insert(name, ring_buffer);
+            map.insert(interface_name, bandwidth_buffer);
         }
 
         Ok(Self { fd, current, map })
@@ -98,15 +96,15 @@ impl Bandwidth {
         for line in lines {
             let splits: Vec<&str> = line.split_whitespace().collect();
 
-            let mut name = splits[0].to_string();
-            name.pop();
+            let mut interface_name = splits[0].to_string();
+            interface_name.pop();
 
             let received: usize = splits[1].parse()?;
             let sent: usize = splits[9].parse()?;
 
-            if let Some(v) = self.map.get_mut(&name) {
-                let current = self.current.get_mut(&name).unwrap();
-                v.push((
+            if let Some(bandwidth_buffer) = self.map.get_mut(&interface_name) {
+                let current = self.current.get_mut(&interface_name).unwrap();
+                bandwidth_buffer.push((
                     received.saturating_sub(current.0) / 1024,
                     sent.saturating_sub(current.1) / 1024,
                 ));
@@ -126,29 +124,31 @@ impl Bandwidth {
                 .split(bandwidth_block);
             (chunks[0], chunks[1])
         };
-        let (incoming_max_val, incoming_unit) = if let Some(v) = self.map.get(network_interface) {
-            match v.incoming_max {
-                n if (1024usize.pow(2)..1024usize.pow(3)).contains(&n) => {
-                    ((n / 1024usize.pow(2)) as f64, "GB")
+        let (incoming_max_val, incoming_unit) =
+            if let Some(bandwidth_buffer) = self.map.get(network_interface) {
+                match bandwidth_buffer.incoming_max {
+                    n if (1024usize.pow(2)..1024usize.pow(3)).contains(&n) => {
+                        ((n / 1024usize.pow(2)) as f64, "GB")
+                    }
+                    n if (1024..1024usize.pow(2)).contains(&n) => ((n / 1000) as f64, "MB"),
+                    n => (n as f64, "KB"),
                 }
-                n if (1024..1024usize.pow(2)).contains(&n) => ((n / 1024) as f64, "MB"),
-                n => (n as f64, "KB"),
-            }
-        } else {
-            (0f64, "KB")
-        };
+            } else {
+                (0f64, "KB")
+            };
 
-        let (outgoing_max_val, outgoing_unit) = if let Some(v) = self.map.get(network_interface) {
-            match v.outgoing_max {
-                n if (1024usize.pow(2)..1024usize.pow(3)).contains(&n) => {
-                    ((n / 1024usize.pow(2)) as f64, "GB")
+        let (outgoing_max_val, outgoing_unit) =
+            if let Some(bandwidth_buffer) = self.map.get(network_interface) {
+                match bandwidth_buffer.outgoing_max {
+                    n if (1024usize.pow(2)..1024usize.pow(3)).contains(&n) => {
+                        ((n / 1024usize.pow(2)) as f64, "GB")
+                    }
+                    n if (1024..1024usize.pow(2)).contains(&n) => ((n / 1024) as f64, "MB"),
+                    n => (n as f64, "KB"),
                 }
-                n if (1024..1024usize.pow(2)).contains(&n) => ((n / 1024) as f64, "MB"),
-                n => (n as f64, "KB"),
-            }
-        } else {
-            (0f64, "KB")
-        };
+            } else {
+                (0f64, "KB")
+            };
 
         let incoming_data = {
             if let Some(v) = self.map.get(network_interface) {
