@@ -1,5 +1,7 @@
 use core::{fmt::Display, net::IpAddr};
 
+use network_types::{icmp::IcmpHdr, tcp::TcpHdr, udp::UdpHdr};
+
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct TcpPacket {
@@ -56,6 +58,14 @@ pub enum IpPacket {
     Tcp(TcpPacket),
     Udp(UdpPacket),
     Icmp(IcmpPacket),
+}
+
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub enum ProtoHdr {
+    Tcp(TcpHdr),
+    Udp(UdpHdr),
+    Icmp(IcmpHdr),
 }
 
 impl Display for IpPacket {

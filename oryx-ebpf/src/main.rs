@@ -7,13 +7,16 @@ use aya_ebpf::{
     maps::RingBuf,
     programs::TcContext,
 };
-
+use core::mem;
 use network_types::{
     arp::ArpHdr,
     eth::{EthHdr, EtherType},
+    icmp::IcmpHdr,
     ip::{IpHdr, IpProto, Ipv4Hdr, Ipv6Hdr},
+    tcp::TcpHdr,
+    udp::UdpHdr,
 };
-use oryx_common::RawPacket;
+use oryx_common::{ip::ProtoHdr, RawPacket};
 
 #[map]
 static DATA: RingBuf = RingBuf::with_byte_size(4096 * 40, 0);
@@ -33,7 +36,18 @@ fn submit(packet: RawPacket) {
         buf.submit(0);
     }
 }
+#[inline]
+fn ptr_at<T>(ctx: &TcContext, offset: usize) -> Result<*const T, ()> {
+    let start = ctx.data();
+    let end = ctx.data_end();
+    let len = mem::size_of::<T>();
 
+    if start + offset + len > end {
+        return Err(());
+    }
+
+    Ok((start + offset) as *const T)
+}
 #[inline]
 fn process(ctx: TcContext) -> Result<i32, ()> {
     let ethhdr: EthHdr = ctx.load(0).map_err(|_| ())?;
@@ -42,8 +56,26 @@ fn process(ctx: TcContext) -> Result<i32, ()> {
         EtherType::Ipv4 => {
             let header: Ipv4Hdr = ctx.load(EthHdr::LEN).map_err(|_| ())?;
             match header.proto {
-                IpProto::Tcp | IpProto::Udp | IpProto::Icmp => {
-                    submit(RawPacket::Ip(IpHdr::V4(header)));
+                IpProto::Tcp => {
+                    let tcphdr: *const TcpHdr = ptr_at(&ctx, EthHdr::LEN + Ipv4Hdr::LEN)?;
+                    submit(RawPacket::Ip(
+                        IpHdr::V4(header),
+                        ProtoHdr::Tcp(unsafe { *tcphdr }),
+                    ));
+                }
+                IpProto::Udp => {
+                    let udphdr: *const UdpHdr = ptr_at(&ctx, EthHdr::LEN + Ipv4Hdr::LEN)?;
+                    submit(RawPacket::Ip(
+                        IpHdr::V4(header),
+                        ProtoHdr::Udp(unsafe { *udphdr }),
+                    ));
+                }
+                IpProto::Icmp => {
+                    let icmphdr: *const IcmpHdr = ptr_at(&ctx, EthHdr::LEN + Ipv4Hdr::LEN)?;
+                    submit(RawPacket::Ip(
+                        IpHdr::V4(header),
+                        ProtoHdr::Icmp(unsafe { *icmphdr }),
+                    ));
                 }
                 _ => {}
             }
@@ -51,8 +83,26 @@ fn process(ctx: TcContext) -> Result<i32, ()> {
         EtherType::Ipv6 => {
             let header: Ipv6Hdr = ctx.load(EthHdr::LEN).map_err(|_| ())?;
             match header.next_hdr {
-                IpProto::Tcp | IpProto::Udp | IpProto::Icmp => {
-                    submit(RawPacket::Ip(IpHdr::V6(header)));
+                IpProto::Tcp => {
+                    let tcphdr: *const TcpHdr = ptr_at(&ctx, EthHdr::LEN + Ipv4Hdr::LEN)?;
+                    submit(RawPacket::Ip(
+                        IpHdr::V6(header),
+                        ProtoHdr::Tcp(unsafe { *tcphdr }),
+                    ));
+                }
+                IpProto::Udp => {
+                    let udphdr: *const UdpHdr = ptr_at(&ctx, EthHdr::LEN + Ipv4Hdr::LEN)?;
+                    submit(RawPacket::Ip(
+                        IpHdr::V6(header),
+                        ProtoHdr::Udp(unsafe { *udphdr }),
+                    ));
+                }
+                IpProto::Icmp => {
+                    let icmphdr: *const IcmpHdr = ptr_at(&ctx, EthHdr::LEN + Ipv4Hdr::LEN)?;
+                    submit(RawPacket::Ip(
+                        IpHdr::V6(header),
+                        ProtoHdr::Icmp(unsafe { *icmphdr }),
+                    ));
                 }
                 _ => {}
             }

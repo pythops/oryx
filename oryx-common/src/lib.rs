@@ -21,7 +21,7 @@ pub mod ip;
 
 #[repr(C)]
 pub enum RawPacket {
-    Ip(IpHdr),
+    Ip(IpHdr, ip::ProtoHdr),
     Arp(ArpHdr),
 }
 
@@ -53,40 +53,40 @@ impl From<[u8; RawPacket::LEN]> for AppPacket {
     fn from(value: [u8; RawPacket::LEN]) -> Self {
         let raw_packet = value.as_ptr() as *const RawPacket;
         match unsafe { &*raw_packet } {
-            RawPacket::Ip(packet) => match packet {
-                IpHdr::V4(ipv4_packet) => match ipv4_packet.proto {
-                    IpProto::Tcp => {
+            RawPacket::Ip(packet, proto) => match packet {
+                IpHdr::V4(ipv4_packet) => match proto {
+                    ip::ProtoHdr::Tcp(header) => {
                         //FIX: This does not work
-                        let tcphdr =
-                            unsafe { raw_packet.add(mem::size_of::<Ipv4Hdr>()) } as *const TcpHdr;
+                        // let tcphdr =
+                        //     unsafe { raw_packet.add(mem::size_of::<Ipv4Hdr>()) } as *const TcpHdr;
 
                         let tcp_packet = TcpPacket {
                             src_ip: IpAddr::V4(Ipv4Addr::from(u32::from_be(ipv4_packet.src_addr))),
-                            src_port: u16::from_be(unsafe { (*tcphdr).source }),
+                            src_port: u16::from_be(header.source),
                             dst_ip: IpAddr::V4(Ipv4Addr::from(u32::from_be(ipv4_packet.dst_addr))),
-                            dst_port: u16::from_be(unsafe { (*tcphdr).dest }),
+                            dst_port: u16::from_be(header.dest),
                         };
                         AppPacket::Ip(IpPacket::Tcp(tcp_packet))
                     }
-                    IpProto::Udp => {
-                        let udphdr = unsafe {
-                            raw_packet.offset(Ipv4Hdr::LEN.try_into().unwrap()) as *const UdpHdr
-                        };
+                    ip::ProtoHdr::Udp(header) => {
+                        // let udphdr = unsafe {
+                        //     raw_packet.offset(Ipv4Hdr::LEN.try_into().unwrap()) as *const UdpHdr
+                        // };
 
                         let udp_packet = UdpPacket {
                             src_ip: IpAddr::V4(Ipv4Addr::from(u32::from_be(ipv4_packet.src_addr))),
-                            src_port: u16::from_be(unsafe { (*udphdr).source }),
+                            src_port: u16::from_be(header.source),
                             dst_ip: IpAddr::V4(Ipv4Addr::from(u32::from_be(ipv4_packet.dst_addr))),
-                            dst_port: u16::from_be(unsafe { (*udphdr).dest }),
+                            dst_port: u16::from_be(header.dest),
                         };
                         Self::Ip(IpPacket::Udp(udp_packet))
                     }
-                    IpProto::Icmp => {
-                        let icmphdr = unsafe {
-                            raw_packet.offset(Ipv4Hdr::LEN.try_into().unwrap()) as *const IcmpHdr
-                        };
+                    ip::ProtoHdr::Icmp(header) => {
+                        // let icmphdr = unsafe {
+                        //     raw_packet.offset(Ipv4Hdr::LEN.try_into().unwrap()) as *const IcmpHdr
+                        // };
 
-                        let icmp_type = match unsafe { (*icmphdr).type_ } {
+                        let icmp_type = match header.type_ {
                             0 => IcmpType::EchoRequest,
                             1 => IcmpType::EchoReply,
                             _ => IcmpType::DestinationUnreachable,

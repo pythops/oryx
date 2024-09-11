@@ -12,7 +12,7 @@ pub enum Event {
     Key(KeyEvent),
     Mouse(MouseEvent),
     Resize(u16, u16),
-    Packet([u8; 48]),
+    Packet([u8; 72]),
     Notification(Notification),
     Reset,
 }
