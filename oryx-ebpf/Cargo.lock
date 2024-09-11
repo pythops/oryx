@@ -86,8 +86,7 @@ dependencies = [
 [[package]]
 name = "network-types"
 version = "0.0.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "41b13eba62f530cd2ea031938ac4472b9b649694baa1e587c2a2fadc07844d3c"
+source = "git+https://github.com/vadorovsky/network-types.git?rev=e0ee8d5#e0ee8d50a446923fdcbafd36a99921a0f3aca7fd"
 
 [[package]]
 name = "num_enum"
@@ -112,6 +111,9 @@ dependencies = [
 [[package]]
 name = "oryx-common"
 version = "0.1.0"
+dependencies = [
+ "network-types",
+]
 
 [[package]]
 name = "oryx-ebpf"
