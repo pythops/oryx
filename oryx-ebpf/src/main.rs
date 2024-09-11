@@ -84,21 +84,21 @@ fn process(ctx: TcContext) -> Result<i32, ()> {
             let header: Ipv6Hdr = ctx.load(EthHdr::LEN).map_err(|_| ())?;
             match header.next_hdr {
                 IpProto::Tcp => {
-                    let tcphdr: *const TcpHdr = ptr_at(&ctx, EthHdr::LEN + Ipv4Hdr::LEN)?;
+                    let tcphdr: *const TcpHdr = ptr_at(&ctx, EthHdr::LEN + Ipv6Hdr::LEN)?;
                     submit(RawPacket::Ip(
                         IpHdr::V6(header),
                         ProtoHdr::Tcp(unsafe { *tcphdr }),
                     ));
                 }
                 IpProto::Udp => {
-                    let udphdr: *const UdpHdr = ptr_at(&ctx, EthHdr::LEN + Ipv4Hdr::LEN)?;
+                    let udphdr: *const UdpHdr = ptr_at(&ctx, EthHdr::LEN + Ipv6Hdr::LEN)?;
                     submit(RawPacket::Ip(
                         IpHdr::V6(header),
                         ProtoHdr::Udp(unsafe { *udphdr }),
                     ));
                 }
                 IpProto::Icmp => {
-                    let icmphdr: *const IcmpHdr = ptr_at(&ctx, EthHdr::LEN + Ipv4Hdr::LEN)?;
+                    let icmphdr: *const IcmpHdr = ptr_at(&ctx, EthHdr::LEN + Ipv6Hdr::LEN)?;
                     submit(RawPacket::Ip(
                         IpHdr::V6(header),
                         ProtoHdr::Icmp(unsafe { *icmphdr }),

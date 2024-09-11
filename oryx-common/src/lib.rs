@@ -7,14 +7,8 @@ use core::{
 };
 
 use arp::{ArpPacket, ArpType, MacAddr};
-use ip::{IcmpPacket, IcmpType, IpPacket, TcpPacket, UdpPacket};
-use network_types::{
-    arp::ArpHdr,
-    icmp::IcmpHdr,
-    ip::{IpHdr, IpProto, Ipv4Hdr},
-    tcp::TcpHdr,
-    udp::UdpHdr,
-};
+use ip::{IcmpPacket, IcmpType, IpPacket, ProtoHdr, TcpPacket, UdpPacket};
+use network_types::{arp::ArpHdr, ip::IpHdr};
 
 pub mod arp;
 pub mod ip;
@@ -55,7 +49,7 @@ impl From<[u8; RawPacket::LEN]> for AppPacket {
         match unsafe { &*raw_packet } {
             RawPacket::Ip(packet, proto) => match packet {
                 IpHdr::V4(ipv4_packet) => match proto {
-                    ip::ProtoHdr::Tcp(header) => {
+                    ProtoHdr::Tcp(header) => {
                         let tcp_packet = TcpPacket {
                             src_ip: IpAddr::V4(Ipv4Addr::from(u32::from_be(ipv4_packet.src_addr))),
                             src_port: u16::from_be(header.source),
@@ -64,7 +58,7 @@ impl From<[u8; RawPacket::LEN]> for AppPacket {
                         };
                         AppPacket::Ip(IpPacket::Tcp(tcp_packet))
                     }
-                    ip::ProtoHdr::Udp(header) => {
+                    ProtoHdr::Udp(header) => {
                         let udp_packet = UdpPacket {
                             src_ip: IpAddr::V4(Ipv4Addr::from(u32::from_be(ipv4_packet.src_addr))),
                             src_port: u16::from_be(header.source),
@@ -73,7 +67,7 @@ impl From<[u8; RawPacket::LEN]> for AppPacket {
                         };
                         Self::Ip(IpPacket::Udp(udp_packet))
                     }
-                    ip::ProtoHdr::Icmp(header) => {
+                    ProtoHdr::Icmp(header) => {
                         let icmp_type = match header.type_ {
                             0 => IcmpType::EchoRequest,
                             1 => IcmpType::EchoReply,
@@ -88,39 +82,27 @@ impl From<[u8; RawPacket::LEN]> for AppPacket {
                         Self::Ip(IpPacket::Icmp(icmp_packet))
                     }
                 },
-                IpHdr::V6(ipv6_packet) => match ipv6_packet.next_hdr {
-                    IpProto::Tcp => {
-                        let tcphdr = unsafe {
-                            raw_packet.offset(Ipv4Hdr::LEN.try_into().unwrap()) as *const TcpHdr
-                        };
-
+                IpHdr::V6(ipv6_packet) => match proto {
+                    ProtoHdr::Tcp(header) => {
                         let tcp_packet = TcpPacket {
                             src_ip: IpAddr::V6(ipv6_packet.src_addr()),
-                            src_port: u16::from_be(unsafe { (*tcphdr).source }),
+                            src_port: u16::from_be(header.source),
                             dst_ip: IpAddr::V6(ipv6_packet.dst_addr()),
-                            dst_port: u16::from_be(unsafe { (*tcphdr).dest }),
+                            dst_port: u16::from_be(header.dest),
                         };
                         Self::Ip(IpPacket::Tcp(tcp_packet))
                     }
-                    IpProto::Udp => {
-                        let udphdr = unsafe {
-                            raw_packet.offset(Ipv4Hdr::LEN.try_into().unwrap()) as *const UdpHdr
-                        };
-
+                    ProtoHdr::Udp(header) => {
                         let udp_packet = UdpPacket {
                             src_ip: IpAddr::V6(ipv6_packet.src_addr()),
-                            src_port: u16::from_be(unsafe { (*udphdr).source }),
+                            src_port: u16::from_be(header.source),
                             dst_ip: IpAddr::V6(ipv6_packet.dst_addr()),
-                            dst_port: u16::from_be(unsafe { (*udphdr).dest }),
+                            dst_port: u16::from_be(header.dest),
                         };
                         Self::Ip(IpPacket::Udp(udp_packet))
                     }
-                    IpProto::Icmp => {
-                        let icmphdr = unsafe {
-                            raw_packet.offset(Ipv4Hdr::LEN.try_into().unwrap()) as *const IcmpHdr
-                        };
-
-                        let icmp_type = match unsafe { (*icmphdr).type_ } {
+                    ProtoHdr::Icmp(header) => {
+                        let icmp_type = match header.type_ {
                             0 => IcmpType::EchoRequest,
                             1 => IcmpType::EchoReply,
                             _ => IcmpType::DestinationUnreachable,
@@ -133,7 +115,6 @@ impl From<[u8; RawPacket::LEN]> for AppPacket {
                         };
                         Self::Ip(IpPacket::Icmp(icmp_packet))
                     }
-                    _ => unreachable!(),
                 },
             },
             RawPacket::Arp(packet) => {
