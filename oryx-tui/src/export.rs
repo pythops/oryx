@@ -39,7 +39,10 @@ pub fn export(packets: &[AppPacket]) -> AppResult<()> {
                 writeln!(
                     file,
                     "{:39}  {:^11}  {:39}  {:^11}  ARP",
-                    p.src_mac, "-", p.dst_mac, "-"
+                    p.src_mac.to_string(),
+                    "-",
+                    p.dst_mac.to_string(),
+                    "-"
                 )?;
             }
             AppPacket::Ip(packet) => match packet {
