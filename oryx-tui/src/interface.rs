@@ -7,7 +7,11 @@ use ratatui::{
     Frame,
 };
 
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+use std::{
+    fs::{self},
+    net::{IpAddr, Ipv4Addr, Ipv6Addr},
+    path::PathBuf,
+};
 
 use std::ffi::CStr;
 
@@ -18,6 +22,7 @@ pub struct NetworkInterface {
     pub name: String,
     pub is_up: bool,
     pub addresses: Vec<IpAddr>,
+    pub mac_address: Option<String>,
 }
 
 impl NetworkInterface {
@@ -38,11 +43,17 @@ impl NetworkInterface {
                         let cstr_name = CStr::from_ptr(ifa_name);
                         let interface_name = cstr_name.to_str().unwrap();
 
+                        let interface_path = PathBuf::from("/sys/class/net")
+                            .join(interface_name)
+                            .join("address");
+                        let mac_address = fs::read_to_string(interface_path).ok();
+
                         if !interfaces.iter().any(|i| i.name == interface_name) {
                             interfaces.push(NetworkInterface {
                                 name: interface_name.to_string(),
                                 addresses: Vec::new(),
                                 is_up: (ifa_flags as i32 & IFF_UP) != 0,
+                                mac_address,
                             });
                         }
 

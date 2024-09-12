@@ -69,7 +69,7 @@ impl Notification {
         let notif = Notification {
             message: message.to_string(),
             level,
-            ttl: 16,
+            ttl: 3,
         };
 
         sender.send(Event::Notification(notif))?;

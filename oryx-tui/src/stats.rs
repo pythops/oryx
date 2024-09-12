@@ -1,8 +1,9 @@
 use dns_lookup::lookup_addr;
+use oryx_common::AppPacket;
 use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr};
 
-use oryx_common::IpPacket;
+use oryx_common::ip::IpPacket;
 
 use ratatui::layout::{Alignment, Constraint, Direction, Flex, Layout, Margin, Rect};
 use ratatui::style::{Color, Style, Stylize};
@@ -20,6 +21,7 @@ pub struct Stats {
     pub filtered: usize,
     pub network: NetworkStats,
     pub transport: TransportStats,
+    pub link: LinkStats,
     pub addresses: HashMap<Ipv4Addr, (Option<String>, usize)>,
     pub bandwidth: Option<Bandwidth>,
 }
@@ -37,6 +39,7 @@ impl Stats {
             filtered: 0,
             network: NetworkStats::default(),
             transport: TransportStats::default(),
+            link: LinkStats::default(),
             addresses: HashMap::with_capacity(1024),
             bandwidth: Bandwidth::new().ok(),
         }
@@ -47,14 +50,36 @@ impl Stats {
         items.into_iter().take(10).collect()
     }
 
-    pub fn refresh(&mut self, packet: &IpPacket) {
+    pub fn refresh(&mut self, packet: &AppPacket) {
         match packet {
-            IpPacket::Tcp(p) => {
-                match p.src_ip {
-                    std::net::IpAddr::V4(ip) => {
-                        self.network.ipv4 += 1;
-                        self.transport.tcp += 1;
+            AppPacket::Arp(_) => {
+                self.link.arp += 1;
+            }
+            AppPacket::Ip(packet) => match packet {
+                IpPacket::Tcp(p) => {
+                    match p.src_ip {
+                        std::net::IpAddr::V4(ip) => {
+                            self.network.ipv4 += 1;
+                            self.transport.tcp += 1;
 
+                            if !ip.is_private() && !ip.is_loopback() {
+                                if let Some((_, counts)) = self.addresses.get_mut(&ip) {
+                                    *counts += 1;
+                                } else if let Ok(host) = lookup_addr(&IpAddr::V4(ip)) {
+                                    self.addresses.insert(ip, (Some(host), 1));
+                                } else {
+                                    self.addresses.insert(ip, (None, 1));
+                                }
+                            }
+                        }
+
+                        std::net::IpAddr::V6(_) => {
+                            self.network.ipv6 += 1;
+                            self.transport.tcp += 1;
+                        }
+                    };
+
+                    if let std::net::IpAddr::V4(ip) = p.dst_ip {
                         if !ip.is_private() && !ip.is_loopback() {
                             if let Some((_, counts)) = self.addresses.get_mut(&ip) {
                                 *counts += 1;
@@ -64,32 +89,32 @@ impl Stats {
                                 self.addresses.insert(ip, (None, 1));
                             }
                         }
-                    }
+                    };
+                }
+                IpPacket::Udp(p) => {
+                    match p.src_ip {
+                        std::net::IpAddr::V4(ip) => {
+                            self.network.ipv4 += 1;
+                            self.transport.udp += 1;
 
-                    std::net::IpAddr::V6(_) => {
-                        self.network.ipv6 += 1;
-                        self.transport.tcp += 1;
-                    }
-                };
-
-                if let std::net::IpAddr::V4(ip) = p.dst_ip {
-                    if !ip.is_private() && !ip.is_loopback() {
-                        if let Some((_, counts)) = self.addresses.get_mut(&ip) {
-                            *counts += 1;
-                        } else if let Ok(host) = lookup_addr(&IpAddr::V4(ip)) {
-                            self.addresses.insert(ip, (Some(host), 1));
-                        } else {
-                            self.addresses.insert(ip, (None, 1));
+                            if !ip.is_private() && !ip.is_loopback() {
+                                if let Some((_, counts)) = self.addresses.get_mut(&ip) {
+                                    *counts += 1;
+                                } else if let Ok(host) = lookup_addr(&IpAddr::V4(ip)) {
+                                    self.addresses.insert(ip, (Some(host), 1));
+                                } else {
+                                    self.addresses.insert(ip, (None, 1));
+                                }
+                            }
                         }
-                    }
-                };
-            }
-            IpPacket::Udp(p) => {
-                match p.src_ip {
-                    std::net::IpAddr::V4(ip) => {
-                        self.network.ipv4 += 1;
-                        self.transport.udp += 1;
 
+                        std::net::IpAddr::V6(_) => {
+                            self.network.ipv6 += 1;
+                            self.transport.udp += 1;
+                        }
+                    };
+
+                    if let std::net::IpAddr::V4(ip) = p.dst_ip {
                         if !ip.is_private() && !ip.is_loopback() {
                             if let Some((_, counts)) = self.addresses.get_mut(&ip) {
                                 *counts += 1;
@@ -99,53 +124,36 @@ impl Stats {
                                 self.addresses.insert(ip, (None, 1));
                             }
                         }
-                    }
+                    };
+                }
+                IpPacket::Icmp(p) => {
+                    self.network.icmp += 1;
 
-                    std::net::IpAddr::V6(_) => {
-                        self.network.ipv6 += 1;
-                        self.transport.udp += 1;
-                    }
-                };
-
-                if let std::net::IpAddr::V4(ip) = p.dst_ip {
-                    if !ip.is_private() && !ip.is_loopback() {
-                        if let Some((_, counts)) = self.addresses.get_mut(&ip) {
-                            *counts += 1;
-                        } else if let Ok(host) = lookup_addr(&IpAddr::V4(ip)) {
-                            self.addresses.insert(ip, (Some(host), 1));
-                        } else {
-                            self.addresses.insert(ip, (None, 1));
+                    if let std::net::IpAddr::V4(ip) = p.src_ip {
+                        if !ip.is_private() && !ip.is_loopback() {
+                            if let Some((_, counts)) = self.addresses.get_mut(&ip) {
+                                *counts += 1;
+                            } else if let Ok(host) = lookup_addr(&IpAddr::V4(ip)) {
+                                self.addresses.insert(ip, (Some(host), 1));
+                            } else {
+                                self.addresses.insert(ip, (None, 1));
+                            }
                         }
-                    }
-                };
-            }
-            IpPacket::Icmp(p) => {
-                self.network.icmp += 1;
+                    };
 
-                if let std::net::IpAddr::V4(ip) = p.src_ip {
-                    if !ip.is_private() && !ip.is_loopback() {
-                        if let Some((_, counts)) = self.addresses.get_mut(&ip) {
-                            *counts += 1;
-                        } else if let Ok(host) = lookup_addr(&IpAddr::V4(ip)) {
-                            self.addresses.insert(ip, (Some(host), 1));
-                        } else {
-                            self.addresses.insert(ip, (None, 1));
+                    if let std::net::IpAddr::V4(ip) = p.dst_ip {
+                        if !ip.is_private() && !ip.is_loopback() {
+                            if let Some((_, counts)) = self.addresses.get_mut(&ip) {
+                                *counts += 1;
+                            } else if let Ok(host) = lookup_addr(&IpAddr::V4(ip)) {
+                                self.addresses.insert(ip, (Some(host), 1));
+                            } else {
+                                self.addresses.insert(ip, (None, 1));
+                            }
                         }
-                    }
-                };
-
-                if let std::net::IpAddr::V4(ip) = p.dst_ip {
-                    if !ip.is_private() && !ip.is_loopback() {
-                        if let Some((_, counts)) = self.addresses.get_mut(&ip) {
-                            *counts += 1;
-                        } else if let Ok(host) = lookup_addr(&IpAddr::V4(ip)) {
-                            self.addresses.insert(ip, (Some(host), 1));
-                        } else {
-                            self.addresses.insert(ip, (None, 1));
-                        }
-                    }
-                };
-            }
+                    };
+                }
+            },
         }
 
         self.total += 1;
@@ -161,7 +169,7 @@ impl Stats {
             (chunks[0], chunks[1])
         };
 
-        let (address_block, network_block, transport_block) = {
+        let (address_block, network_block, transport_block, link_block) = {
             let chunks = Layout::default()
                 .direction(Direction::Horizontal)
                 .constraints(
@@ -169,13 +177,14 @@ impl Stats {
                         Constraint::Max(60),
                         Constraint::Length(20),
                         Constraint::Length(12),
+                        Constraint::Length(10),
                     ]
                     .as_ref(),
                 )
                 .margin(1)
                 .flex(Flex::SpaceBetween)
                 .split(barchart_block);
-            (chunks[0], chunks[1], chunks[2])
+            (chunks[0], chunks[1], chunks[2], chunks[3])
         };
 
         frame.render_widget(
@@ -201,9 +210,31 @@ impl Stats {
             }),
         );
 
+        let link_chart = BarChart::default()
+            .bar_width(3)
+            .bar_gap(1)
+            .data(
+                BarGroup::default().bars(&[Bar::default()
+                    .label("ARP".into())
+                    .style(Style::new().fg(Color::LightYellow))
+                    .value_style(Style::new().fg(Color::Black).bg(Color::LightYellow))
+                    .text_value(if self.total != 0 {
+                        format!("{}%", self.link.arp * 100 / self.total)
+                    } else {
+                        "0%".to_string()
+                    })
+                    .value(if self.total != 0 {
+                        (self.link.arp * 100 / self.total) as u64
+                    } else {
+                        0
+                    })]),
+            )
+            .block(Block::new().padding(Padding::horizontal(1)))
+            .max(100);
+
         let transport_chart = BarChart::default()
             .bar_width(3)
-            .bar_gap(4)
+            .bar_gap(1)
             .data(
                 BarGroup::default().bars(&[
                     Bar::default()
@@ -241,7 +272,7 @@ impl Stats {
 
         let network_chart = BarChart::default()
             .bar_width(4)
-            .bar_gap(3)
+            .bar_gap(1)
             .data(
                 BarGroup::default().bars(&[
                     Bar::default()
@@ -322,6 +353,7 @@ impl Stats {
         frame.render_widget(addresses_chart, address_block);
         frame.render_widget(transport_chart, transport_block);
         frame.render_widget(network_chart, network_block);
+        frame.render_widget(link_chart, link_block);
 
         if let Some(bandwidth) = &self.bandwidth {
             bandwidth.render(frame, graph_block, network_interface)
@@ -341,4 +373,9 @@ pub struct NetworkStats {
 pub struct TransportStats {
     pub tcp: usize,
     pub udp: usize,
+}
+
+#[derive(Debug, Default)]
+pub struct LinkStats {
+    pub arp: usize,
 }

@@ -4,6 +4,7 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 use std::io;
 
 use clap::{crate_description, crate_version, Command};
+use oryx_common::AppPacket;
 use oryx_tui::app::{App, AppResult};
 use oryx_tui::event::{Event, EventHandler};
 use oryx_tui::handler::handle_key_events;
@@ -26,7 +27,7 @@ fn main() -> AppResult<()> {
 
     let backend = CrosstermBackend::new(io::stdout());
     let terminal = Terminal::new(backend)?;
-    let events = EventHandler::new(250);
+    let events = EventHandler::new(1_000);
     let mut tui = Tui::new(terminal, events);
     tui.init()?;
 
@@ -38,7 +39,7 @@ fn main() -> AppResult<()> {
                 handle_key_events(key_event, &mut app, tui.events.sender.clone())?
             }
             Event::Packet(packet) => {
-                app.process(packet);
+                app.process(AppPacket::from(packet));
             }
             Event::Notification(notification) => {
                 app.notifications.push(notification);

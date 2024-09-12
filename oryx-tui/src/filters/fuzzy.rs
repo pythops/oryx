@@ -5,25 +5,25 @@ use ratatui::{
 };
 use tui_input::Input;
 
-use oryx_common::IpPacket;
+use oryx_common::AppPacket;
 
 #[derive(Debug, Default)]
 pub struct Fuzzy {
     enabled: bool,
     paused: bool,
     pub filter: Input,
-    pub packets: Vec<IpPacket>,
+    pub packets: Vec<AppPacket>,
     pub scroll_state: TableState,
     pub packet_end_index: usize,
 }
 
 impl Fuzzy {
-    pub fn find(&mut self, packets: &[IpPacket]) {
+    pub fn find(&mut self, packets: &[AppPacket]) {
         self.packets = packets
             .iter()
             .copied()
             .filter(|p| p.to_string().contains(self.filter.value()))
-            .collect::<Vec<IpPacket>>();
+            .collect::<Vec<AppPacket>>();
     }
 
     pub fn enable(&mut self) {

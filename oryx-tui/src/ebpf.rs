@@ -10,7 +10,7 @@ use aya::maps::{MapData, RingBuf};
 use aya::programs::{tc, SchedClassifier, TcAttachType};
 use aya::{include_bytes_aligned, Bpf};
 use mio::{Events, Interest, Poll, Registry, Token};
-use oryx_common::IpPacket;
+use oryx_common::RawPacket;
 
 use crate::event::Event;
 use crate::notification::{Notification, NotificationLevel};
@@ -166,8 +166,9 @@ impl Ebpf {
                                 if terminate.load(std::sync::atomic::Ordering::Relaxed) {
                                     break;
                                 }
-                                let packet: [u8; 40] = item.to_owned().try_into().unwrap();
-                                sender.send(Event::Packet(IpPacket::from(packet))).ok();
+                                let packet: [u8; RawPacket::LEN] =
+                                    item.to_owned().try_into().unwrap();
+                                sender.send(Event::Packet(packet)).ok();
                             }
                         }
                     }
@@ -283,8 +284,9 @@ impl Ebpf {
                                 if terminate.load(std::sync::atomic::Ordering::Relaxed) {
                                     break;
                                 }
-                                let packet: [u8; 40] = item.to_owned().try_into().unwrap();
-                                sender.send(Event::Packet(IpPacket::from(packet))).ok();
+                                let packet: [u8; RawPacket::LEN] =
+                                    item.to_owned().try_into().unwrap();
+                                sender.send(Event::Packet(packet)).ok();
                             }
                         }
                     }

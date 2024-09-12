@@ -2,11 +2,12 @@ use std::fs::{create_dir, OpenOptions};
 use std::io::prelude::*;
 use std::os::unix::fs::chown;
 
-use oryx_common::IpPacket;
+use oryx_common::ip::IpPacket;
+use oryx_common::AppPacket;
 
 use crate::app::AppResult;
 
-pub fn export(packets: &[IpPacket]) -> AppResult<()> {
+pub fn export(packets: &[AppPacket]) -> AppResult<()> {
     let uid = unsafe { libc::geteuid() };
 
     let oryx_export_dir = dirs::home_dir().unwrap().join("oryx");
@@ -34,27 +35,39 @@ pub fn export(packets: &[IpPacket]) -> AppResult<()> {
     )?;
     for packet in packets {
         match packet {
-            IpPacket::Tcp(p) => {
+            AppPacket::Arp(p) => {
                 writeln!(
                     file,
-                    "{:39}  {:<11}  {:39}  {:<11}  TCP",
-                    p.src_ip, p.src_port, p.dst_ip, p.dst_port
+                    "{:39}  {:^11}  {:39}  {:^11}  ARP",
+                    p.src_mac.to_string(),
+                    "-",
+                    p.dst_mac.to_string(),
+                    "-"
                 )?;
             }
-            IpPacket::Udp(p) => {
-                writeln!(
-                    file,
-                    "{:39}  {:<11}  {:39}  {:<11}  UDP",
-                    p.src_ip, p.src_port, p.dst_ip, p.dst_port
-                )?;
-            }
-            IpPacket::Icmp(p) => {
-                writeln!(
-                    file,
-                    "{:39}  {:^11}  {:39}  {:^11}  ICMP",
-                    p.src_ip, "-", p.dst_ip, "-"
-                )?;
-            }
+            AppPacket::Ip(packet) => match packet {
+                IpPacket::Tcp(p) => {
+                    writeln!(
+                        file,
+                        "{:39}  {:<11}  {:39}  {:<11}  TCP",
+                        p.src_ip, p.src_port, p.dst_ip, p.dst_port
+                    )?;
+                }
+                IpPacket::Udp(p) => {
+                    writeln!(
+                        file,
+                        "{:39}  {:<11}  {:39}  {:<11}  UDP",
+                        p.src_ip, p.src_port, p.dst_ip, p.dst_port
+                    )?;
+                }
+                IpPacket::Icmp(p) => {
+                    writeln!(
+                        file,
+                        "{:39}  {:^11}  {:39}  {:^11}  ICMP",
+                        p.src_ip, "-", p.dst_ip, "-"
+                    )?;
+                }
+            },
         }
     }
 
