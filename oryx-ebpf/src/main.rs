@@ -19,7 +19,7 @@ use network_types::{
 use oryx_common::{ip::ProtoHdr, RawPacket};
 
 #[map]
-static DATA: RingBuf = RingBuf::with_byte_size(4096 * 40, 0);
+static DATA: RingBuf = RingBuf::with_byte_size(4096 * RawPacket::LEN as u32, 0);
 
 #[classifier]
 pub fn oryx(ctx: TcContext) -> i32 {
