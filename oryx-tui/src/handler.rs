@@ -363,13 +363,20 @@ pub fn handle_key_events(
             KeyCode::Char('f') => {
                 if app.focused_block != FocusedBlock::Help && app.start_sniffing {
                     app.update_filters = true;
+
                     app.focused_block = FocusedBlock::NetworkFilter;
+
                     app.network_filter.selected_protocols =
                         app.network_filter.applied_protocols.clone();
+
                     app.transport_filter.selected_protocols =
                         app.transport_filter.applied_protocols.clone();
+
+                    app.link_filter.selected_protocols = app.link_filter.applied_protocols.clone();
+
                     app.traffic_direction_filter.selected_direction =
                         app.traffic_direction_filter.applied_direction.clone();
+
                     app.network_filter.state = TableState::default().with_selected(0);
                 }
             }

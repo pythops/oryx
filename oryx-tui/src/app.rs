@@ -168,7 +168,7 @@ impl App {
             let (settings_block, mode_block) = {
                 let chunks = Layout::default()
                     .direction(Direction::Vertical)
-                    .constraints([Constraint::Length(7), Constraint::Fill(1)])
+                    .constraints([Constraint::Length(8), Constraint::Fill(1)])
                     .split(frame.area());
                 (chunks[0], chunks[1])
             };
@@ -189,6 +189,16 @@ impl App {
                 Row::new(vec![
                     Span::styled("Name", Style::new().bold()),
                     Span::from(self.interface.selected_interface.name.clone()),
+                ]),
+                Row::new(vec![
+                    Span::styled("Mac", Style::new().bold()),
+                    Span::from(
+                        self.interface
+                            .selected_interface
+                            .mac_address
+                            .clone()
+                            .unwrap_or("-".to_string()),
+                    ),
                 ]),
                 Row::new(vec![
                     Span::styled("IPv4", Style::new().bold()),
@@ -249,6 +259,17 @@ impl App {
                     Span::styled("Transport", Style::new().bold()),
                     Span::from(
                         self.transport_filter
+                            .applied_protocols
+                            .iter()
+                            .map(|filter| filter.to_string())
+                            .collect::<Vec<String>>()
+                            .join(" "),
+                    ),
+                ]),
+                Row::new(vec![
+                    Span::styled("Link", Style::new().bold()),
+                    Span::from(
+                        self.link_filter
                             .applied_protocols
                             .iter()
                             .map(|filter| filter.to_string())
