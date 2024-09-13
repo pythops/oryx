@@ -248,7 +248,7 @@ impl App {
                     Line::styled("Network", Style::new().bold()),
                     Line::from_iter(NetworkFilter::default().selected_protocols.iter().map(
                         |filter| {
-                            if self.network_filter.applied_protocols.contains(&filter) {
+                            if self.network_filter.applied_protocols.contains(filter) {
                                 Span::styled(
                                     format!(" {}  ", filter),
                                     Style::default().light_green(),
@@ -266,7 +266,7 @@ impl App {
                     Line::styled("Transport", Style::new().bold()),
                     Line::from_iter(TransportFilter::default().selected_protocols.iter().map(
                         |filter| {
-                            if self.transport_filter.applied_protocols.contains(&filter) {
+                            if self.transport_filter.applied_protocols.contains(filter) {
                                 Span::styled(
                                     format!(" {}  ", filter),
                                     Style::default().light_green(),
@@ -284,7 +284,7 @@ impl App {
                     Line::styled("Link", Style::new().bold()),
                     Line::from_iter(LinkFilter::default().selected_protocols.iter().map(
                         |filter| {
-                            if self.link_filter.applied_protocols.contains(&filter) {
+                            if self.link_filter.applied_protocols.contains(filter) {
                                 Span::styled(
                                     format!(" {}  ", filter),
                                     Style::default().light_green(),
@@ -308,7 +308,7 @@ impl App {
                                 if self
                                     .traffic_direction_filter
                                     .applied_direction
-                                    .contains(&filter)
+                                    .contains(filter)
                                 {
                                     Span::styled(
                                         format!("󰞁 {}  ", filter),
