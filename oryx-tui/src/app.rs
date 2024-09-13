@@ -245,47 +245,82 @@ impl App {
             let widths = [Constraint::Length(10), Constraint::Fill(1)];
             let filters = [
                 Row::new(vec![
-                    Span::styled("Network", Style::new().bold()),
-                    Span::from(
-                        self.network_filter
-                            .applied_protocols
-                            .iter()
-                            .map(|filter| filter.to_string())
-                            .collect::<Vec<String>>()
-                            .join(" "),
-                    ),
+                    Line::styled("Network", Style::new().bold()),
+                    Line::from_iter(NetworkFilter::default().selected_protocols.iter().map(
+                        |filter| {
+                            if self.network_filter.applied_protocols.contains(&filter) {
+                                Span::styled(
+                                    format!(" {}  ", filter),
+                                    Style::default().light_green(),
+                                )
+                            } else {
+                                Span::styled(
+                                    format!("❌{}  ", filter),
+                                    Style::default().light_red(),
+                                )
+                            }
+                        },
+                    )),
                 ]),
                 Row::new(vec![
-                    Span::styled("Transport", Style::new().bold()),
-                    Span::from(
-                        self.transport_filter
-                            .applied_protocols
-                            .iter()
-                            .map(|filter| filter.to_string())
-                            .collect::<Vec<String>>()
-                            .join(" "),
-                    ),
+                    Line::styled("Transport", Style::new().bold()),
+                    Line::from_iter(TransportFilter::default().selected_protocols.iter().map(
+                        |filter| {
+                            if self.transport_filter.applied_protocols.contains(&filter) {
+                                Span::styled(
+                                    format!(" {}  ", filter),
+                                    Style::default().light_green(),
+                                )
+                            } else {
+                                Span::styled(
+                                    format!("❌{}  ", filter),
+                                    Style::default().light_red(),
+                                )
+                            }
+                        },
+                    )),
                 ]),
                 Row::new(vec![
-                    Span::styled("Link", Style::new().bold()),
-                    Span::from(
-                        self.link_filter
-                            .applied_protocols
-                            .iter()
-                            .map(|filter| filter.to_string())
-                            .collect::<Vec<String>>()
-                            .join(" "),
-                    ),
+                    Line::styled("Link", Style::new().bold()),
+                    Line::from_iter(LinkFilter::default().selected_protocols.iter().map(
+                        |filter| {
+                            if self.link_filter.applied_protocols.contains(&filter) {
+                                Span::styled(
+                                    format!(" {}  ", filter),
+                                    Style::default().light_green(),
+                                )
+                            } else {
+                                Span::styled(
+                                    format!("❌{}  ", filter),
+                                    Style::default().light_red(),
+                                )
+                            }
+                        },
+                    )),
                 ]),
                 Row::new(vec![
-                    Span::styled("Direction", Style::new().bold()),
-                    Span::from(
-                        self.traffic_direction_filter
-                            .applied_direction
+                    Line::styled("Direction", Style::new().bold()),
+                    Line::from_iter(
+                        TrafficDirectionFilter::default()
+                            .selected_direction
                             .iter()
-                            .map(|direction| direction.to_string())
-                            .collect::<Vec<String>>()
-                            .join(" "),
+                            .map(|filter| {
+                                if self
+                                    .traffic_direction_filter
+                                    .applied_direction
+                                    .contains(&filter)
+                                {
+                                    Span::styled(
+                                        format!("󰞁 {}  ", filter),
+                                        Style::default().light_green(),
+                                    )
+                                } else {
+                                    Span::styled(
+                                        format!("󰿝 {}  ", filter),
+                                        Style::default().light_red(),
+                                    )
+                                }
+                            }),
                     ),
                 ]),
             ];
