@@ -107,8 +107,8 @@ impl App {
         if !self.start_sniffing {
             let (
                 interface_block,
-                network_filter_block,
                 transport_filter_block,
+                network_filter_block,
                 link_filter_block,
                 traffic_direction_block,
                 start_block,
@@ -117,8 +117,8 @@ impl App {
                     .direction(Direction::Vertical)
                     .constraints([
                         Constraint::Length(self.interface.interfaces.len() as u16 + 6),
-                        Constraint::Length(NB_NETWORK_PROTOCOL + 4),
                         Constraint::Length(NB_TRANSPORT_PROTOCOL + 4),
+                        Constraint::Length(NB_NETWORK_PROTOCOL + 4),
                         Constraint::Length(NB_LINK_PROTOCOL + 4),
                         Constraint::Length(6),
                         Constraint::Length(4),
@@ -245,10 +245,10 @@ impl App {
             let widths = [Constraint::Length(10), Constraint::Fill(1)];
             let filters = [
                 Row::new(vec![
-                    Line::styled("Network", Style::new().bold()),
-                    Line::from_iter(NetworkFilter::default().selected_protocols.iter().map(
+                    Line::styled("Transport", Style::new().bold()),
+                    Line::from_iter(TransportFilter::default().selected_protocols.iter().map(
                         |filter| {
-                            if self.network_filter.applied_protocols.contains(filter) {
+                            if self.transport_filter.applied_protocols.contains(filter) {
                                 Span::styled(
                                     format!(" {}  ", filter),
                                     Style::default().light_green(),
@@ -263,10 +263,10 @@ impl App {
                     )),
                 ]),
                 Row::new(vec![
-                    Line::styled("Transport", Style::new().bold()),
-                    Line::from_iter(TransportFilter::default().selected_protocols.iter().map(
+                    Line::styled("Network", Style::new().bold()),
+                    Line::from_iter(NetworkFilter::default().selected_protocols.iter().map(
                         |filter| {
-                            if self.transport_filter.applied_protocols.contains(filter) {
+                            if self.network_filter.applied_protocols.contains(filter) {
                                 Span::styled(
                                     format!(" {}  ", filter),
                                     Style::default().light_green(),
@@ -370,8 +370,8 @@ impl App {
                     .split(layout[1])[1];
 
                 let (
-                    network_filter_block,
                     transport_filter_block,
+                    network_filter_block,
                     link_filter_block,
                     traffic_direction_block,
                     apply_block,
@@ -379,8 +379,8 @@ impl App {
                     let chunks = Layout::default()
                         .direction(Direction::Vertical)
                         .constraints([
-                            Constraint::Length(NB_NETWORK_PROTOCOL + 4),
                             Constraint::Length(NB_TRANSPORT_PROTOCOL + 4),
+                            Constraint::Length(NB_NETWORK_PROTOCOL + 4),
                             Constraint::Length(NB_LINK_PROTOCOL + 4),
                             Constraint::Length(6),
                             Constraint::Length(4),
@@ -399,11 +399,12 @@ impl App {
                         .border_style(Style::default().green()),
                     block,
                 );
-                self.network_filter
-                    .render(frame, network_filter_block, &self.focused_block);
 
                 self.transport_filter
                     .render(frame, transport_filter_block, &self.focused_block);
+
+                self.network_filter
+                    .render(frame, network_filter_block, &self.focused_block);
 
                 self.link_filter
                     .render(frame, link_filter_block, &self.focused_block);
