@@ -59,10 +59,15 @@ impl Source for RingBuffer<'_> {
 }
 
 impl Ebpf {
-    pub fn load_ingress(iface: String, sender: kanal::Sender<Event>, terminate: Arc<AtomicBool>) {
+    pub fn load_ingress(
+        iface: String,
+        notification_sender: kanal::Sender<Event>,
+        data_sender: kanal::Sender<[u8; RawPacket::LEN]>,
+        terminate: Arc<AtomicBool>,
+    ) {
         thread::spawn({
             let iface = iface.to_owned();
-            let sender = sender.clone();
+            let notification_sender = notification_sender.clone();
 
             move || {
                 let rlim = libc::rlimit {
@@ -81,7 +86,7 @@ impl Ebpf {
                         Notification::send(
                             format!("Failed to load the ingress eBPF bytecode\n {}", e),
                             NotificationLevel::Error,
-                            sender,
+                            notification_sender,
                         )
                         .unwrap();
                         return;
@@ -97,7 +102,7 @@ impl Ebpf {
                         Notification::send(
                             format!("Failed to load the ingress eBPF bytecode\n {}", e),
                             NotificationLevel::Error,
-                            sender,
+                            notification_sender,
                         )
                         .unwrap();
                         return;
@@ -116,7 +121,7 @@ impl Ebpf {
                             e
                         ),
                         NotificationLevel::Error,
-                        sender,
+                        notification_sender,
                     )
                     .unwrap();
                     return;
@@ -129,7 +134,7 @@ impl Ebpf {
                             e
                         ),
                         NotificationLevel::Error,
-                        sender,
+                        notification_sender,
                     )
                     .unwrap();
                     return;
@@ -168,7 +173,7 @@ impl Ebpf {
                                 }
                                 let packet: [u8; RawPacket::LEN] =
                                     item.to_owned().try_into().unwrap();
-                                sender.send(Event::Packet(packet)).ok();
+                                data_sender.send(packet).ok();
                             }
                         }
                     }
@@ -181,10 +186,15 @@ impl Ebpf {
         });
     }
 
-    pub fn load_egress(iface: String, sender: kanal::Sender<Event>, terminate: Arc<AtomicBool>) {
+    pub fn load_egress(
+        iface: String,
+        notification_sender: kanal::Sender<Event>,
+        data_sender: kanal::Sender<[u8; RawPacket::LEN]>,
+        terminate: Arc<AtomicBool>,
+    ) {
         thread::spawn({
             let iface = iface.to_owned();
-            let sender = sender.clone();
+            let notification_sender = notification_sender.clone();
 
             move || {
                 let rlim = libc::rlimit {
@@ -203,7 +213,7 @@ impl Ebpf {
                         Notification::send(
                             format!("Fail to load the egress eBPF bytecode\n {}", e),
                             NotificationLevel::Error,
-                            sender,
+                            notification_sender,
                         )
                         .unwrap();
                         return;
@@ -219,7 +229,7 @@ impl Ebpf {
                         Notification::send(
                             format!("Failed to load the egress eBPF bytecode\n {}", e),
                             NotificationLevel::Error,
-                            sender,
+                            notification_sender,
                         )
                         .unwrap();
                         return;
@@ -234,7 +244,7 @@ impl Ebpf {
                     Notification::send(
                         format!("Fail to load the egress eBPF program to the kernel\n{}", e),
                         NotificationLevel::Error,
-                        sender,
+                        notification_sender,
                     )
                     .unwrap();
                     return;
@@ -247,7 +257,7 @@ impl Ebpf {
                             e
                         ),
                         NotificationLevel::Error,
-                        sender,
+                        notification_sender,
                     )
                     .unwrap();
                     return;
@@ -286,7 +296,7 @@ impl Ebpf {
                                 }
                                 let packet: [u8; RawPacket::LEN] =
                                     item.to_owned().try_into().unwrap();
-                                sender.send(Event::Packet(packet)).ok();
+                                data_sender.send(packet).ok();
                             }
                         }
                     }

@@ -7,7 +7,7 @@ use tui_input::Input;
 
 use oryx_common::AppPacket;
 
-#[derive(Debug, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct Fuzzy {
     enabled: bool,
     paused: bool,

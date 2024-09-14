@@ -5,15 +5,13 @@ use std::net::{IpAddr, Ipv4Addr};
 
 use oryx_common::ip::IpPacket;
 
-use ratatui::layout::{Alignment, Constraint, Direction, Flex, Layout, Margin, Rect};
-use ratatui::style::{Color, Style, Stylize};
-use ratatui::text::{Line, Span};
+use ratatui::layout::{Alignment, Constraint, Direction, Flex, Layout, Rect};
+use ratatui::style::{Color, Style};
+use ratatui::text::Line;
 use ratatui::{
-    widgets::{Bar, BarChart, BarGroup, Block, BorderType, Borders, Padding},
+    widgets::{Bar, BarChart, BarGroup, Block, Padding},
     Frame,
 };
-
-use crate::bandwidth::Bandwidth;
 
 #[derive(Debug)]
 pub struct Stats {
@@ -23,7 +21,6 @@ pub struct Stats {
     pub transport: TransportStats,
     pub link: LinkStats,
     pub addresses: HashMap<Ipv4Addr, (Option<String>, usize)>,
-    pub bandwidth: Option<Bandwidth>,
 }
 
 impl Default for Stats {
@@ -41,7 +38,6 @@ impl Stats {
             transport: TransportStats::default(),
             link: LinkStats::default(),
             addresses: HashMap::with_capacity(1024),
-            bandwidth: Bandwidth::new().ok(),
         }
     }
     pub fn get_top_10(&self) -> Vec<(&Ipv4Addr, &(Option<String>, usize))> {
@@ -159,16 +155,7 @@ impl Stats {
         self.total += 1;
     }
 
-    pub fn render(&self, frame: &mut Frame, stats_block: Rect, network_interface: &str) {
-        let (graph_block, barchart_block) = {
-            let chunks = Layout::default()
-                .direction(Direction::Vertical)
-                .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
-                .margin(2)
-                .split(stats_block);
-            (chunks[0], chunks[1])
-        };
-
+    pub fn render(&self, frame: &mut Frame, stats_block: Rect) {
         let (address_block, network_block, transport_block, link_block) = {
             let chunks = Layout::default()
                 .direction(Direction::Horizontal)
@@ -183,32 +170,9 @@ impl Stats {
                 )
                 .margin(1)
                 .flex(Flex::SpaceBetween)
-                .split(barchart_block);
+                .split(stats_block);
             (chunks[0], chunks[1], chunks[2], chunks[3])
         };
-
-        frame.render_widget(
-            Block::default()
-                .title({
-                    Line::from(vec![
-                        Span::from(" Packet ").fg(Color::DarkGray),
-                        Span::styled(
-                            " Stats ",
-                            Style::default().bg(Color::Green).fg(Color::White).bold(),
-                        ),
-                    ])
-                })
-                .title_alignment(Alignment::Left)
-                .padding(Padding::top(1))
-                .borders(Borders::ALL)
-                .style(Style::default())
-                .border_type(BorderType::default())
-                .border_style(Style::default().green()),
-            stats_block.inner(Margin {
-                horizontal: 1,
-                vertical: 0,
-            }),
-        );
 
         let link_chart = BarChart::default()
             .bar_width(3)
@@ -354,10 +318,6 @@ impl Stats {
         frame.render_widget(transport_chart, transport_block);
         frame.render_widget(network_chart, network_block);
         frame.render_widget(link_chart, link_block);
-
-        if let Some(bandwidth) = &self.bandwidth {
-            bandwidth.render(frame, graph_block, network_interface)
-        }
     }
 }
 

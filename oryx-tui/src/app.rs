@@ -1,5 +1,5 @@
 use oryx_common::ip::IpPacket;
-use oryx_common::AppPacket;
+use oryx_common::{AppPacket, RawPacket};
 use ratatui::layout::{Alignment, Constraint, Direction, Flex, Layout, Margin, Rect};
 use ratatui::style::{Color, Style, Stylize};
 use ratatui::text::{Line, Span};
@@ -11,13 +11,17 @@ use ratatui::{
     },
     Frame,
 };
-use std::error;
+use std::borrow::Borrow;
 use std::net::IpAddr;
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
+use std::{error, thread};
 use tui_big_text::{BigText, PixelSize};
 
+use crate::bandwidth::Bandwidth;
 use crate::filters::direction::TrafficDirectionFilter;
 use crate::filters::fuzzy::{self, Fuzzy};
-use crate::filters::link::{LinkFilter, NB_LINK_PROTOCOL};
+use crate::filters::link::{LinkFilter, LinkProtocol, NB_LINK_PROTOCOL};
 use crate::filters::network::{NetworkFilter, NetworkProtocol, NB_NETWORK_PROTOCOL};
 use crate::filters::transport::{TransportFilter, TransportProtocol, NB_TRANSPORT_PROTOCOL};
 use crate::help::Help;
@@ -46,6 +50,12 @@ pub enum Mode {
 }
 
 #[derive(Debug)]
+pub struct DataEventHandler {
+    pub sender: kanal::Sender<[u8; RawPacket::LEN]>,
+    pub handler: thread::JoinHandle<()>,
+}
+
+#[derive(Debug)]
 pub struct App {
     pub running: bool,
     pub help: Help,
@@ -58,16 +68,18 @@ pub struct App {
     pub link_filter: LinkFilter,
     pub traffic_direction_filter: TrafficDirectionFilter,
     pub start_sniffing: bool,
-    pub packets: Vec<AppPacket>,
+    pub packets: Arc<Mutex<Vec<AppPacket>>>,
     pub packets_table_state: TableState,
-    pub fuzzy: Fuzzy,
+    pub fuzzy: Arc<Mutex<Fuzzy>>,
     pub notifications: Vec<Notification>,
     pub manuall_scroll: bool,
     pub mode: Mode,
-    pub stats: Stats,
+    pub stats: Arc<Mutex<Stats>>,
     pub packet_end_index: usize,
     pub packet_window_size: usize,
     pub update_filters: bool,
+    pub data_channel_sender: kanal::Sender<[u8; RawPacket::LEN]>,
+    pub bandwidth: Arc<Mutex<Option<Bandwidth>>>,
 }
 
 impl Default for App {
@@ -78,27 +90,91 @@ impl Default for App {
 
 impl App {
     pub fn new() -> Self {
+        let packets = Arc::new(Mutex::new(Vec::with_capacity(AppPacket::LEN * 1024 * 1024)));
+        let stats = Arc::new(Mutex::new(Stats::default()));
+        let fuzzy = Arc::new(Mutex::new(Fuzzy::default()));
+
+        let network_filter = NetworkFilter::default();
+        let transport_filter = TransportFilter::default();
+        let link_filter = LinkFilter::default();
+
+        let (sender, receiver) = kanal::unbounded();
+
+        thread::spawn({
+            let packets = packets.clone();
+            let stats = stats.clone();
+            let transport_filters = transport_filter.applied_protocols.clone();
+            let network_filters = network_filter.applied_protocols.clone();
+            let link_filters = link_filter.applied_protocols.clone();
+
+            move || loop {
+                if let Ok(raw_packet) = receiver.recv() {
+                    App::process(
+                        packets.clone(),
+                        stats.clone(),
+                        transport_filters.clone(),
+                        network_filters.clone(),
+                        link_filters.clone(),
+                        AppPacket::from(raw_packet),
+                    );
+                }
+            }
+        });
+
+        let bandwidth = Arc::new(Mutex::new(Bandwidth::new().ok()));
+
+        thread::spawn({
+            let bandwidth = bandwidth.clone();
+            move || loop {
+                thread::sleep(Duration::from_secs(1));
+                {
+                    let mut bandwidth = bandwidth.lock().unwrap();
+                    if bandwidth.is_some() {
+                        let _ = bandwidth.as_mut().unwrap().refresh();
+                    }
+                }
+            }
+        });
+
+        thread::spawn({
+            let fuzzy = fuzzy.clone();
+            let packets = packets.clone();
+            move || loop {
+                thread::sleep(Duration::from_millis(100));
+                {
+                    let packets = packets.lock().unwrap();
+                    let mut fuzzy = fuzzy.lock().unwrap();
+
+                    if fuzzy.is_enabled() && !fuzzy.filter.value().is_empty() {
+                        fuzzy.find(packets.as_slice());
+                    }
+                }
+            }
+        });
+
         Self {
             running: true,
             help: Help::new(),
             focused_block: FocusedBlock::Interface,
             previous_focused_block: FocusedBlock::Interface,
             interface: Interface::default(),
-            network_filter: NetworkFilter::default(),
-            transport_filter: TransportFilter::default(),
-            link_filter: LinkFilter::default(),
+            network_filter,
+            transport_filter,
+            link_filter,
             traffic_direction_filter: TrafficDirectionFilter::default(),
             start_sniffing: false,
-            packets: Vec::with_capacity(AppPacket::LEN * 1024 * 1024),
+            packets,
             packets_table_state: TableState::default(),
-            fuzzy: Fuzzy::default(),
+            fuzzy,
             notifications: Vec::new(),
             manuall_scroll: false,
             mode: Mode::Packet,
-            stats: Stats::default(),
+            stats,
             packet_end_index: 0,
             packet_window_size: 0,
             update_filters: false,
+            data_channel_sender: sender,
+            bandwidth,
         }
     }
 
@@ -243,87 +319,93 @@ impl App {
 
             // Filters
             let widths = [Constraint::Length(10), Constraint::Fill(1)];
-            let filters = [
-                Row::new(vec![
-                    Line::styled("Transport", Style::new().bold()),
-                    Line::from_iter(TransportFilter::default().selected_protocols.iter().map(
-                        |filter| {
-                            if self.transport_filter.applied_protocols.contains(filter) {
-                                Span::styled(
-                                    format!(" {}  ", filter),
-                                    Style::default().light_green(),
-                                )
-                            } else {
-                                Span::styled(
-                                    format!("❌{}  ", filter),
-                                    Style::default().light_red(),
-                                )
-                            }
-                        },
-                    )),
-                ]),
-                Row::new(vec![
-                    Line::styled("Network", Style::new().bold()),
-                    Line::from_iter(NetworkFilter::default().selected_protocols.iter().map(
-                        |filter| {
-                            if self.network_filter.applied_protocols.contains(filter) {
-                                Span::styled(
-                                    format!(" {}  ", filter),
-                                    Style::default().light_green(),
-                                )
-                            } else {
-                                Span::styled(
-                                    format!("❌{}  ", filter),
-                                    Style::default().light_red(),
-                                )
-                            }
-                        },
-                    )),
-                ]),
-                Row::new(vec![
-                    Line::styled("Link", Style::new().bold()),
-                    Line::from_iter(LinkFilter::default().selected_protocols.iter().map(
-                        |filter| {
-                            if self.link_filter.applied_protocols.contains(filter) {
-                                Span::styled(
-                                    format!(" {}  ", filter),
-                                    Style::default().light_green(),
-                                )
-                            } else {
-                                Span::styled(
-                                    format!("❌{}  ", filter),
-                                    Style::default().light_red(),
-                                )
-                            }
-                        },
-                    )),
-                ]),
-                Row::new(vec![
-                    Line::styled("Direction", Style::new().bold()),
-                    Line::from_iter(
-                        TrafficDirectionFilter::default()
-                            .selected_direction
-                            .iter()
-                            .map(|filter| {
-                                if self
-                                    .traffic_direction_filter
-                                    .applied_direction
-                                    .contains(filter)
-                                {
+            let filters = {
+                let applied_transport_filters =
+                    self.transport_filter.applied_protocols.lock().unwrap();
+                let applied_network_filters = self.network_filter.applied_protocols.lock().unwrap();
+                let applied_link_filters = self.link_filter.applied_protocols.lock().unwrap();
+                [
+                    Row::new(vec![
+                        Line::styled("Transport", Style::new().bold()),
+                        Line::from_iter(TransportFilter::default().selected_protocols.iter().map(
+                            |filter| {
+                                if applied_transport_filters.contains(filter) {
                                     Span::styled(
-                                        format!("󰞁 {}  ", filter),
+                                        format!(" {}  ", filter),
                                         Style::default().light_green(),
                                     )
                                 } else {
                                     Span::styled(
-                                        format!("󰿝 {}  ", filter),
+                                        format!("❌{}  ", filter),
                                         Style::default().light_red(),
                                     )
                                 }
-                            }),
-                    ),
-                ]),
-            ];
+                            },
+                        )),
+                    ]),
+                    Row::new(vec![
+                        Line::styled("Network", Style::new().bold()),
+                        Line::from_iter(NetworkFilter::default().selected_protocols.iter().map(
+                            |filter| {
+                                if applied_network_filters.contains(filter) {
+                                    Span::styled(
+                                        format!(" {}  ", filter),
+                                        Style::default().light_green(),
+                                    )
+                                } else {
+                                    Span::styled(
+                                        format!("❌{}  ", filter),
+                                        Style::default().light_red(),
+                                    )
+                                }
+                            },
+                        )),
+                    ]),
+                    Row::new(vec![
+                        Line::styled("Link", Style::new().bold()),
+                        Line::from_iter(LinkFilter::default().selected_protocols.iter().map(
+                            |filter| {
+                                if applied_link_filters.contains(filter) {
+                                    Span::styled(
+                                        format!(" {}  ", filter),
+                                        Style::default().light_green(),
+                                    )
+                                } else {
+                                    Span::styled(
+                                        format!("❌{}  ", filter),
+                                        Style::default().light_red(),
+                                    )
+                                }
+                            },
+                        )),
+                    ]),
+                    Row::new(vec![
+                        Line::styled("Direction", Style::new().bold()),
+                        Line::from_iter(
+                            TrafficDirectionFilter::default()
+                                .selected_direction
+                                .iter()
+                                .map(|filter| {
+                                    if self
+                                        .traffic_direction_filter
+                                        .applied_direction
+                                        .contains(filter)
+                                    {
+                                        Span::styled(
+                                            format!("󰞁 {}  ", filter),
+                                            Style::default().light_green(),
+                                        )
+                                    } else {
+                                        Span::styled(
+                                            format!("󰿝 {}  ", filter),
+                                            Style::default().light_red(),
+                                        )
+                                    }
+                                }),
+                        ),
+                    ]),
+                ]
+            };
 
             let filter_table = Table::new(filters, widths).column_spacing(3).block(
                 Block::default()
@@ -431,8 +513,16 @@ impl App {
     }
 
     pub fn render_packets_mode(&mut self, frame: &mut Frame, packet_mode_block: Rect) {
+        let app_packets = self.packets.lock().unwrap();
+        let mut fuzzy = self.fuzzy.lock().unwrap();
+        let fuzzy_packets = fuzzy.clone().packets.clone();
+
+        //TODO: ugly
+        let pattern = fuzzy.clone();
+        let pattern = pattern.filter.value();
+
         let (packet_block, fuzzy_block) = {
-            if self.fuzzy.is_enabled() {
+            if fuzzy.is_enabled() {
                 let chunks = Layout::default()
                     .direction(Direction::Vertical)
                     .constraints([Constraint::Fill(1), Constraint::Length(3)])
@@ -467,89 +557,74 @@ impl App {
             self.packet_end_index = window_size;
         }
 
-        if self.fuzzy.packet_end_index < window_size {
-            self.fuzzy.packet_end_index = window_size;
+        if fuzzy.packet_end_index < window_size {
+            fuzzy.packet_end_index = window_size;
         }
 
         let packets_to_display = match self.manuall_scroll {
             true => {
-                if self.fuzzy.is_enabled() & !self.fuzzy.filter.value().is_empty() {
-                    if self.fuzzy.packets.len() > window_size {
-                        &self.fuzzy.packets.as_slice()[self
-                            .fuzzy
-                            .packet_end_index
-                            .saturating_sub(window_size)
-                            ..self.fuzzy.packet_end_index]
+                if fuzzy.is_enabled() & !fuzzy.filter.value().is_empty() {
+                    if fuzzy_packets.len() > window_size {
+                        &fuzzy_packets[fuzzy.packet_end_index.saturating_sub(window_size)
+                            ..fuzzy.packet_end_index]
                     } else {
-                        &self.fuzzy.packets
+                        &fuzzy_packets
                     }
-                } else if self.packets.len() > window_size {
-                    &self.packets
+                } else if app_packets.len() > window_size {
+                    &app_packets
                         [self.packet_end_index.saturating_sub(window_size)..self.packet_end_index]
                 } else {
-                    &self.packets
+                    &app_packets
                 }
             }
             false => {
-                if self.fuzzy.is_enabled() & !self.fuzzy.filter.value().is_empty() {
-                    if self.fuzzy.packets.len() > window_size {
-                        &self.fuzzy.packets[self.fuzzy.packets.len().saturating_sub(window_size)..]
+                if fuzzy.is_enabled() & !fuzzy.filter.value().is_empty() {
+                    if fuzzy_packets.len() > window_size {
+                        &fuzzy_packets[fuzzy_packets.len().saturating_sub(window_size)..]
                     } else {
-                        &self.fuzzy.packets
+                        &fuzzy_packets
                     }
-                } else if self.packets.len() > window_size {
-                    &self.packets[self.packets.len().saturating_sub(window_size)..]
+                } else if app_packets.len() > window_size {
+                    &app_packets[app_packets.len().saturating_sub(window_size)..]
                 } else {
-                    &self.packets
+                    &app_packets
                 }
             }
         };
 
         // Style the packets
-        let packets: Vec<Row> = if self.fuzzy.is_enabled() & !self.fuzzy.filter.value().is_empty() {
+        let packets: Vec<Row> = if fuzzy.is_enabled() & !fuzzy.borrow().filter.value().is_empty() {
             packets_to_display
                 .iter()
                 .map(|app_packet| match app_packet {
                     AppPacket::Arp(packet) => Row::new(vec![
-                        fuzzy::highlight(self.fuzzy.filter.value(), packet.src_mac.to_string())
-                            .blue(),
+                        fuzzy::highlight(pattern, packet.src_mac.to_string()).blue(),
                         Cell::from(Line::from("-").centered()).yellow(),
-                        fuzzy::highlight(self.fuzzy.filter.value(), packet.dst_mac.to_string())
-                            .blue(),
+                        fuzzy::highlight(pattern, packet.dst_mac.to_string()).blue(),
                         Cell::from(Line::from("-").centered()).yellow(),
-                        fuzzy::highlight(self.fuzzy.filter.value(), "ARP".to_string()).cyan(),
+                        fuzzy::highlight(pattern, "ARP".to_string()).cyan(),
                     ]),
                     AppPacket::Ip(packet) => match packet {
                         IpPacket::Tcp(p) => Row::new(vec![
-                            fuzzy::highlight(self.fuzzy.filter.value(), p.src_ip.to_string())
-                                .blue(),
-                            fuzzy::highlight(self.fuzzy.filter.value(), p.src_port.to_string())
-                                .yellow(),
-                            fuzzy::highlight(self.fuzzy.filter.value(), p.dst_ip.to_string())
-                                .blue(),
-                            fuzzy::highlight(self.fuzzy.filter.value(), p.dst_port.to_string())
-                                .yellow(),
-                            fuzzy::highlight(self.fuzzy.filter.value(), "TCP".to_string()).cyan(),
+                            fuzzy::highlight(pattern, p.src_ip.to_string()).blue(),
+                            fuzzy::highlight(pattern, p.src_port.to_string()).yellow(),
+                            fuzzy::highlight(pattern, p.dst_ip.to_string()).blue(),
+                            fuzzy::highlight(pattern, p.dst_port.to_string()).yellow(),
+                            fuzzy::highlight(pattern, "TCP".to_string()).cyan(),
                         ]),
                         IpPacket::Udp(p) => Row::new(vec![
-                            fuzzy::highlight(self.fuzzy.filter.value(), p.src_ip.to_string())
-                                .blue(),
-                            fuzzy::highlight(self.fuzzy.filter.value(), p.src_port.to_string())
-                                .yellow(),
-                            fuzzy::highlight(self.fuzzy.filter.value(), p.dst_ip.to_string())
-                                .blue(),
-                            fuzzy::highlight(self.fuzzy.filter.value(), p.dst_port.to_string())
-                                .yellow(),
-                            fuzzy::highlight(self.fuzzy.filter.value(), "UDP".to_string()).cyan(),
+                            fuzzy::highlight(pattern, p.src_ip.to_string()).blue(),
+                            fuzzy::highlight(pattern, p.src_port.to_string()).yellow(),
+                            fuzzy::highlight(pattern, p.dst_ip.to_string()).blue(),
+                            fuzzy::highlight(pattern, p.dst_port.to_string()).yellow(),
+                            fuzzy::highlight(pattern, "UDP".to_string()).cyan(),
                         ]),
                         IpPacket::Icmp(p) => Row::new(vec![
-                            fuzzy::highlight(self.fuzzy.filter.value(), p.src_ip.to_string())
-                                .blue(),
+                            fuzzy::highlight(pattern, p.src_ip.to_string()).blue(),
                             Cell::from(Line::from("-").centered()).yellow(),
-                            fuzzy::highlight(self.fuzzy.filter.value(), p.dst_ip.to_string())
-                                .blue(),
+                            fuzzy::highlight(pattern, p.dst_ip.to_string()).blue(),
                             Cell::from(Line::from("-").centered()).yellow(),
-                            fuzzy::highlight(self.fuzzy.filter.value(), "ICMP".to_string()).cyan(),
+                            fuzzy::highlight(pattern, "ICMP".to_string()).cyan(),
                         ]),
                     },
                 })
@@ -606,10 +681,8 @@ impl App {
 
         // Always select the last packet
         if !self.manuall_scroll {
-            if self.fuzzy.is_enabled() {
-                self.fuzzy
-                    .scroll_state
-                    .select(Some(packets_to_display.len()));
+            if fuzzy.is_enabled() {
+                fuzzy.scroll_state.select(Some(packets_to_display.len()));
             } else {
                 self.packets_table_state
                     .select(Some(packets_to_display.len()));
@@ -658,8 +731,8 @@ impl App {
                     .border_style(Style::default().green()),
             );
 
-        if self.fuzzy.is_enabled() {
-            frame.render_stateful_widget(table, packet_block, &mut self.fuzzy.scroll_state);
+        if fuzzy.borrow().is_enabled() {
+            frame.render_stateful_widget(table, packet_block, &mut fuzzy.scroll_state);
         } else {
             frame.render_stateful_widget(table, packet_block, &mut self.packets_table_state);
         }
@@ -670,34 +743,33 @@ impl App {
             .begin_symbol(Some("↑"))
             .end_symbol(Some("↓"));
 
-        let mut scrollbar_state =
-            if self.fuzzy.is_enabled() && self.fuzzy.packets.len() > window_size {
-                ScrollbarState::new(self.fuzzy.packets.len()).position({
-                    if self.manuall_scroll {
-                        if self.fuzzy.packet_end_index == window_size {
-                            0
-                        } else {
-                            self.fuzzy.packet_end_index
-                        }
+        let mut scrollbar_state = if fuzzy.is_enabled() && fuzzy_packets.len() > window_size {
+            ScrollbarState::new(fuzzy_packets.len()).position({
+                if self.manuall_scroll {
+                    if fuzzy.borrow().packet_end_index == window_size {
+                        0
                     } else {
-                        self.fuzzy.packets.len()
+                        fuzzy.borrow().packet_end_index
                     }
-                })
-            } else if !self.fuzzy.is_enabled() && self.packets.len() > window_size {
-                ScrollbarState::new(self.packets.len()).position({
-                    if self.manuall_scroll {
-                        if self.packet_end_index == window_size {
-                            0
-                        } else {
-                            self.packet_end_index
-                        }
+                } else {
+                    fuzzy.borrow().packets.len()
+                }
+            })
+        } else if !fuzzy.is_enabled() && app_packets.len() > window_size {
+            ScrollbarState::new(app_packets.len()).position({
+                if self.manuall_scroll {
+                    if self.packet_end_index == window_size {
+                        0
                     } else {
-                        self.packets.len()
+                        self.packet_end_index
                     }
-                })
-            } else {
-                ScrollbarState::default()
-            };
+                } else {
+                    app_packets.len()
+                }
+            })
+        } else {
+            ScrollbarState::default()
+        };
 
         frame.render_stateful_widget(
             scrollbar,
@@ -708,8 +780,8 @@ impl App {
             &mut scrollbar_state,
         );
 
-        if self.fuzzy.is_enabled() {
-            let fuzzy = Paragraph::new(format!("> {}", self.fuzzy.filter.value()))
+        if fuzzy.borrow().is_enabled() {
+            let fuzzy = Paragraph::new(format!("> {}", fuzzy.filter.value()))
                 .alignment(Alignment::Left)
                 .style(Style::default().white())
                 .block(
@@ -717,14 +789,14 @@ impl App {
                         .borders(Borders::all())
                         .title(" Search  ")
                         .title_style({
-                            if self.fuzzy.is_paused() {
+                            if fuzzy.is_paused() {
                                 Style::default().bold().green()
                             } else {
                                 Style::default().bold().yellow()
                             }
                         })
                         .border_style({
-                            if self.fuzzy.is_paused() {
+                            if fuzzy.is_paused() {
                                 Style::default().green()
                             } else {
                                 Style::default().yellow()
@@ -736,109 +808,125 @@ impl App {
         }
     }
 
-    pub fn render_stats_mode(&mut self, frame: &mut Frame, stats_block: Rect) {
-        self.stats
-            .render(frame, stats_block, &self.interface.selected_interface.name);
+    pub fn render_stats_mode(&mut self, frame: &mut Frame, block: Rect) {
+        let stats = self.stats.lock().unwrap();
+        let mut bandwidth = self.bandwidth.lock().unwrap();
+
+        let (bandwidth_block, stats_block) = {
+            let chunks = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
+                .margin(2)
+                .split(block);
+            (chunks[0], chunks[1])
+        };
+
+        frame.render_widget(
+            Block::default()
+                .title({
+                    Line::from(vec![
+                        Span::from(" Packet ").fg(Color::DarkGray),
+                        Span::styled(
+                            " Stats ",
+                            Style::default().bg(Color::Green).fg(Color::White).bold(),
+                        ),
+                    ])
+                })
+                .title_alignment(Alignment::Left)
+                .padding(Padding::top(1))
+                .borders(Borders::ALL)
+                .style(Style::default())
+                .border_type(BorderType::default())
+                .border_style(Style::default().green()),
+            block.inner(Margin {
+                horizontal: 1,
+                vertical: 0,
+            }),
+        );
+
+        stats.render(frame, stats_block);
+
+        if bandwidth.is_some() {
+            bandwidth.as_mut().unwrap().render(
+                frame,
+                bandwidth_block,
+                &self.interface.selected_interface.name.clone(),
+            );
+        }
     }
 
-    pub fn process(&mut self, app_packet: AppPacket) {
-        if self.packets.len() == self.packets.capacity() {
-            self.packets.reserve(1024 * 1024);
+    pub fn process(
+        packets: Arc<Mutex<Vec<AppPacket>>>,
+        stats: Arc<Mutex<Stats>>,
+        transport_filters: Arc<Mutex<Vec<TransportProtocol>>>,
+        network_filters: Arc<Mutex<Vec<NetworkProtocol>>>,
+        link_filters: Arc<Mutex<Vec<LinkProtocol>>>,
+        app_packet: AppPacket,
+    ) {
+        let mut packets = packets.lock().unwrap();
+
+        let applied_transport_protocols = transport_filters.lock().unwrap();
+        let applied_network_protocols = network_filters.lock().unwrap();
+        let applied_link_protocols = link_filters.lock().unwrap();
+
+        if packets.len() == packets.capacity() {
+            packets.reserve(1024 * 1024);
         }
         match app_packet {
             AppPacket::Arp(_) => {
-                if self
-                    .link_filter
-                    .applied_protocols
-                    .contains(&crate::filters::link::LinkProtocol::Arp)
-                {
-                    self.packets.push(app_packet);
+                if applied_link_protocols.contains(&LinkProtocol::Arp) {
+                    packets.push(app_packet);
                 }
             }
             AppPacket::Ip(packet) => match packet {
                 IpPacket::Tcp(p) => {
-                    if self
-                        .transport_filter
-                        .applied_protocols
-                        .contains(&TransportProtocol::TCP)
-                    {
+                    if applied_transport_protocols.contains(&TransportProtocol::TCP) {
                         match p.src_ip {
                             core::net::IpAddr::V6(_) => {
-                                if self
-                                    .network_filter
-                                    .applied_protocols
-                                    .contains(&NetworkProtocol::Ipv6)
-                                {
-                                    self.packets.push(app_packet);
+                                if applied_network_protocols.contains(&NetworkProtocol::Ipv6) {
+                                    packets.push(app_packet);
                                 }
                             }
                             core::net::IpAddr::V4(_) => {
-                                if self
-                                    .network_filter
-                                    .applied_protocols
-                                    .contains(&NetworkProtocol::Ipv4)
-                                {
-                                    self.packets.push(app_packet);
+                                if applied_network_protocols.contains(&NetworkProtocol::Ipv4) {
+                                    packets.push(app_packet);
                                 }
                             }
                         }
                     }
                 }
                 IpPacket::Udp(p) => {
-                    if self
-                        .transport_filter
-                        .applied_protocols
-                        .contains(&TransportProtocol::UDP)
-                    {
+                    if applied_transport_protocols.contains(&TransportProtocol::UDP) {
                         match p.src_ip {
                             core::net::IpAddr::V6(_) => {
-                                if self
-                                    .network_filter
-                                    .applied_protocols
-                                    .contains(&NetworkProtocol::Ipv6)
-                                {
-                                    self.packets.push(app_packet);
+                                if applied_network_protocols.contains(&NetworkProtocol::Ipv6) {
+                                    packets.push(app_packet);
                                 }
                             }
                             core::net::IpAddr::V4(_) => {
-                                if self
-                                    .network_filter
-                                    .applied_protocols
-                                    .contains(&NetworkProtocol::Ipv4)
-                                {
-                                    self.packets.push(app_packet);
+                                if applied_network_protocols.contains(&NetworkProtocol::Ipv4) {
+                                    packets.push(app_packet);
                                 }
                             }
                         }
                     }
                 }
                 IpPacket::Icmp(_) => {
-                    if self
-                        .network_filter
-                        .applied_protocols
-                        .contains(&NetworkProtocol::Icmp)
-                    {
-                        self.packets.push(app_packet);
+                    if applied_network_protocols.contains(&NetworkProtocol::Icmp) {
+                        packets.push(app_packet);
                     }
                 }
             },
         }
 
-        self.stats.refresh(&app_packet);
+        let mut stats = stats.lock().unwrap();
+
+        stats.refresh(&app_packet);
     }
 
     pub fn tick(&mut self) {
         self.notifications.iter_mut().for_each(|n| n.ttl -= 1);
         self.notifications.retain(|n| n.ttl > 0);
-
-        // Even when not updating the pattern, new packets are still comming
-        if self.fuzzy.is_enabled() {
-            self.fuzzy.find(&self.packets);
-        }
-
-        if let Some(bandwidth) = &mut self.stats.bandwidth {
-            bandwidth.refresh().ok();
-        }
     }
 
     pub fn quit(&mut self) {

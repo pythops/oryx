@@ -12,7 +12,7 @@ use crate::{app::AppResult, event::Event};
 pub struct Notification {
     pub message: String,
     pub level: NotificationLevel,
-    pub ttl: u8,
+    pub ttl: u16,
 }
 
 #[derive(Debug, Clone)]
@@ -69,7 +69,7 @@ impl Notification {
         let notif = Notification {
             message: message.to_string(),
             level,
-            ttl: 3,
+            ttl: 500,
         };
 
         sender.send(Event::Notification(notif))?;
