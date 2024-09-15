@@ -139,14 +139,24 @@ impl App {
         thread::spawn({
             let fuzzy = fuzzy.clone();
             let packets = packets.clone();
-            move || loop {
-                thread::sleep(Duration::from_millis(100));
-                {
+            move || {
+                let mut last_index = 0;
+                let mut pattern = String::new();
+                loop {
+                    thread::sleep(Duration::from_millis(100));
                     let packets = packets.lock().unwrap();
                     let mut fuzzy = fuzzy.lock().unwrap();
 
                     if fuzzy.is_enabled() && !fuzzy.filter.value().is_empty() {
-                        fuzzy.find(packets.as_slice());
+                        let current_pattern = fuzzy.filter.value().to_owned();
+                        if current_pattern != pattern {
+                            fuzzy.find(packets.as_slice());
+                            pattern = current_pattern;
+                            last_index = packets.len();
+                        } else {
+                            fuzzy.append(&packets.as_slice()[last_index..]);
+                            last_index = packets.len();
+                        }
                     }
                 }
             }
