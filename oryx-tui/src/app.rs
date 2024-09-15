@@ -143,7 +143,7 @@ impl App {
                 let mut last_index = 0;
                 let mut pattern = String::new();
                 loop {
-                    thread::sleep(Duration::from_millis(100));
+                    thread::sleep(Duration::from_millis(30));
                     let packets = packets.lock().unwrap();
                     let mut fuzzy = fuzzy.lock().unwrap();
 
