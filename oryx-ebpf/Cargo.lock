@@ -43,8 +43,9 @@ dependencies = [
 
 [[package]]
 name = "network-types"
-version = "0.0.6"
-source = "git+https://github.com/vadorovsky/network-types.git?rev=e0ee8d5#e0ee8d50a446923fdcbafd36a99921a0f3aca7fd"
+version = "0.0.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e82e9f64c09f56aa7c80c3fa087997bd99a913f91d9c74d36cf5fd75dd5773e6"
 
 [[package]]
 name = "oryx-common"
