@@ -1,4 +1,7 @@
-use std::fmt::Display;
+use std::{
+    fmt::Display,
+    sync::{Arc, Mutex},
+};
 
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Flex, Layout, Rect},
@@ -15,7 +18,7 @@ pub const NB_TRANSPORT_PROTOCOL: u16 = 2;
 pub struct TransportFilter {
     pub state: TableState,
     pub selected_protocols: Vec<TransportProtocol>,
-    pub applied_protocols: Vec<TransportProtocol>,
+    pub applied_protocols: Arc<Mutex<Vec<TransportProtocol>>>,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -38,14 +41,15 @@ impl Default for TransportFilter {
         Self {
             state: TableState::default(),
             selected_protocols: vec![TransportProtocol::TCP, TransportProtocol::UDP],
-            applied_protocols: Vec::new(),
+            applied_protocols: Arc::new(Mutex::new(Vec::new())),
         }
     }
 }
 
 impl TransportFilter {
     pub fn apply(&mut self) {
-        self.applied_protocols = self.selected_protocols.clone();
+        let mut applied_protocols = self.applied_protocols.lock().unwrap();
+        *applied_protocols = self.selected_protocols.clone();
         self.selected_protocols.clear();
     }
 

@@ -27,7 +27,10 @@ pub fn handle_key_events(
     app: &mut App,
     sender: kanal::Sender<Event>,
 ) -> AppResult<()> {
-    if app.fuzzy.is_enabled() {
+    let fuzzy = app.fuzzy.clone();
+    let mut fuzzy = fuzzy.lock().unwrap();
+
+    if fuzzy.is_enabled() {
         match key_event.code {
             KeyCode::Esc => {
                 if app.focused_block == FocusedBlock::Help {
@@ -40,14 +43,14 @@ pub fn handle_key_events(
                     return Ok(());
                 }
 
-                if app.fuzzy.is_paused() {
+                if fuzzy.is_paused() {
                     if app.manuall_scroll {
                         app.manuall_scroll = false;
                     } else {
-                        app.fuzzy.disable();
+                        fuzzy.disable();
                     }
                 } else {
-                    app.fuzzy.pause();
+                    fuzzy.pause();
                 }
             }
 
@@ -141,15 +144,15 @@ pub fn handle_key_events(
                 if app.focused_block == FocusedBlock::Help {
                     return Ok(());
                 }
-                if !app.fuzzy.is_paused() && !app.update_filters {
-                    app.fuzzy
+                if !fuzzy.is_paused() && !app.update_filters {
+                    fuzzy
                         .filter
                         .handle_event(&crossterm::event::Event::Key(key_event));
                 } else {
                     match key_event.code {
                         KeyCode::Char('/') => {
                             if !app.update_filters {
-                                app.fuzzy.unpause();
+                                fuzzy.unpause();
                             }
                         }
 
@@ -162,14 +165,19 @@ pub fn handle_key_events(
                                 app.update_filters = true;
                                 app.focused_block = FocusedBlock::TransportFilter;
 
+                                let applied_network_protocols =
+                                    app.network_filter.applied_protocols.lock().unwrap();
                                 app.network_filter.selected_protocols =
-                                    app.network_filter.applied_protocols.clone();
+                                    applied_network_protocols.clone();
 
+                                let applied_transport_protocols =
+                                    app.transport_filter.applied_protocols.lock().unwrap();
                                 app.transport_filter.selected_protocols =
-                                    app.transport_filter.applied_protocols.clone();
+                                    applied_transport_protocols.clone();
 
-                                app.link_filter.selected_protocols =
-                                    app.link_filter.applied_protocols.clone();
+                                let applied_link_protocols =
+                                    app.link_filter.applied_protocols.lock().unwrap();
+                                app.link_filter.selected_protocols = applied_link_protocols.clone();
 
                                 app.traffic_direction_filter.selected_direction =
                                     app.traffic_direction_filter.applied_direction.clone();
@@ -183,26 +191,26 @@ pub fn handle_key_events(
                                 if !app.manuall_scroll {
                                     app.manuall_scroll = true;
                                     // Record the last position. Usefull for selecting the packets to display
-                                    app.fuzzy.packet_end_index = app.fuzzy.packets.len();
+                                    fuzzy.packet_end_index = fuzzy.packets.len();
                                 }
-                                let i = match app.fuzzy.scroll_state.selected() {
+                                let i = match fuzzy.scroll_state.selected() {
                                     Some(i) => {
                                         if i < app.packet_window_size - 1 {
                                             i + 1
                                         } else if i == app.packet_window_size - 1
-                                            && app.fuzzy.packets.len() > app.fuzzy.packet_end_index
+                                            && fuzzy.packets.len() > fuzzy.packet_end_index
                                         {
                                             // shit the window by one
-                                            app.fuzzy.packet_end_index += 1;
+                                            fuzzy.packet_end_index += 1;
                                             i + 1
                                         } else {
                                             i
                                         }
                                     }
-                                    None => app.fuzzy.packets.len(),
+                                    None => fuzzy.packets.len(),
                                 };
 
-                                app.fuzzy.scroll_state.select(Some(i));
+                                fuzzy.scroll_state.select(Some(i));
                             } else {
                                 match &app.focused_block {
                                     FocusedBlock::NetworkFilter => {
@@ -263,26 +271,26 @@ pub fn handle_key_events(
                                 if !app.manuall_scroll {
                                     app.manuall_scroll = true;
                                     // Record the last position. Usefull for selecting the packets to display
-                                    app.fuzzy.packet_end_index = app.fuzzy.packets.len();
+                                    fuzzy.packet_end_index = fuzzy.packets.len();
                                 }
-                                let i = match app.fuzzy.scroll_state.selected() {
+                                let i = match fuzzy.scroll_state.selected() {
                                     Some(i) => {
                                         if i > 1 {
                                             i - 1
                                         } else if i == 0
-                                            && app.fuzzy.packet_end_index > app.packet_window_size
+                                            && fuzzy.packet_end_index > app.packet_window_size
                                         {
                                             // shit the window by one
-                                            app.fuzzy.packet_end_index -= 1;
+                                            fuzzy.packet_end_index -= 1;
                                             0
                                         } else {
                                             0
                                         }
                                     }
-                                    None => app.fuzzy.packets.len(),
+                                    None => fuzzy.packets.len(),
                                 };
 
-                                app.fuzzy.scroll_state.select(Some(i));
+                                fuzzy.scroll_state.select(Some(i));
                             } else {
                                 match &app.focused_block {
                                     FocusedBlock::NetworkFilter => {
@@ -402,13 +410,16 @@ pub fn handle_key_events(
 
                     app.focused_block = FocusedBlock::TransportFilter;
 
-                    app.network_filter.selected_protocols =
-                        app.network_filter.applied_protocols.clone();
+                    let applied_network_protocols =
+                        app.network_filter.applied_protocols.lock().unwrap();
+                    app.network_filter.selected_protocols = applied_network_protocols.clone();
 
-                    app.transport_filter.selected_protocols =
-                        app.transport_filter.applied_protocols.clone();
+                    let applied_transport_protocols =
+                        app.transport_filter.applied_protocols.lock().unwrap();
+                    app.transport_filter.selected_protocols = applied_transport_protocols.clone();
 
-                    app.link_filter.selected_protocols = app.link_filter.applied_protocols.clone();
+                    let applied_link_protocols = app.link_filter.applied_protocols.lock().unwrap();
+                    app.link_filter.selected_protocols = applied_link_protocols.clone();
 
                     app.traffic_direction_filter.selected_direction =
                         app.traffic_direction_filter.applied_direction.clone();
@@ -423,14 +434,15 @@ pub fn handle_key_events(
                 }
 
                 if app.start_sniffing {
-                    if app.packets.is_empty() {
+                    let app_packets = app.packets.lock().unwrap();
+                    if app_packets.is_empty() {
                         Notification::send(
                             "There is no packets".to_string(),
                             NotificationLevel::Info,
                             sender,
                         )?;
                     } else {
-                        match export(&app.packets) {
+                        match export(&app_packets) {
                             Ok(_) => {
                                 Notification::send(
                                     "Packets exported to ~/oryx/capture file".to_string(),
@@ -455,8 +467,8 @@ pub fn handle_key_events(
                     return Ok(());
                 }
                 if app.start_sniffing {
-                    app.fuzzy.enable();
-                    app.fuzzy.unpause();
+                    fuzzy.enable();
+                    fuzzy.unpause();
                 }
             }
 
@@ -493,6 +505,7 @@ pub fn handle_key_events(
                         Ebpf::load_ingress(
                             iface.clone(),
                             sender.clone(),
+                            app.data_channel_sender.clone(),
                             app.traffic_direction_filter.terminate_ingress.clone(),
                         );
                     }
@@ -505,6 +518,7 @@ pub fn handle_key_events(
                         Ebpf::load_egress(
                             iface,
                             sender.clone(),
+                            app.data_channel_sender.clone(),
                             app.traffic_direction_filter.terminate_egress.clone(),
                         );
                     }
@@ -541,6 +555,7 @@ pub fn handle_key_events(
                         Ebpf::load_egress(
                             iface,
                             sender.clone(),
+                            app.data_channel_sender.clone(),
                             app.traffic_direction_filter.terminate_egress.clone(),
                         );
                     }
@@ -574,6 +589,7 @@ pub fn handle_key_events(
                         Ebpf::load_ingress(
                             iface,
                             sender.clone(),
+                            app.data_channel_sender.clone(),
                             app.traffic_direction_filter.terminate_ingress.clone(),
                         );
                     }
@@ -860,19 +876,20 @@ pub fn handle_key_events(
                 if let FocusedBlock::Help = app.focused_block {
                     return Ok(());
                 }
+                let app_packets = app.packets.lock().unwrap();
                 // Sniff mode
                 if app.start_sniffing && !app.update_filters {
                     if !app.manuall_scroll {
                         app.manuall_scroll = true;
                         // Record the last position. Usefull for selecting the packets to display
-                        app.packet_end_index = app.packets.len();
+                        app.packet_end_index = app_packets.len();
                     }
                     let i = match app.packets_table_state.selected() {
                         Some(i) => {
                             if i < app.packet_window_size - 1 {
                                 i + 1
                             } else if i == app.packet_window_size - 1
-                                && app.packets.len() > app.packet_end_index
+                                && app_packets.len() > app.packet_end_index
                             {
                                 // shit the window by one
                                 app.packet_end_index += 1;
@@ -881,7 +898,7 @@ pub fn handle_key_events(
                                 i
                             }
                         }
-                        None => app.packets.len(),
+                        None => app_packets.len(),
                     };
 
                     app.packets_table_state.select(Some(i));
@@ -960,6 +977,7 @@ pub fn handle_key_events(
             }
 
             KeyCode::Char('k') | KeyCode::Up => {
+                let app_packets = app.packets.lock().unwrap();
                 if let FocusedBlock::Help = app.focused_block {
                     return Ok(());
                 }
@@ -967,7 +985,7 @@ pub fn handle_key_events(
                     if !app.manuall_scroll {
                         app.manuall_scroll = true;
                         // Record the last position. Usefull for selecting the packets to display
-                        app.packet_end_index = app.packets.len();
+                        app.packet_end_index = app_packets.len();
                     }
                     let i = match app.packets_table_state.selected() {
                         Some(i) => {

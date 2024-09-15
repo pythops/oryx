@@ -7,7 +7,7 @@ use tui_input::Input;
 
 use oryx_common::AppPacket;
 
-#[derive(Debug, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct Fuzzy {
     enabled: bool,
     paused: bool,
@@ -24,6 +24,16 @@ impl Fuzzy {
             .copied()
             .filter(|p| p.to_string().contains(self.filter.value()))
             .collect::<Vec<AppPacket>>();
+    }
+
+    pub fn append(&mut self, packets: &[AppPacket]) {
+        self.packets.append(
+            &mut packets
+                .iter()
+                .copied()
+                .filter(|p| p.to_string().contains(self.filter.value()))
+                .collect::<Vec<AppPacket>>(),
+        );
     }
 
     pub fn enable(&mut self) {

@@ -1,4 +1,7 @@
-use std::fmt::Display;
+use std::{
+    fmt::Display,
+    sync::{Arc, Mutex},
+};
 
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Flex, Layout, Rect},
@@ -15,7 +18,7 @@ pub const NB_NETWORK_PROTOCOL: u16 = 3;
 pub struct NetworkFilter {
     pub state: TableState,
     pub selected_protocols: Vec<NetworkProtocol>,
-    pub applied_protocols: Vec<NetworkProtocol>,
+    pub applied_protocols: Arc<Mutex<Vec<NetworkProtocol>>>,
 }
 
 impl Default for NetworkFilter {
@@ -27,7 +30,7 @@ impl Default for NetworkFilter {
                 NetworkProtocol::Ipv6,
                 NetworkProtocol::Icmp,
             ],
-            applied_protocols: Vec::new(),
+            applied_protocols: Arc::new(Mutex::new(Vec::new())),
         }
     }
 }
@@ -51,7 +54,8 @@ impl Display for NetworkProtocol {
 
 impl NetworkFilter {
     pub fn apply(&mut self) {
-        self.applied_protocols = self.selected_protocols.clone();
+        let mut applied_protocols = self.applied_protocols.lock().unwrap();
+        *applied_protocols = self.selected_protocols.clone();
         self.selected_protocols.clear();
     }
     pub fn render(&mut self, frame: &mut Frame, block: Rect, focused_block: &FocusedBlock) {

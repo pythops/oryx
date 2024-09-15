@@ -1,4 +1,7 @@
-use std::fmt::Display;
+use std::{
+    fmt::Display,
+    sync::{Arc, Mutex},
+};
 
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Flex, Layout, Rect},
@@ -15,7 +18,7 @@ pub const NB_LINK_PROTOCOL: u16 = 1;
 pub struct LinkFilter {
     pub state: TableState,
     pub selected_protocols: Vec<LinkProtocol>,
-    pub applied_protocols: Vec<LinkProtocol>,
+    pub applied_protocols: Arc<Mutex<Vec<LinkProtocol>>>,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -34,14 +37,15 @@ impl Default for LinkFilter {
         Self {
             state: TableState::default(),
             selected_protocols: vec![LinkProtocol::Arp],
-            applied_protocols: Vec::new(),
+            applied_protocols: Arc::new(Mutex::new(Vec::new())),
         }
     }
 }
 
 impl LinkFilter {
     pub fn apply(&mut self) {
-        self.applied_protocols = self.selected_protocols.clone();
+        let mut applied_protocols = self.applied_protocols.lock().unwrap();
+        *applied_protocols = self.selected_protocols.clone();
         self.selected_protocols.clear();
     }
 
