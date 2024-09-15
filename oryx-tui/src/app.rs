@@ -31,6 +31,8 @@ use crate::stats::Stats;
 
 pub type AppResult<T> = std::result::Result<T, Box<dyn error::Error>>;
 
+pub const TICK_RATE: u64 = 30;
+
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum FocusedBlock {
     Interface,
@@ -143,7 +145,7 @@ impl App {
                 let mut last_index = 0;
                 let mut pattern = String::new();
                 loop {
-                    thread::sleep(Duration::from_millis(30));
+                    thread::sleep(Duration::from_millis(TICK_RATE));
                     let packets = packets.lock().unwrap();
                     let mut fuzzy = fuzzy.lock().unwrap();
 
