@@ -587,14 +587,14 @@ checksum = "04744f49eae99ab78e0d5c0b603ab218f515ea8cfe5a456d7629ad883a3b6e7d"
 
 [[package]]
 name = "oryx-common"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "network-types",
 ]
 
 [[package]]
 name = "oryx-tui"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "aya",
  "clap",
