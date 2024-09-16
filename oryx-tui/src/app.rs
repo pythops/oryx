@@ -31,7 +31,7 @@ use crate::stats::Stats;
 
 pub type AppResult<T> = std::result::Result<T, Box<dyn error::Error>>;
 
-pub const TICK_RATE: u64 = 30;
+pub const TICK_RATE: u64 = 40;
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum FocusedBlock {
@@ -348,7 +348,7 @@ impl App {
                                     )
                                 } else {
                                     Span::styled(
-                                        format!("❌{}  ", filter),
+                                        format!(" {}  ", filter),
                                         Style::default().light_red(),
                                     )
                                 }
@@ -366,7 +366,7 @@ impl App {
                                     )
                                 } else {
                                     Span::styled(
-                                        format!("❌{}  ", filter),
+                                        format!(" {}  ", filter),
                                         Style::default().light_red(),
                                     )
                                 }
@@ -384,7 +384,7 @@ impl App {
                                     )
                                 } else {
                                     Span::styled(
-                                        format!("❌{}  ", filter),
+                                        format!(" {}  ", filter),
                                         Style::default().light_red(),
                                     )
                                 }
