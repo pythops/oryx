@@ -611,7 +611,7 @@ pub fn handle_key_events(
                 }
 
                 for protocol in TransportProtocol::all().iter() {
-                    if app.transport_filter.applied_protocols.contains(&protocol) {
+                    if app.transport_filter.applied_protocols.contains(protocol) {
                         app.ingress_filter_channel
                             .sender
                             .send((Protocol::Transport(*protocol), false))?;
@@ -629,7 +629,7 @@ pub fn handle_key_events(
                 }
 
                 for protocol in NetworkProtocol::all().iter() {
-                    if app.network_filter.applied_protocols.contains(&protocol) {
+                    if app.network_filter.applied_protocols.contains(protocol) {
                         app.ingress_filter_channel
                             .sender
                             .send((Protocol::Network(*protocol), false))?;
@@ -647,7 +647,7 @@ pub fn handle_key_events(
                 }
 
                 for protocol in LinkProtocol::all().iter() {
-                    if app.link_filter.applied_protocols.contains(&protocol) {
+                    if app.link_filter.applied_protocols.contains(protocol) {
                         app.ingress_filter_channel
                             .sender
                             .send((Protocol::Link(*protocol), false))?;

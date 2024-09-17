@@ -15,7 +15,11 @@ pub struct TransportFilter {
     pub applied_protocols: Vec<TransportProtocol>,
 }
 
-impl TransportFilter {}
+impl Default for TransportFilter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl TransportFilter {
     pub fn new() -> Self {

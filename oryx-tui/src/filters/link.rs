@@ -15,6 +15,12 @@ pub struct LinkFilter {
     pub applied_protocols: Vec<LinkProtocol>,
 }
 
+impl Default for LinkFilter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl LinkFilter {
     pub fn new() -> Self {
         Self {

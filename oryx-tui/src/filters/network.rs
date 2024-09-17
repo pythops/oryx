@@ -15,6 +15,12 @@ pub struct NetworkFilter {
     pub applied_protocols: Vec<NetworkProtocol>,
 }
 
+impl Default for NetworkFilter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl NetworkFilter {
     pub fn new() -> Self {
         NetworkFilter {
@@ -27,13 +33,12 @@ impl NetworkFilter {
             applied_protocols: Vec::new(),
         }
     }
-}
 
-impl NetworkFilter {
     pub fn apply(&mut self) {
         self.applied_protocols = self.selected_protocols.clone();
         self.selected_protocols.clear();
     }
+
     pub fn render(&mut self, frame: &mut Frame, block: Rect, focused_block: &FocusedBlock) {
         let layout = Layout::default()
             .direction(Direction::Horizontal)

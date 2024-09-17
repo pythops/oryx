@@ -60,8 +60,6 @@ pub struct DataEventHandler {
     pub handler: thread::JoinHandle<()>,
 }
 
-// let x = Protocol::NetworkProtocol(Tcp)
-
 #[derive(Debug, Clone)]
 pub struct FilterChannel {
     pub sender: kanal::Sender<(Protocol, bool)>,
@@ -72,6 +70,12 @@ impl FilterChannel {
     pub fn new() -> Self {
         let (sender, receiver) = kanal::unbounded();
         Self { sender, receiver }
+    }
+}
+
+impl Default for FilterChannel {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
