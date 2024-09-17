@@ -1,3 +1,7 @@
+use oryx_common::protocols::{
+    LinkProtocol, NetworkProtocol, Protocol, TransportProtocol, NB_LINK_PROTOCOL,
+    NB_NETWORK_PROTOCOL, NB_TRANSPORT_PROTOCOL,
+};
 use std::{thread, time::Duration};
 use tui_input::backend::crossterm::EventHandler;
 
@@ -6,12 +10,7 @@ use crate::{
     ebpf::Ebpf,
     event::Event,
     export::export,
-    filters::{
-        direction::TrafficDirection,
-        link::{LinkProtocol, NB_LINK_PROTOCOL},
-        network::{NetworkProtocol, NB_NETWORK_PROTOCOL},
-        transport::{TransportProtocol, NB_TRANSPORT_PROTOCOL},
-    },
+    filters::direction::TrafficDirection,
     notification::{Notification, NotificationLevel},
 };
 use ratatui::{
@@ -165,19 +164,14 @@ pub fn handle_key_events(
                                 app.update_filters = true;
                                 app.focused_block = FocusedBlock::TransportFilter;
 
-                                let applied_network_protocols =
-                                    app.network_filter.applied_protocols.lock().unwrap();
                                 app.network_filter.selected_protocols =
-                                    applied_network_protocols.clone();
+                                    app.network_filter.applied_protocols.clone();
 
-                                let applied_transport_protocols =
-                                    app.transport_filter.applied_protocols.lock().unwrap();
                                 app.transport_filter.selected_protocols =
-                                    applied_transport_protocols.clone();
+                                    app.transport_filter.applied_protocols.clone();
 
-                                let applied_link_protocols =
-                                    app.link_filter.applied_protocols.lock().unwrap();
-                                app.link_filter.selected_protocols = applied_link_protocols.clone();
+                                app.link_filter.selected_protocols =
+                                    app.link_filter.applied_protocols.clone();
 
                                 app.traffic_direction_filter.selected_direction =
                                     app.traffic_direction_filter.applied_direction.clone();
@@ -410,16 +404,13 @@ pub fn handle_key_events(
 
                     app.focused_block = FocusedBlock::TransportFilter;
 
-                    let applied_network_protocols =
-                        app.network_filter.applied_protocols.lock().unwrap();
-                    app.network_filter.selected_protocols = applied_network_protocols.clone();
+                    app.network_filter.selected_protocols =
+                        app.network_filter.applied_protocols.clone();
 
-                    let applied_transport_protocols =
-                        app.transport_filter.applied_protocols.lock().unwrap();
-                    app.transport_filter.selected_protocols = applied_transport_protocols.clone();
+                    app.transport_filter.selected_protocols =
+                        app.transport_filter.applied_protocols.clone();
 
-                    let applied_link_protocols = app.link_filter.applied_protocols.lock().unwrap();
-                    app.link_filter.selected_protocols = applied_link_protocols.clone();
+                    app.link_filter.selected_protocols = app.link_filter.applied_protocols.clone();
 
                     app.traffic_direction_filter.selected_direction =
                         app.traffic_direction_filter.applied_direction.clone();
@@ -506,6 +497,7 @@ pub fn handle_key_events(
                             iface.clone(),
                             sender.clone(),
                             app.data_channel_sender.clone(),
+                            app.ingress_filter_channel.receiver.clone(),
                             app.traffic_direction_filter.terminate_ingress.clone(),
                         );
                     }
@@ -519,6 +511,7 @@ pub fn handle_key_events(
                             iface,
                             sender.clone(),
                             app.data_channel_sender.clone(),
+                            app.egress_filter_channel.receiver.clone(),
                             app.traffic_direction_filter.terminate_egress.clone(),
                         );
                     }
@@ -551,11 +544,15 @@ pub fn handle_key_events(
                             .selected_direction
                             .contains(&TrafficDirection::Egress)
                     {
+                        app.traffic_direction_filter
+                            .terminate_egress
+                            .store(false, std::sync::atomic::Ordering::Relaxed);
                         let iface = app.interface.selected_interface.name.clone();
                         Ebpf::load_egress(
                             iface,
                             sender.clone(),
                             app.data_channel_sender.clone(),
+                            app.egress_filter_channel.receiver.clone(),
                             app.traffic_direction_filter.terminate_egress.clone(),
                         );
                     }
@@ -586,10 +583,14 @@ pub fn handle_key_events(
                             .contains(&TrafficDirection::Ingress)
                     {
                         let iface = app.interface.selected_interface.name.clone();
+                        app.traffic_direction_filter
+                            .terminate_ingress
+                            .store(false, std::sync::atomic::Ordering::Relaxed);
                         Ebpf::load_ingress(
                             iface,
                             sender.clone(),
                             app.data_channel_sender.clone(),
+                            app.ingress_filter_channel.receiver.clone(),
                             app.traffic_direction_filter.terminate_ingress.clone(),
                         );
                     }
@@ -607,6 +608,60 @@ pub fn handle_key_events(
                         .store(false, std::sync::atomic::Ordering::Relaxed);
 
                     app.update_filters = false;
+                }
+
+                for protocol in TransportProtocol::all().iter() {
+                    if app.transport_filter.applied_protocols.contains(&protocol) {
+                        app.ingress_filter_channel
+                            .sender
+                            .send((Protocol::Transport(*protocol), false))?;
+                        app.egress_filter_channel
+                            .sender
+                            .send((Protocol::Transport(*protocol), false))?;
+                    } else {
+                        app.ingress_filter_channel
+                            .sender
+                            .send((Protocol::Transport(*protocol), true))?;
+                        app.egress_filter_channel
+                            .sender
+                            .send((Protocol::Transport(*protocol), true))?;
+                    }
+                }
+
+                for protocol in NetworkProtocol::all().iter() {
+                    if app.network_filter.applied_protocols.contains(&protocol) {
+                        app.ingress_filter_channel
+                            .sender
+                            .send((Protocol::Network(*protocol), false))?;
+                        app.egress_filter_channel
+                            .sender
+                            .send((Protocol::Network(*protocol), false))?;
+                    } else {
+                        app.ingress_filter_channel
+                            .sender
+                            .send((Protocol::Network(*protocol), true))?;
+                        app.egress_filter_channel
+                            .sender
+                            .send((Protocol::Network(*protocol), true))?;
+                    }
+                }
+
+                for protocol in LinkProtocol::all().iter() {
+                    if app.link_filter.applied_protocols.contains(&protocol) {
+                        app.ingress_filter_channel
+                            .sender
+                            .send((Protocol::Link(*protocol), false))?;
+                        app.egress_filter_channel
+                            .sender
+                            .send((Protocol::Link(*protocol), false))?;
+                    } else {
+                        app.ingress_filter_channel
+                            .sender
+                            .send((Protocol::Link(*protocol), true))?;
+                        app.egress_filter_channel
+                            .sender
+                            .send((Protocol::Link(*protocol), true))?;
+                    }
                 }
             }
 

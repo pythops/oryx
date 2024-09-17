@@ -1,8 +1,6 @@
 use crate::app::AppResult;
 use crate::notification::Notification;
-use ratatui::crossterm::event::{
-    self, Event as CrosstermEvent, KeyEvent, KeyEventKind, MouseEvent,
-};
+use crossterm::event::{self, Event as CrosstermEvent, KeyEvent, KeyEventKind, MouseEvent};
 use std::thread;
 use std::time::{Duration, Instant};
 

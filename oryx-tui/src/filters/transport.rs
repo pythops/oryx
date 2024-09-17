@@ -1,8 +1,4 @@
-use std::{
-    fmt::Display,
-    sync::{Arc, Mutex},
-};
-
+use oryx_common::protocols::TransportProtocol;
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Flex, Layout, Rect},
     style::{Color, Style, Stylize},
@@ -12,44 +8,25 @@ use ratatui::{
 
 use crate::app::FocusedBlock;
 
-pub const NB_TRANSPORT_PROTOCOL: u16 = 2;
-
 #[derive(Debug)]
 pub struct TransportFilter {
     pub state: TableState,
     pub selected_protocols: Vec<TransportProtocol>,
-    pub applied_protocols: Arc<Mutex<Vec<TransportProtocol>>>,
+    pub applied_protocols: Vec<TransportProtocol>,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub enum TransportProtocol {
-    TCP,
-    UDP,
-}
+impl TransportFilter {}
 
-impl Display for TransportProtocol {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            TransportProtocol::TCP => write!(f, "Tcp"),
-            TransportProtocol::UDP => write!(f, "Udp"),
-        }
-    }
-}
-
-impl Default for TransportFilter {
-    fn default() -> Self {
+impl TransportFilter {
+    pub fn new() -> Self {
         Self {
             state: TableState::default(),
             selected_protocols: vec![TransportProtocol::TCP, TransportProtocol::UDP],
-            applied_protocols: Arc::new(Mutex::new(Vec::new())),
+            applied_protocols: Vec::new(),
         }
     }
-}
-
-impl TransportFilter {
     pub fn apply(&mut self) {
-        let mut applied_protocols = self.applied_protocols.lock().unwrap();
-        *applied_protocols = self.selected_protocols.clone();
+        self.applied_protocols = self.selected_protocols.clone();
         self.selected_protocols.clear();
     }
 
