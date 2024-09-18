@@ -1,3 +1,9 @@
+## v0.3 - TBA
+
+### Changed
+
+- move filters to the epbf program
+
 ## v0.2 - 2024-09-16
 
 ### Added
