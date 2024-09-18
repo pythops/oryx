@@ -9,6 +9,7 @@ homepage.workspace = true
 edition.workspace = true
 
 [dependencies]
+crossterm = { version = "0.28", default-features = false }
 ratatui = "0.28"
 tui-big-text = "0.6"
 tui-input = "0.10"

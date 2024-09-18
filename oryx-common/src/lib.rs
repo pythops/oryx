@@ -12,6 +12,7 @@ use network_types::{arp::ArpHdr, ip::IpHdr};
 
 pub mod arp;
 pub mod ip;
+pub mod protocols;
 
 #[repr(C)]
 pub enum RawPacket {

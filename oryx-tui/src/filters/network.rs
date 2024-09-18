@@ -1,8 +1,4 @@
-use std::{
-    fmt::Display,
-    sync::{Arc, Mutex},
-};
-
+use oryx_common::protocols::NetworkProtocol;
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Flex, Layout, Rect},
     style::{Color, Style, Stylize},
@@ -12,17 +8,21 @@ use ratatui::{
 
 use crate::app::FocusedBlock;
 
-pub const NB_NETWORK_PROTOCOL: u16 = 3;
-
 #[derive(Debug)]
 pub struct NetworkFilter {
     pub state: TableState,
     pub selected_protocols: Vec<NetworkProtocol>,
-    pub applied_protocols: Arc<Mutex<Vec<NetworkProtocol>>>,
+    pub applied_protocols: Vec<NetworkProtocol>,
 }
 
 impl Default for NetworkFilter {
     fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl NetworkFilter {
+    pub fn new() -> Self {
         NetworkFilter {
             state: TableState::default(),
             selected_protocols: vec![
@@ -30,34 +30,15 @@ impl Default for NetworkFilter {
                 NetworkProtocol::Ipv6,
                 NetworkProtocol::Icmp,
             ],
-            applied_protocols: Arc::new(Mutex::new(Vec::new())),
+            applied_protocols: Vec::new(),
         }
     }
-}
 
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub enum NetworkProtocol {
-    Ipv4,
-    Ipv6,
-    Icmp,
-}
-
-impl Display for NetworkProtocol {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            NetworkProtocol::Ipv4 => write!(f, "Ipv4"),
-            NetworkProtocol::Ipv6 => write!(f, "Ipv6"),
-            NetworkProtocol::Icmp => write!(f, "Icmp"),
-        }
-    }
-}
-
-impl NetworkFilter {
     pub fn apply(&mut self) {
-        let mut applied_protocols = self.applied_protocols.lock().unwrap();
-        *applied_protocols = self.selected_protocols.clone();
+        self.applied_protocols = self.selected_protocols.clone();
         self.selected_protocols.clear();
     }
+
     pub fn render(&mut self, frame: &mut Frame, block: Rect, focused_block: &FocusedBlock) {
         let layout = Layout::default()
             .direction(Direction::Horizontal)

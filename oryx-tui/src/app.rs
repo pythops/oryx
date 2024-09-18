@@ -1,4 +1,7 @@
 use oryx_common::ip::IpPacket;
+use oryx_common::protocols::{
+    Protocol, NB_LINK_PROTOCOL, NB_NETWORK_PROTOCOL, NB_TRANSPORT_PROTOCOL,
+};
 use oryx_common::{AppPacket, RawPacket};
 use ratatui::layout::{Alignment, Constraint, Direction, Flex, Layout, Margin, Rect};
 use ratatui::style::{Color, Style, Stylize};
@@ -21,9 +24,9 @@ use tui_big_text::{BigText, PixelSize};
 use crate::bandwidth::Bandwidth;
 use crate::filters::direction::TrafficDirectionFilter;
 use crate::filters::fuzzy::{self, Fuzzy};
-use crate::filters::link::{LinkFilter, LinkProtocol, NB_LINK_PROTOCOL};
-use crate::filters::network::{NetworkFilter, NetworkProtocol, NB_NETWORK_PROTOCOL};
-use crate::filters::transport::{TransportFilter, TransportProtocol, NB_TRANSPORT_PROTOCOL};
+use crate::filters::link::LinkFilter;
+use crate::filters::network::NetworkFilter;
+use crate::filters::transport::TransportFilter;
 use crate::help::Help;
 use crate::interface::Interface;
 use crate::notification::Notification;
@@ -57,6 +60,25 @@ pub struct DataEventHandler {
     pub handler: thread::JoinHandle<()>,
 }
 
+#[derive(Debug, Clone)]
+pub struct FilterChannel {
+    pub sender: kanal::Sender<(Protocol, bool)>,
+    pub receiver: kanal::Receiver<(Protocol, bool)>,
+}
+
+impl FilterChannel {
+    pub fn new() -> Self {
+        let (sender, receiver) = kanal::unbounded();
+        Self { sender, receiver }
+    }
+}
+
+impl Default for FilterChannel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[derive(Debug)]
 pub struct App {
     pub running: bool,
@@ -69,6 +91,8 @@ pub struct App {
     pub transport_filter: TransportFilter,
     pub link_filter: LinkFilter,
     pub traffic_direction_filter: TrafficDirectionFilter,
+    pub ingress_filter_channel: FilterChannel,
+    pub egress_filter_channel: FilterChannel,
     pub start_sniffing: bool,
     pub packets: Arc<Mutex<Vec<AppPacket>>>,
     pub packets_table_state: TableState,
@@ -96,29 +120,19 @@ impl App {
         let stats = Arc::new(Mutex::new(Stats::default()));
         let fuzzy = Arc::new(Mutex::new(Fuzzy::default()));
 
-        let network_filter = NetworkFilter::default();
-        let transport_filter = TransportFilter::default();
-        let link_filter = LinkFilter::default();
+        let network_filter = NetworkFilter::new();
+        let transport_filter = TransportFilter::new();
+        let link_filter = LinkFilter::new();
 
         let (sender, receiver) = kanal::unbounded();
 
         thread::spawn({
             let packets = packets.clone();
             let stats = stats.clone();
-            let transport_filters = transport_filter.applied_protocols.clone();
-            let network_filters = network_filter.applied_protocols.clone();
-            let link_filters = link_filter.applied_protocols.clone();
 
             move || loop {
                 if let Ok(raw_packet) = receiver.recv() {
-                    App::process(
-                        packets.clone(),
-                        stats.clone(),
-                        transport_filters.clone(),
-                        network_filters.clone(),
-                        link_filters.clone(),
-                        AppPacket::from(raw_packet),
-                    );
+                    App::process(packets.clone(), stats.clone(), AppPacket::from(raw_packet));
                 }
             }
         });
@@ -174,6 +188,8 @@ impl App {
             transport_filter,
             link_filter,
             traffic_direction_filter: TrafficDirectionFilter::default(),
+            ingress_filter_channel: FilterChannel::new(),
+            egress_filter_channel: FilterChannel::new(),
             start_sniffing: false,
             packets,
             packets_table_state: TableState::default(),
@@ -332,16 +348,12 @@ impl App {
             // Filters
             let widths = [Constraint::Length(10), Constraint::Fill(1)];
             let filters = {
-                let applied_transport_filters =
-                    self.transport_filter.applied_protocols.lock().unwrap();
-                let applied_network_filters = self.network_filter.applied_protocols.lock().unwrap();
-                let applied_link_filters = self.link_filter.applied_protocols.lock().unwrap();
                 [
                     Row::new(vec![
                         Line::styled("Transport", Style::new().bold()),
-                        Line::from_iter(TransportFilter::default().selected_protocols.iter().map(
+                        Line::from_iter(TransportFilter::new().selected_protocols.iter().map(
                             |filter| {
-                                if applied_transport_filters.contains(filter) {
+                                if self.transport_filter.applied_protocols.contains(filter) {
                                     Span::styled(
                                         format!(" {}  ", filter),
                                         Style::default().light_green(),
@@ -357,9 +369,9 @@ impl App {
                     ]),
                     Row::new(vec![
                         Line::styled("Network", Style::new().bold()),
-                        Line::from_iter(NetworkFilter::default().selected_protocols.iter().map(
+                        Line::from_iter(NetworkFilter::new().selected_protocols.iter().map(
                             |filter| {
-                                if applied_network_filters.contains(filter) {
+                                if self.network_filter.applied_protocols.contains(filter) {
                                     Span::styled(
                                         format!(" {}  ", filter),
                                         Style::default().light_green(),
@@ -375,9 +387,9 @@ impl App {
                     ]),
                     Row::new(vec![
                         Line::styled("Link", Style::new().bold()),
-                        Line::from_iter(LinkFilter::default().selected_protocols.iter().map(
+                        Line::from_iter(LinkFilter::new().selected_protocols.iter().map(
                             |filter| {
-                                if applied_link_filters.contains(filter) {
+                                if self.link_filter.applied_protocols.contains(filter) {
                                     Span::styled(
                                         format!(" {}  ", filter),
                                         Style::default().light_green(),
@@ -870,69 +882,17 @@ impl App {
     pub fn process(
         packets: Arc<Mutex<Vec<AppPacket>>>,
         stats: Arc<Mutex<Stats>>,
-        transport_filters: Arc<Mutex<Vec<TransportProtocol>>>,
-        network_filters: Arc<Mutex<Vec<NetworkProtocol>>>,
-        link_filters: Arc<Mutex<Vec<LinkProtocol>>>,
         app_packet: AppPacket,
     ) {
         let mut packets = packets.lock().unwrap();
 
-        let applied_transport_protocols = transport_filters.lock().unwrap();
-        let applied_network_protocols = network_filters.lock().unwrap();
-        let applied_link_protocols = link_filters.lock().unwrap();
-
         if packets.len() == packets.capacity() {
             packets.reserve(1024 * 1024);
         }
-        match app_packet {
-            AppPacket::Arp(_) => {
-                if applied_link_protocols.contains(&LinkProtocol::Arp) {
-                    packets.push(app_packet);
-                }
-            }
-            AppPacket::Ip(packet) => match packet {
-                IpPacket::Tcp(p) => {
-                    if applied_transport_protocols.contains(&TransportProtocol::TCP) {
-                        match p.src_ip {
-                            core::net::IpAddr::V6(_) => {
-                                if applied_network_protocols.contains(&NetworkProtocol::Ipv6) {
-                                    packets.push(app_packet);
-                                }
-                            }
-                            core::net::IpAddr::V4(_) => {
-                                if applied_network_protocols.contains(&NetworkProtocol::Ipv4) {
-                                    packets.push(app_packet);
-                                }
-                            }
-                        }
-                    }
-                }
-                IpPacket::Udp(p) => {
-                    if applied_transport_protocols.contains(&TransportProtocol::UDP) {
-                        match p.src_ip {
-                            core::net::IpAddr::V6(_) => {
-                                if applied_network_protocols.contains(&NetworkProtocol::Ipv6) {
-                                    packets.push(app_packet);
-                                }
-                            }
-                            core::net::IpAddr::V4(_) => {
-                                if applied_network_protocols.contains(&NetworkProtocol::Ipv4) {
-                                    packets.push(app_packet);
-                                }
-                            }
-                        }
-                    }
-                }
-                IpPacket::Icmp(_) => {
-                    if applied_network_protocols.contains(&NetworkProtocol::Icmp) {
-                        packets.push(app_packet);
-                    }
-                }
-            },
-        }
+
+        packets.push(app_packet);
 
         let mut stats = stats.lock().unwrap();
-
         stats.refresh(&app_packet);
     }
 

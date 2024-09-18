@@ -1,15 +1,16 @@
-use std::io;
 use std::os::fd::AsRawFd;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
-use std::thread;
+use std::thread::spawn;
 use std::time::Duration;
+use std::{io, thread};
 
 use aya::maps::ring_buf::RingBufItem;
-use aya::maps::{MapData, RingBuf};
+use aya::maps::{Array, MapData, RingBuf};
 use aya::programs::{tc, SchedClassifier, TcAttachType};
 use aya::{include_bytes_aligned, Bpf};
 use mio::{Events, Interest, Poll, Registry, Token};
+use oryx_common::protocols::Protocol;
 use oryx_common::RawPacket;
 
 use crate::event::Event;
@@ -63,6 +64,7 @@ impl Ebpf {
         iface: String,
         notification_sender: kanal::Sender<Event>,
         data_sender: kanal::Sender<[u8; RawPacket::LEN]>,
+        filter_channel_receiver: kanal::Receiver<(Protocol, bool)>,
         terminate: Arc<AtomicBool>,
     ) {
         thread::spawn({
@@ -143,6 +145,31 @@ impl Ebpf {
                 let mut poll = Poll::new().unwrap();
                 let mut events = Events::with_capacity(128);
 
+                let mut transport_filters: Array<_, u32> =
+                    Array::try_from(bpf.take_map("TRANSPORT_FILTERS").unwrap()).unwrap();
+
+                let mut network_filters: Array<_, u32> =
+                    Array::try_from(bpf.take_map("NETWORK_FILTERS").unwrap()).unwrap();
+
+                let mut link_filters: Array<_, u32> =
+                    Array::try_from(bpf.take_map("LINK_FILTERS").unwrap()).unwrap();
+
+                spawn(move || loop {
+                    if let Ok((filter, flag)) = filter_channel_receiver.recv() {
+                        match filter {
+                            Protocol::Transport(p) => {
+                                let _ = transport_filters.set(p as u32, flag as u32, 0);
+                            }
+                            Protocol::Network(p) => {
+                                let _ = network_filters.set(p as u32, flag as u32, 0);
+                            }
+                            Protocol::Link(p) => {
+                                let _ = link_filters.set(p as u32, flag as u32, 0);
+                            }
+                        }
+                    }
+                });
+
                 let mut ring_buf = RingBuffer::new(&mut bpf);
 
                 poll.registry()
@@ -190,6 +217,7 @@ impl Ebpf {
         iface: String,
         notification_sender: kanal::Sender<Event>,
         data_sender: kanal::Sender<[u8; RawPacket::LEN]>,
+        filter_channel_receiver: kanal::Receiver<(Protocol, bool)>,
         terminate: Arc<AtomicBool>,
     ) {
         thread::spawn({
@@ -266,6 +294,30 @@ impl Ebpf {
                 let mut poll = Poll::new().unwrap();
                 let mut events = Events::with_capacity(128);
 
+                let mut transport_filters: Array<_, u32> =
+                    Array::try_from(bpf.take_map("TRANSPORT_FILTERS").unwrap()).unwrap();
+
+                let mut network_filters: Array<_, u32> =
+                    Array::try_from(bpf.take_map("NETWORK_FILTERS").unwrap()).unwrap();
+
+                let mut link_filters: Array<_, u32> =
+                    Array::try_from(bpf.take_map("LINK_FILTERS").unwrap()).unwrap();
+
+                spawn(move || loop {
+                    if let Ok((filter, flag)) = filter_channel_receiver.recv() {
+                        match filter {
+                            Protocol::Transport(p) => {
+                                let _ = transport_filters.set(p as u32, flag as u32, 0);
+                            }
+                            Protocol::Network(p) => {
+                                let _ = network_filters.set(p as u32, flag as u32, 0);
+                            }
+                            Protocol::Link(p) => {
+                                let _ = link_filters.set(p as u32, flag as u32, 0);
+                            }
+                        }
+                    }
+                });
                 let mut ring_buf = RingBuffer::new(&mut bpf);
 
                 poll.registry()
