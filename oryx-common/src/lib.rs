@@ -1,14 +1,10 @@
 #![no_std]
 
-use core::{
-    fmt::Display,
-    mem,
-    net::{IpAddr, Ipv4Addr},
-};
+use core::{fmt::Display, mem, net::Ipv4Addr};
 
 use arp::{ArpPacket, ArpType, MacAddr};
-use ip::{IcmpPacket, IcmpType, IpPacket, ProtoHdr, TcpPacket, UdpPacket};
-use network_types::{arp::ArpHdr, ip::IpHdr};
+use ip::{IcmpPacket, IcmpType, IpPacket, IpProto, Ipv4Packet, Ipv6Packet, TcpPacket, UdpPacket};
+use network_types::{arp::ArpHdr, icmp::IcmpHdr, ip::IpHdr, tcp::TcpHdr, udp::UdpHdr};
 
 pub mod arp;
 pub mod ip;
@@ -16,8 +12,16 @@ pub mod protocols;
 
 #[repr(C)]
 pub enum RawPacket {
-    Ip(IpHdr, ip::ProtoHdr),
+    Ip(IpHdr, ProtoHdr),
     Arp(ArpHdr),
+}
+
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub enum ProtoHdr {
+    Tcp(TcpHdr),
+    Udp(UdpHdr),
+    Icmp(IcmpHdr),
 }
 
 impl RawPacket {
@@ -49,74 +53,64 @@ impl From<[u8; RawPacket::LEN]> for AppPacket {
         let raw_packet = value.as_ptr() as *const RawPacket;
         match unsafe { &*raw_packet } {
             RawPacket::Ip(packet, proto) => match packet {
-                IpHdr::V4(ipv4_packet) => match proto {
-                    ProtoHdr::Tcp(header) => {
-                        let tcp_packet = TcpPacket {
-                            src_ip: IpAddr::V4(Ipv4Addr::from(u32::from_be(ipv4_packet.src_addr))),
-                            src_port: u16::from_be(header.source),
-                            dst_ip: IpAddr::V4(Ipv4Addr::from(u32::from_be(ipv4_packet.dst_addr))),
-                            dst_port: u16::from_be(header.dest),
-                        };
-                        AppPacket::Ip(IpPacket::Tcp(tcp_packet))
-                    }
-                    ProtoHdr::Udp(header) => {
-                        let udp_packet = UdpPacket {
-                            src_ip: IpAddr::V4(Ipv4Addr::from(u32::from_be(ipv4_packet.src_addr))),
-                            src_port: u16::from_be(header.source),
-                            dst_ip: IpAddr::V4(Ipv4Addr::from(u32::from_be(ipv4_packet.dst_addr))),
-                            dst_port: u16::from_be(header.dest),
-                        };
-                        Self::Ip(IpPacket::Udp(udp_packet))
-                    }
-                    ProtoHdr::Icmp(header) => {
-                        let icmp_type = match header.type_ {
-                            0 => IcmpType::EchoRequest,
-                            1 => IcmpType::EchoReply,
-                            _ => IcmpType::DestinationUnreachable,
-                        };
+                IpHdr::V4(ipv4_packet) => {
+                    let src_ip = Ipv4Addr::from(u32::from_be(ipv4_packet.src_addr));
+                    let dst_ip = Ipv4Addr::from(u32::from_be(ipv4_packet.dst_addr));
 
-                        let icmp_packet = IcmpPacket {
-                            src_ip: IpAddr::V4(Ipv4Addr::from(u32::from_be(ipv4_packet.src_addr))),
-                            dst_ip: IpAddr::V4(Ipv4Addr::from(u32::from_be(ipv4_packet.dst_addr))),
-                            icmp_type,
-                        };
-                        Self::Ip(IpPacket::Icmp(icmp_packet))
-                    }
-                },
-                IpHdr::V6(ipv6_packet) => match proto {
-                    ProtoHdr::Tcp(header) => {
-                        let tcp_packet = TcpPacket {
-                            src_ip: IpAddr::V6(ipv6_packet.src_addr()),
-                            src_port: u16::from_be(header.source),
-                            dst_ip: IpAddr::V6(ipv6_packet.dst_addr()),
-                            dst_port: u16::from_be(header.dest),
-                        };
-                        Self::Ip(IpPacket::Tcp(tcp_packet))
-                    }
-                    ProtoHdr::Udp(header) => {
-                        let udp_packet = UdpPacket {
-                            src_ip: IpAddr::V6(ipv6_packet.src_addr()),
-                            src_port: u16::from_be(header.source),
-                            dst_ip: IpAddr::V6(ipv6_packet.dst_addr()),
-                            dst_port: u16::from_be(header.dest),
-                        };
-                        Self::Ip(IpPacket::Udp(udp_packet))
-                    }
-                    ProtoHdr::Icmp(header) => {
-                        let icmp_type = match header.type_ {
-                            0 => IcmpType::EchoRequest,
-                            1 => IcmpType::EchoReply,
-                            _ => IcmpType::DestinationUnreachable,
-                        };
+                    let proto = match proto {
+                        ProtoHdr::Tcp(tcp_header) => IpProto::Tcp(TcpPacket {
+                            src_port: u16::from_be(tcp_header.source),
+                            dst_port: u16::from_be(tcp_header.dest),
+                        }),
+                        ProtoHdr::Udp(udp_header) => IpProto::Udp(UdpPacket {
+                            src_port: u16::from_be(udp_header.source),
+                            dst_port: u16::from_be(udp_header.dest),
+                        }),
+                        ProtoHdr::Icmp(header) => {
+                            let icmp_type = match header.type_ {
+                                0 => IcmpType::EchoRequest,
+                                1 => IcmpType::EchoReply,
+                                _ => IcmpType::DestinationUnreachable,
+                            };
+                            IpProto::Icmp(IcmpPacket { icmp_type })
+                        }
+                    };
 
-                        let icmp_packet = IcmpPacket {
-                            src_ip: IpAddr::V6(ipv6_packet.src_addr()),
-                            dst_ip: IpAddr::V6(ipv6_packet.dst_addr()),
-                            icmp_type,
-                        };
-                        Self::Ip(IpPacket::Icmp(icmp_packet))
-                    }
-                },
+                    AppPacket::Ip(IpPacket::V4(Ipv4Packet {
+                        src_ip,
+                        dst_ip,
+                        proto,
+                    }))
+                }
+                IpHdr::V6(ipv6_packet) => {
+                    let src_ip = ipv6_packet.src_addr();
+                    let dst_ip = ipv6_packet.dst_addr();
+
+                    let proto = match proto {
+                        ProtoHdr::Tcp(tcp_header) => IpProto::Tcp(TcpPacket {
+                            src_port: u16::from_be(tcp_header.source),
+                            dst_port: u16::from_be(tcp_header.dest),
+                        }),
+                        ProtoHdr::Udp(udp_header) => IpProto::Udp(UdpPacket {
+                            src_port: u16::from_be(udp_header.source),
+                            dst_port: u16::from_be(udp_header.dest),
+                        }),
+                        ProtoHdr::Icmp(header) => {
+                            let icmp_type = match header.type_ {
+                                0 => IcmpType::EchoRequest,
+                                1 => IcmpType::EchoReply,
+                                _ => IcmpType::DestinationUnreachable,
+                            };
+                            IpProto::Icmp(IcmpPacket { icmp_type })
+                        }
+                    };
+
+                    AppPacket::Ip(IpPacket::V6(Ipv6Packet {
+                        src_ip,
+                        dst_ip,
+                        proto,
+                    }))
+                }
             },
             RawPacket::Arp(packet) => {
                 let arp_type = match u16::from_be(packet.oper) {

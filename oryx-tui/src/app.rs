@@ -1,4 +1,4 @@
-use oryx_common::ip::IpPacket;
+use oryx_common::ip::{IpPacket, IpProto};
 use oryx_common::protocols::{
     Protocol, NB_LINK_PROTOCOL, NB_NETWORK_PROTOCOL, NB_TRANSPORT_PROTOCOL,
 };
@@ -629,27 +629,52 @@ impl App {
                         fuzzy::highlight(pattern, "ARP".to_string()).cyan(),
                     ]),
                     AppPacket::Ip(packet) => match packet {
-                        IpPacket::Tcp(p) => Row::new(vec![
-                            fuzzy::highlight(pattern, p.src_ip.to_string()).blue(),
-                            fuzzy::highlight(pattern, p.src_port.to_string()).yellow(),
-                            fuzzy::highlight(pattern, p.dst_ip.to_string()).blue(),
-                            fuzzy::highlight(pattern, p.dst_port.to_string()).yellow(),
-                            fuzzy::highlight(pattern, "TCP".to_string()).cyan(),
-                        ]),
-                        IpPacket::Udp(p) => Row::new(vec![
-                            fuzzy::highlight(pattern, p.src_ip.to_string()).blue(),
-                            fuzzy::highlight(pattern, p.src_port.to_string()).yellow(),
-                            fuzzy::highlight(pattern, p.dst_ip.to_string()).blue(),
-                            fuzzy::highlight(pattern, p.dst_port.to_string()).yellow(),
-                            fuzzy::highlight(pattern, "UDP".to_string()).cyan(),
-                        ]),
-                        IpPacket::Icmp(p) => Row::new(vec![
-                            fuzzy::highlight(pattern, p.src_ip.to_string()).blue(),
-                            Cell::from(Line::from("-").centered()).yellow(),
-                            fuzzy::highlight(pattern, p.dst_ip.to_string()).blue(),
-                            Cell::from(Line::from("-").centered()).yellow(),
-                            fuzzy::highlight(pattern, "ICMP".to_string()).cyan(),
-                        ]),
+                        IpPacket::V4(ipv4_packet) => match ipv4_packet.proto {
+                            IpProto::Tcp(p) => Row::new(vec![
+                                fuzzy::highlight(pattern, ipv4_packet.src_ip.to_string()).blue(),
+                                fuzzy::highlight(pattern, p.src_port.to_string()).yellow(),
+                                fuzzy::highlight(pattern, ipv4_packet.dst_ip.to_string()).blue(),
+                                fuzzy::highlight(pattern, p.dst_port.to_string()).yellow(),
+                                fuzzy::highlight(pattern, "TCP".to_string()).cyan(),
+                            ]),
+                            IpProto::Udp(p) => Row::new(vec![
+                                fuzzy::highlight(pattern, ipv4_packet.src_ip.to_string()).blue(),
+                                fuzzy::highlight(pattern, p.src_port.to_string()).yellow(),
+                                fuzzy::highlight(pattern, ipv4_packet.dst_ip.to_string()).blue(),
+                                fuzzy::highlight(pattern, p.dst_port.to_string()).yellow(),
+                                fuzzy::highlight(pattern, "UDP".to_string()).cyan(),
+                            ]),
+                            IpProto::Icmp(_) => Row::new(vec![
+                                fuzzy::highlight(pattern, ipv4_packet.src_ip.to_string()).blue(),
+                                Cell::from(Line::from("-").centered()).yellow(),
+                                fuzzy::highlight(pattern, ipv4_packet.dst_ip.to_string()).blue(),
+                                Cell::from(Line::from("-").centered()).yellow(),
+                                fuzzy::highlight(pattern, "ICMP".to_string()).cyan(),
+                            ]),
+                        },
+                        IpPacket::V6(ipv6_packet) => match ipv6_packet.proto {
+                            IpProto::Tcp(p) => Row::new(vec![
+                                fuzzy::highlight(pattern, ipv6_packet.src_ip.to_string()).blue(),
+                                fuzzy::highlight(pattern, p.src_port.to_string()).yellow(),
+                                fuzzy::highlight(pattern, ipv6_packet.dst_ip.to_string()).blue(),
+                                fuzzy::highlight(pattern, p.dst_port.to_string()).yellow(),
+                                fuzzy::highlight(pattern, "TCP".to_string()).cyan(),
+                            ]),
+                            IpProto::Udp(p) => Row::new(vec![
+                                fuzzy::highlight(pattern, ipv6_packet.src_ip.to_string()).blue(),
+                                fuzzy::highlight(pattern, p.src_port.to_string()).yellow(),
+                                fuzzy::highlight(pattern, ipv6_packet.dst_ip.to_string()).blue(),
+                                fuzzy::highlight(pattern, p.dst_port.to_string()).yellow(),
+                                fuzzy::highlight(pattern, "UDP".to_string()).cyan(),
+                            ]),
+                            IpProto::Icmp(_) => Row::new(vec![
+                                fuzzy::highlight(pattern, ipv6_packet.src_ip.to_string()).blue(),
+                                Cell::from(Line::from("-").centered()).yellow(),
+                                fuzzy::highlight(pattern, ipv6_packet.dst_ip.to_string()).blue(),
+                                Cell::from(Line::from("-").centered()).yellow(),
+                                fuzzy::highlight(pattern, "ICMP".to_string()).cyan(),
+                            ]),
+                        },
                     },
                 })
                 .collect()
@@ -669,35 +694,92 @@ impl App {
                         Span::from("ARP".to_string()).into_centered_line().cyan(),
                     ]),
                     AppPacket::Ip(packet) => match packet {
-                        IpPacket::Tcp(p) => Row::new(vec![
-                            Span::from(p.src_ip.to_string()).into_centered_line().blue(),
-                            Span::from(p.src_port.to_string())
-                                .into_centered_line()
-                                .yellow(),
-                            Span::from(p.dst_ip.to_string()).into_centered_line().blue(),
-                            Span::from(p.dst_port.to_string())
-                                .into_centered_line()
-                                .yellow(),
-                            Span::from("TCP".to_string()).into_centered_line().cyan(),
-                        ]),
-                        IpPacket::Udp(p) => Row::new(vec![
-                            Span::from(p.src_ip.to_string()).into_centered_line().blue(),
-                            Span::from(p.src_port.to_string())
-                                .into_centered_line()
-                                .yellow(),
-                            Span::from(p.dst_ip.to_string()).into_centered_line().blue(),
-                            Span::from(p.dst_port.to_string())
-                                .into_centered_line()
-                                .yellow(),
-                            Span::from("UDP".to_string()).into_centered_line().cyan(),
-                        ]),
-                        IpPacket::Icmp(p) => Row::new(vec![
-                            Span::from(p.src_ip.to_string()).into_centered_line().blue(),
-                            Span::from("-").into_centered_line().yellow(),
-                            Span::from(p.dst_ip.to_string()).into_centered_line().blue(),
-                            Span::from("-").into_centered_line().yellow(),
-                            Span::from("ICMP".to_string()).into_centered_line().cyan(),
-                        ]),
+                        IpPacket::V4(ipv4_packet) => match ipv4_packet.proto {
+                            IpProto::Tcp(p) => Row::new(vec![
+                                Span::from(ipv4_packet.src_ip.to_string())
+                                    .into_centered_line()
+                                    .blue(),
+                                Span::from(p.src_port.to_string())
+                                    .into_centered_line()
+                                    .yellow(),
+                                Span::from(ipv4_packet.dst_ip.to_string())
+                                    .into_centered_line()
+                                    .blue(),
+                                Span::from(p.dst_port.to_string())
+                                    .into_centered_line()
+                                    .yellow(),
+                                Span::from("TCP".to_string()).into_centered_line().cyan(),
+                            ]),
+                            IpProto::Udp(p) => Row::new(vec![
+                                Span::from(ipv4_packet.src_ip.to_string())
+                                    .into_centered_line()
+                                    .blue(),
+                                Span::from(p.src_port.to_string())
+                                    .into_centered_line()
+                                    .yellow(),
+                                Span::from(ipv4_packet.dst_ip.to_string())
+                                    .into_centered_line()
+                                    .blue(),
+                                Span::from(p.dst_port.to_string())
+                                    .into_centered_line()
+                                    .yellow(),
+                                Span::from("UDP".to_string()).into_centered_line().cyan(),
+                            ]),
+                            IpProto::Icmp(_) => Row::new(vec![
+                                Span::from(ipv4_packet.src_ip.to_string())
+                                    .into_centered_line()
+                                    .blue(),
+                                Span::from("-").into_centered_line().yellow(),
+                                Span::from(ipv4_packet.dst_ip.to_string())
+                                    .into_centered_line()
+                                    .blue(),
+                                Span::from("-").into_centered_line().yellow(),
+                                Span::from("ICMP".to_string()).into_centered_line().cyan(),
+                            ]),
+                        },
+                        IpPacket::V6(ipv6_packet) => match ipv6_packet.proto {
+                            IpProto::Tcp(p) => Row::new(vec![
+                                Span::from(ipv6_packet.src_ip.to_string())
+                                    .into_centered_line()
+                                    .blue(),
+                                Span::from(p.src_port.to_string())
+                                    .into_centered_line()
+                                    .yellow(),
+                                Span::from(ipv6_packet.dst_ip.to_string())
+                                    .into_centered_line()
+                                    .blue(),
+                                Span::from(p.dst_port.to_string())
+                                    .into_centered_line()
+                                    .yellow(),
+                                Span::from("TCP".to_string()).into_centered_line().cyan(),
+                            ]),
+                            IpProto::Udp(p) => Row::new(vec![
+                                Span::from(ipv6_packet.src_ip.to_string())
+                                    .into_centered_line()
+                                    .blue(),
+                                Span::from(p.src_port.to_string())
+                                    .into_centered_line()
+                                    .yellow(),
+                                Span::from(ipv6_packet.dst_ip.to_string())
+                                    .into_centered_line()
+                                    .blue(),
+                                Span::from(p.dst_port.to_string())
+                                    .into_centered_line()
+                                    .yellow(),
+                                Span::from("UDP".to_string()).into_centered_line().cyan(),
+                            ]),
+                            IpProto::Icmp(_) => Row::new(vec![
+                                Span::from(ipv6_packet.src_ip.to_string())
+                                    .into_centered_line()
+                                    .blue(),
+                                Span::from("-").into_centered_line().yellow(),
+                                Span::from(ipv6_packet.dst_ip.to_string())
+                                    .into_centered_line()
+                                    .blue(),
+                                Span::from("-").into_centered_line().yellow(),
+                                Span::from("ICMP".to_string()).into_centered_line().cyan(),
+                            ]),
+                        },
                     },
                 })
                 .collect()
