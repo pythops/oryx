@@ -26,7 +26,7 @@ impl IpPacket {
                         let chunks = Layout::default()
                             .direction(Direction::Vertical)
                             .constraints([Constraint::Length(20), Constraint::Length(13)])
-                            .flex(ratatui::layout::Flex::SpaceBetween)
+                            .flex(ratatui::layout::Flex::SpaceAround)
                             .margin(2)
                             .split(block);
 
@@ -41,7 +41,7 @@ impl IpPacket {
                         let chunks = Layout::default()
                             .direction(Direction::Vertical)
                             .constraints([Constraint::Length(8), Constraint::Length(13)])
-                            .flex(ratatui::layout::Flex::SpaceBetween)
+                            .flex(ratatui::layout::Flex::SpaceAround)
                             .margin(2)
                             .split(block);
 
@@ -55,7 +55,7 @@ impl IpPacket {
                         let chunks = Layout::default()
                             .direction(Direction::Vertical)
                             .constraints([Constraint::Length(7), Constraint::Length(13)])
-                            .flex(ratatui::layout::Flex::SpaceBetween)
+                            .flex(ratatui::layout::Flex::SpaceAround)
                             .margin(2)
                             .split(block);
 
@@ -71,7 +71,7 @@ impl IpPacket {
                         let chunks = Layout::default()
                             .direction(Direction::Vertical)
                             .constraints([Constraint::Length(20), Constraint::Length(9)])
-                            .flex(ratatui::layout::Flex::SpaceBetween)
+                            .flex(ratatui::layout::Flex::SpaceAround)
                             .margin(2)
                             .split(block);
 
@@ -86,7 +86,7 @@ impl IpPacket {
                         let chunks = Layout::default()
                             .direction(Direction::Vertical)
                             .constraints([Constraint::Length(8), Constraint::Length(9)])
-                            .flex(ratatui::layout::Flex::SpaceBetween)
+                            .flex(ratatui::layout::Flex::SpaceAround)
                             .margin(2)
                             .split(block);
 
@@ -100,7 +100,7 @@ impl IpPacket {
                         let chunks = Layout::default()
                             .direction(Direction::Vertical)
                             .constraints([Constraint::Length(7), Constraint::Length(9)])
-                            .flex(ratatui::layout::Flex::SpaceBetween)
+                            .flex(ratatui::layout::Flex::SpaceAround)
                             .margin(2)
                             .split(block);
 
@@ -187,7 +187,7 @@ impl Ipv4Packet {
             ]),
             Row::new(vec![
                 Span::styled("Checksum", Style::new().bold()),
-                Span::from(format!("{:0x}", self.checksum)),
+                Span::from(format!("{:#0x}", self.checksum)),
             ]),
         ];
 
@@ -326,7 +326,7 @@ impl IcmpPacket {
             ]),
             Row::new(vec![
                 Span::styled("Checksum", Style::new().bold()),
-                Span::from(self.checksum.to_string()),
+                Span::from(format!("{:#0x}", self.checksum)),
             ]),
         ];
 

@@ -108,7 +108,7 @@ impl TcpPacket {
             ]),
             Row::new(vec![
                 Span::styled("Checksum", Style::new().bold()),
-                Span::from(self.checksum.to_string()),
+                Span::from(format!("{:#0x}", self.checksum)),
             ]),
             Row::new(vec![
                 Span::styled("Urgent Pointer", Style::new().bold()),
@@ -169,11 +169,11 @@ impl UdpPacket {
             ]),
             Row::new(vec![
                 Span::styled("Length", Style::new().bold()),
-                Span::from(self.length.to_string()),
+                Span::from(format!("{} bytes", self.length)),
             ]),
             Row::new(vec![
                 Span::styled("Checksum", Style::new().bold()),
-                Span::from(self.checksum.to_string()),
+                Span::from(format!("{:#0x}", self.checksum)),
             ]),
         ];
 
