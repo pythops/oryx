@@ -1,9 +1,6 @@
 use dns_lookup::lookup_addr;
-use oryx_common::AppPacket;
 use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr};
-
-use oryx_common::ip::{IpPacket, IpProto};
 
 use ratatui::layout::{Alignment, Constraint, Direction, Flex, Layout, Rect};
 use ratatui::style::{Color, Style};
@@ -12,6 +9,9 @@ use ratatui::{
     widgets::{Bar, BarChart, BarGroup, Block, Padding},
     Frame,
 };
+
+use crate::packets::network::{IpPacket, IpProto};
+use crate::packets::packet::AppPacket;
 
 #[derive(Debug)]
 pub struct Stats {

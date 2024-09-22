@@ -5,7 +5,7 @@ use ratatui::{
 };
 use tui_input::Input;
 
-use oryx_common::AppPacket;
+use crate::packets::packet::AppPacket;
 
 #[derive(Debug, Clone, Default)]
 pub struct Fuzzy {

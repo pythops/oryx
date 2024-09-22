@@ -2,10 +2,9 @@ use std::fs::{create_dir, OpenOptions};
 use std::io::prelude::*;
 use std::os::unix::fs::chown;
 
-use oryx_common::ip::{IpPacket, IpProto};
-use oryx_common::AppPacket;
-
 use crate::app::AppResult;
+use crate::packets::network::{IpPacket, IpProto};
+use crate::packets::packet::AppPacket;
 
 pub fn export(packets: &[AppPacket]) -> AppResult<()> {
     let uid = unsafe { libc::geteuid() };

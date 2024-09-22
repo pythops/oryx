@@ -26,6 +26,14 @@ pub fn handle_key_events(
     app: &mut App,
     sender: kanal::Sender<Event>,
 ) -> AppResult<()> {
+    if app.show_packet_infos_popup {
+        if key_event.code == KeyCode::Esc {
+            app.show_packet_infos_popup = false;
+        }
+
+        return Ok(());
+    }
+
     let fuzzy = app.fuzzy.clone();
     let mut fuzzy = fuzzy.lock().unwrap();
 
@@ -157,6 +165,13 @@ pub fn handle_key_events(
 
                         KeyCode::Char('?') => {
                             app.focused_block = FocusedBlock::Help;
+                        }
+
+                        KeyCode::Char('i') => {
+                            if app.focused_block == FocusedBlock::Help {
+                                return Ok(());
+                            }
+                            app.show_packet_infos_popup = true;
                         }
 
                         KeyCode::Char('f') => {
@@ -461,6 +476,13 @@ pub fn handle_key_events(
                     fuzzy.enable();
                     fuzzy.unpause();
                 }
+            }
+
+            KeyCode::Char('i') => {
+                if app.focused_block == FocusedBlock::Help {
+                    return Ok(());
+                }
+                app.show_packet_infos_popup = true;
             }
 
             KeyCode::Char('r') => {

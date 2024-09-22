@@ -1,8 +1,7 @@
-use oryx_common::ip::{IpPacket, IpProto};
 use oryx_common::protocols::{
     Protocol, NB_LINK_PROTOCOL, NB_NETWORK_PROTOCOL, NB_TRANSPORT_PROTOCOL,
 };
-use oryx_common::{AppPacket, RawPacket};
+use oryx_common::RawPacket;
 use ratatui::layout::{Alignment, Constraint, Direction, Flex, Layout, Margin, Rect};
 use ratatui::style::{Color, Style, Stylize};
 use ratatui::text::{Line, Span};
@@ -14,7 +13,6 @@ use ratatui::{
     },
     Frame,
 };
-use std::borrow::Borrow;
 use std::net::IpAddr;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -30,6 +28,8 @@ use crate::filters::transport::TransportFilter;
 use crate::help::Help;
 use crate::interface::Interface;
 use crate::notification::Notification;
+use crate::packets::network::{IpPacket, IpProto};
+use crate::packets::packet::AppPacket;
 use crate::stats::Stats;
 
 pub type AppResult<T> = std::result::Result<T, Box<dyn error::Error>>;
@@ -106,6 +106,8 @@ pub struct App {
     pub update_filters: bool,
     pub data_channel_sender: kanal::Sender<[u8; RawPacket::LEN]>,
     pub bandwidth: Arc<Mutex<Option<Bandwidth>>>,
+    pub show_packet_infos_popup: bool,
+    pub packet_index: Option<usize>,
 }
 
 impl Default for App {
@@ -203,6 +205,8 @@ impl App {
             update_filters: false,
             data_channel_sender: sender,
             bandwidth,
+            show_packet_infos_popup: false,
+            packet_index: None,
         }
     }
 
@@ -448,7 +452,12 @@ impl App {
 
             // Packets/Stats
             match self.mode {
-                Mode::Packet => self.render_packets_mode(frame, mode_block),
+                Mode::Packet => {
+                    self.render_packets_mode(frame, mode_block);
+                    if self.show_packet_infos_popup {
+                        self.render_packet_infos_popup(frame);
+                    }
+                }
                 Mode::Stats => self.render_stats_mode(frame, mode_block),
             }
 
@@ -588,36 +597,52 @@ impl App {
         let packets_to_display = match self.manuall_scroll {
             true => {
                 if fuzzy.is_enabled() & !fuzzy.filter.value().is_empty() {
+                    let selected_packet_index = fuzzy.scroll_state.selected().unwrap();
                     if fuzzy_packets.len() > window_size {
+                        self.packet_index = Some(
+                            fuzzy.packet_end_index.saturating_sub(window_size)
+                                + selected_packet_index,
+                        );
                         &fuzzy_packets[fuzzy.packet_end_index.saturating_sub(window_size)
                             ..fuzzy.packet_end_index]
                     } else {
+                        self.packet_index = Some(selected_packet_index);
                         &fuzzy_packets
                     }
                 } else if app_packets.len() > window_size {
+                    let selected_packet_index = self.packets_table_state.selected().unwrap();
+                    self.packet_index = Some(
+                        fuzzy.packet_end_index.saturating_sub(window_size) + selected_packet_index,
+                    );
                     &app_packets
                         [self.packet_end_index.saturating_sub(window_size)..self.packet_end_index]
                 } else {
+                    let selected_packet_index = self.packets_table_state.selected().unwrap();
+                    self.packet_index = Some(selected_packet_index);
                     &app_packets
                 }
             }
             false => {
                 if fuzzy.is_enabled() & !fuzzy.filter.value().is_empty() {
                     if fuzzy_packets.len() > window_size {
+                        self.packet_index = Some(fuzzy_packets.len().saturating_sub(1));
                         &fuzzy_packets[fuzzy_packets.len().saturating_sub(window_size)..]
                     } else {
+                        self.packet_index = Some(fuzzy_packets.len().saturating_sub(1));
                         &fuzzy_packets
                     }
                 } else if app_packets.len() > window_size {
+                    self.packet_index = Some(app_packets.len().saturating_sub(1));
                     &app_packets[app_packets.len().saturating_sub(window_size)..]
                 } else {
+                    self.packet_index = Some(app_packets.len().saturating_sub(1));
                     &app_packets
                 }
             }
         };
 
         // Style the packets
-        let packets: Vec<Row> = if fuzzy.is_enabled() & !fuzzy.borrow().filter.value().is_empty() {
+        let packets: Vec<Row> = if fuzzy.is_enabled() & !fuzzy.filter.value().is_empty() {
             packets_to_display
                 .iter()
                 .map(|app_packet| match app_packet {
@@ -837,7 +862,7 @@ impl App {
                     .border_style(Style::default().green()),
             );
 
-        if fuzzy.borrow().is_enabled() {
+        if fuzzy.is_enabled() {
             frame.render_stateful_widget(table, packet_block, &mut fuzzy.scroll_state);
         } else {
             frame.render_stateful_widget(table, packet_block, &mut self.packets_table_state);
@@ -852,13 +877,13 @@ impl App {
         let mut scrollbar_state = if fuzzy.is_enabled() && fuzzy_packets.len() > window_size {
             ScrollbarState::new(fuzzy_packets.len()).position({
                 if self.manuall_scroll {
-                    if fuzzy.borrow().packet_end_index == window_size {
+                    if fuzzy.packet_end_index == window_size {
                         0
                     } else {
-                        fuzzy.borrow().packet_end_index
+                        fuzzy.packet_end_index
                     }
                 } else {
-                    fuzzy.borrow().packets.len()
+                    fuzzy.packets.len()
                 }
             })
         } else if !fuzzy.is_enabled() && app_packets.len() > window_size {
@@ -886,7 +911,7 @@ impl App {
             &mut scrollbar_state,
         );
 
-        if fuzzy.borrow().is_enabled() {
+        if fuzzy.is_enabled() {
             let fuzzy = Paragraph::new(format!("> {}", fuzzy.filter.value()))
                 .alignment(Alignment::Left)
                 .style(Style::default().white())
@@ -959,6 +984,53 @@ impl App {
                 &self.interface.selected_interface.name.clone(),
             );
         }
+    }
+
+    fn render_packet_infos_popup(&self, frame: &mut Frame) {
+        let layout = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Fill(1),
+                Constraint::Length(36),
+                Constraint::Fill(1),
+            ])
+            .flex(ratatui::layout::Flex::SpaceBetween)
+            .split(frame.area());
+
+        let block = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Fill(1),
+                Constraint::Percentage(70),
+                Constraint::Fill(1),
+            ])
+            .flex(ratatui::layout::Flex::SpaceBetween)
+            .split(layout[1])[1];
+
+        let fuzzy = self.fuzzy.lock().unwrap();
+        let packets = self.packets.lock().unwrap();
+
+        let packet = if fuzzy.is_enabled() {
+            fuzzy.packets[self.packet_index.unwrap()]
+        } else {
+            packets[self.packet_index.unwrap()]
+        };
+
+        frame.render_widget(Clear, block);
+        frame.render_widget(
+            Block::new()
+                .title(" Packet Infos 󰋼  ")
+                .title_style(Style::new().bold().green())
+                .title_alignment(Alignment::Center)
+                .borders(Borders::all())
+                .border_style(Style::new().green())
+                .border_type(BorderType::Thick),
+            block,
+        );
+        match packet {
+            AppPacket::Ip(ip_packet) => ip_packet.render(block, frame),
+            AppPacket::Arp(arp_packet) => arp_packet.render(block, frame),
+        };
     }
 
     pub fn process(
