@@ -1001,7 +1001,7 @@ impl App {
             .direction(Direction::Horizontal)
             .constraints([
                 Constraint::Fill(1),
-                Constraint::Percentage(70),
+                Constraint::Max(80),
                 Constraint::Fill(1),
             ])
             .flex(ratatui::layout::Flex::SpaceBetween)
