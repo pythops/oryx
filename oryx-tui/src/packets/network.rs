@@ -70,7 +70,7 @@ impl IpPacket {
                     let (transport_block, network_block) = {
                         let chunks = Layout::default()
                             .direction(Direction::Vertical)
-                            .constraints([Constraint::Length(20), Constraint::Length(9)])
+                            .constraints([Constraint::Length(20), Constraint::Length(10)])
                             .flex(ratatui::layout::Flex::SpaceAround)
                             .margin(2)
                             .split(block);
@@ -85,7 +85,7 @@ impl IpPacket {
                     let (transport_block, network_block) = {
                         let chunks = Layout::default()
                             .direction(Direction::Vertical)
-                            .constraints([Constraint::Length(8), Constraint::Length(9)])
+                            .constraints([Constraint::Length(8), Constraint::Length(10)])
                             .flex(ratatui::layout::Flex::SpaceAround)
                             .margin(2)
                             .split(block);
@@ -99,7 +99,7 @@ impl IpPacket {
                     let (transport_block, network_block) = {
                         let chunks = Layout::default()
                             .direction(Direction::Vertical)
-                            .constraints([Constraint::Length(7), Constraint::Length(9)])
+                            .constraints([Constraint::Length(7), Constraint::Length(10)])
                             .flex(ratatui::layout::Flex::SpaceAround)
                             .margin(2)
                             .split(block);
@@ -252,10 +252,15 @@ impl Ipv6Packet {
                 Span::styled("Traffic Class", Style::new().bold()),
                 Span::from(self.traffic_class.to_string()),
             ]),
-            // Row::new(vec![
-            //     Span::styled("Flow Label", Style::new().bold()),
-            //     Span::from(&self.flow_label.to_vec().to_string()),
-            // ]),
+            Row::new(vec![
+                Span::styled("Flow Label", Style::new().bold()),
+                Span::from(format!(
+                    "{:#0x}",
+                    (self.flow_label[0] as u32) << 16
+                        | (self.flow_label[1] as u32) << 8
+                        | (self.flow_label[2] as u32)
+                )),
+            ]),
             Row::new(vec![
                 Span::styled("Payload Length", Style::new().bold()),
                 Span::from(self.traffic_class.to_string()),
