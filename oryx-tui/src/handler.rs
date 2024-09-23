@@ -168,7 +168,7 @@ pub fn handle_key_events(
                         }
 
                         KeyCode::Char('i') => {
-                            if app.focused_block == FocusedBlock::Help {
+                            if app.focused_block == FocusedBlock::Help || app.update_filters {
                                 return Ok(());
                             }
                             app.show_packet_infos_popup = true;
@@ -479,7 +479,7 @@ pub fn handle_key_events(
             }
 
             KeyCode::Char('i') => {
-                if app.focused_block == FocusedBlock::Help {
+                if app.focused_block == FocusedBlock::Help || app.update_filters {
                     return Ok(());
                 }
                 app.show_packet_infos_popup = true;
