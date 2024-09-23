@@ -171,6 +171,10 @@ pub fn handle_key_events(
                             if app.focused_block == FocusedBlock::Help || app.update_filters {
                                 return Ok(());
                             }
+                            if app.packet_index.is_none() || fuzzy.packets.is_empty() {
+                                return Ok(());
+                            }
+
                             app.show_packet_infos_popup = true;
                         }
 
@@ -482,6 +486,12 @@ pub fn handle_key_events(
                 if app.focused_block == FocusedBlock::Help || app.update_filters {
                     return Ok(());
                 }
+                let packets = app.packets.lock().unwrap();
+
+                if app.packet_index.is_none() || packets.is_empty() {
+                    return Ok(());
+                }
+
                 app.show_packet_infos_popup = true;
             }
 

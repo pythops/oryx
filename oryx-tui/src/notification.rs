@@ -17,6 +17,7 @@ pub struct Notification {
 
 #[derive(Debug, Clone)]
 pub enum NotificationLevel {
+    Alert,
     Error,
     Warning,
     Info,
@@ -25,9 +26,10 @@ pub enum NotificationLevel {
 impl Notification {
     pub fn render(&self, index: usize, frame: &mut Frame) {
         let (color, title) = match self.level {
-            NotificationLevel::Info => (Color::Green, "Info"),
-            NotificationLevel::Warning => (Color::Yellow, "Warning"),
-            NotificationLevel::Error => (Color::Red, "Error"),
+            NotificationLevel::Info => (Color::Green, "Infos 󰋼 "),
+            NotificationLevel::Warning => (Color::Yellow, "Warning  "),
+            NotificationLevel::Error => (Color::Red, "Error  "),
+            NotificationLevel::Alert => (Color::Red, "Alert  "),
         };
 
         let mut text = Text::from(vec![

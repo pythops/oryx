@@ -597,28 +597,34 @@ impl App {
         let packets_to_display = match self.manuall_scroll {
             true => {
                 if fuzzy.is_enabled() & !fuzzy.filter.value().is_empty() {
-                    let selected_packet_index = fuzzy.scroll_state.selected().unwrap();
                     if fuzzy_packets.len() > window_size {
-                        self.packet_index = Some(
-                            fuzzy.packet_end_index.saturating_sub(window_size)
-                                + selected_packet_index,
-                        );
+                        if let Some(selected_index) = fuzzy.scroll_state.selected() {
+                            self.packet_index = Some(
+                                fuzzy.packet_end_index.saturating_sub(window_size) + selected_index,
+                            );
+                        }
                         &fuzzy_packets[fuzzy.packet_end_index.saturating_sub(window_size)
                             ..fuzzy.packet_end_index]
                     } else {
-                        self.packet_index = Some(selected_packet_index);
+                        if let Some(selected_index) = fuzzy.scroll_state.selected() {
+                            self.packet_index = Some(selected_index);
+                        } else {
+                            self.packet_index = None;
+                        }
                         &fuzzy_packets
                     }
                 } else if app_packets.len() > window_size {
-                    let selected_packet_index = self.packets_table_state.selected().unwrap();
-                    self.packet_index = Some(
-                        self.packet_end_index.saturating_sub(window_size) + selected_packet_index,
-                    );
+                    if let Some(selected_index) = self.packets_table_state.selected() {
+                        self.packet_index = Some(
+                            self.packet_end_index.saturating_sub(window_size) + selected_index,
+                        );
+                    }
                     &app_packets
                         [self.packet_end_index.saturating_sub(window_size)..self.packet_end_index]
                 } else {
-                    let selected_packet_index = self.packets_table_state.selected().unwrap();
-                    self.packet_index = Some(selected_packet_index);
+                    if let Some(selected_index) = self.packets_table_state.selected() {
+                        self.packet_index = Some(selected_index);
+                    }
                     &app_packets
                 }
             }
