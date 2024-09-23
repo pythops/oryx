@@ -1,5 +1,9 @@
 ## v0.3 - TBA
 
+### Added
+
+- Show packet details
+
 ### Changed
 
 - move filters to the epbf program
