@@ -606,6 +606,7 @@ dependencies = [
  "libc",
  "mimalloc",
  "mio",
+ "network-types",
  "oryx-common",
  "ratatui",
  "tui-big-text",

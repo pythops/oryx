@@ -95,6 +95,8 @@ sudo oryx
 
 `f`: Update the applied filters.
 
+`i`: Show more infos about the selected packet.
+
 `ctrl + r`: Reset the app.
 
 `ctrl + s`: Export the capture to `~/oryx/capture` file.

@@ -17,9 +17,8 @@ use network_types::{
     udp::UdpHdr,
 };
 use oryx_common::{
-    ip::ProtoHdr,
     protocols::{LinkProtocol, NetworkProtocol, Protocol, TransportProtocol},
-    RawPacket,
+    ProtoHdr, RawPacket,
 };
 
 #[map]

@@ -2,10 +2,9 @@ use std::fs::{create_dir, OpenOptions};
 use std::io::prelude::*;
 use std::os::unix::fs::chown;
 
-use oryx_common::ip::IpPacket;
-use oryx_common::AppPacket;
-
 use crate::app::AppResult;
+use crate::packets::network::{IpPacket, IpProto};
+use crate::packets::packet::AppPacket;
 
 pub fn export(packets: &[AppPacket]) -> AppResult<()> {
     let uid = unsafe { libc::geteuid() };
@@ -46,27 +45,52 @@ pub fn export(packets: &[AppPacket]) -> AppResult<()> {
                 )?;
             }
             AppPacket::Ip(packet) => match packet {
-                IpPacket::Tcp(p) => {
-                    writeln!(
-                        file,
-                        "{:39}  {:<11}  {:39}  {:<11}  TCP",
-                        p.src_ip, p.src_port, p.dst_ip, p.dst_port
-                    )?;
-                }
-                IpPacket::Udp(p) => {
-                    writeln!(
-                        file,
-                        "{:39}  {:<11}  {:39}  {:<11}  UDP",
-                        p.src_ip, p.src_port, p.dst_ip, p.dst_port
-                    )?;
-                }
-                IpPacket::Icmp(p) => {
-                    writeln!(
-                        file,
-                        "{:39}  {:^11}  {:39}  {:^11}  ICMP",
-                        p.src_ip, "-", p.dst_ip, "-"
-                    )?;
-                }
+                IpPacket::V4(ipv4_packet) => match ipv4_packet.proto {
+                    IpProto::Tcp(p) => {
+                        writeln!(
+                            file,
+                            "{:39}  {:<11}  {:39}  {:<11}  TCP",
+                            ipv4_packet.src_ip, p.src_port, ipv4_packet.dst_ip, p.dst_port
+                        )?;
+                    }
+                    IpProto::Udp(p) => {
+                        writeln!(
+                            file,
+                            "{:39}  {:<11}  {:39}  {:<11}  UDP",
+                            ipv4_packet.src_ip, p.src_port, ipv4_packet.dst_ip, p.dst_port
+                        )?;
+                    }
+                    IpProto::Icmp(_) => {
+                        writeln!(
+                            file,
+                            "{:39}  {:^11}  {:39}  {:^11}  ICMP",
+                            ipv4_packet.src_ip, "-", ipv4_packet.dst_ip, "-"
+                        )?;
+                    }
+                },
+                IpPacket::V6(ipv6_packet) => match ipv6_packet.proto {
+                    IpProto::Tcp(p) => {
+                        writeln!(
+                            file,
+                            "{:39}  {:<11}  {:39}  {:<11}  TCP",
+                            ipv6_packet.src_ip, p.src_port, ipv6_packet.dst_ip, p.dst_port
+                        )?;
+                    }
+                    IpProto::Udp(p) => {
+                        writeln!(
+                            file,
+                            "{:39}  {:<11}  {:39}  {:<11}  UDP",
+                            ipv6_packet.src_ip, p.src_port, ipv6_packet.dst_ip, p.dst_port
+                        )?;
+                    }
+                    IpProto::Icmp(_) => {
+                        writeln!(
+                            file,
+                            "{:39}  {:^11}  {:39}  {:^11}  ICMP",
+                            ipv6_packet.src_ip, "-", ipv6_packet.dst_ip, "-"
+                        )?;
+                    }
+                },
             },
         }
     }

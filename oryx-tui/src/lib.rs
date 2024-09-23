@@ -29,3 +29,10 @@ pub mod export;
 pub mod stats;
 
 pub mod bandwidth;
+
+pub mod packets {
+    pub mod link;
+    pub mod network;
+    pub mod packet;
+    pub mod transport;
+}

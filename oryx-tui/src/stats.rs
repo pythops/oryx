@@ -1,9 +1,6 @@
 use dns_lookup::lookup_addr;
-use oryx_common::AppPacket;
 use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr};
-
-use oryx_common::ip::IpPacket;
 
 use ratatui::layout::{Alignment, Constraint, Direction, Flex, Layout, Rect};
 use ratatui::style::{Color, Style};
@@ -12,6 +9,9 @@ use ratatui::{
     widgets::{Bar, BarChart, BarGroup, Block, Padding},
     Frame,
 };
+
+use crate::packets::network::{IpPacket, IpProto};
+use crate::packets::packet::AppPacket;
 
 #[derive(Debug)]
 pub struct Stats {
@@ -52,115 +52,48 @@ impl Stats {
                 self.link.arp += 1;
             }
             AppPacket::Ip(packet) => match packet {
-                IpPacket::Tcp(p) => {
-                    match p.src_ip {
-                        IpAddr::V4(ip) => {
-                            self.network.ipv4 += 1;
-                            self.transport.tcp += 1;
+                IpPacket::V4(ipv4_packet) => {
+                    self.network.ipv4 += 1;
 
-                            if !ip.is_private() && !ip.is_loopback() {
-                                if let Some((_, counts)) = self.addresses.get_mut(&ip) {
-                                    *counts += 1;
-                                } else if let Ok(host) = lookup_addr(&IpAddr::V4(ip)) {
-                                    self.addresses.insert(ip, (Some(host), 1));
-                                } else {
-                                    self.addresses.insert(ip, (None, 1));
-                                }
-                            }
+                    if !ipv4_packet.dst_ip.is_private() && !ipv4_packet.dst_ip.is_loopback() {
+                        if let Some((_, counts)) = self.addresses.get_mut(&ipv4_packet.dst_ip) {
+                            *counts += 1;
+                        } else if let Ok(host) = lookup_addr(&IpAddr::V4(ipv4_packet.dst_ip)) {
+                            self.addresses.insert(ipv4_packet.dst_ip, (Some(host), 1));
+                        } else {
+                            self.addresses.insert(ipv4_packet.dst_ip, (None, 1));
                         }
+                    }
 
-                        IpAddr::V6(_) => {
-                            self.network.ipv6 += 1;
+                    match ipv4_packet.proto {
+                        IpProto::Tcp(_) => {
                             self.transport.tcp += 1;
                         }
-                    };
-
-                    if let IpAddr::V4(ip) = p.dst_ip {
-                        if !ip.is_private() && !ip.is_loopback() {
-                            if let Some((_, counts)) = self.addresses.get_mut(&ip) {
-                                *counts += 1;
-                            } else if let Ok(host) = lookup_addr(&IpAddr::V4(ip)) {
-                                self.addresses.insert(ip, (Some(host), 1));
-                            } else {
-                                self.addresses.insert(ip, (None, 1));
-                            }
-                        }
-                    };
-                }
-                IpPacket::Udp(p) => {
-                    match p.src_ip {
-                        IpAddr::V4(ip) => {
-                            self.network.ipv4 += 1;
-                            self.transport.udp += 1;
-
-                            if !ip.is_private() && !ip.is_loopback() {
-                                if let Some((_, counts)) = self.addresses.get_mut(&ip) {
-                                    *counts += 1;
-                                } else if let Ok(host) = lookup_addr(&IpAddr::V4(ip)) {
-                                    self.addresses.insert(ip, (Some(host), 1));
-                                } else {
-                                    self.addresses.insert(ip, (None, 1));
-                                }
-                            }
-                        }
-
-                        IpAddr::V6(_) => {
-                            self.network.ipv6 += 1;
+                        IpProto::Udp(_) => {
                             self.transport.udp += 1;
                         }
-                    };
-
-                    if let IpAddr::V4(ip) = p.dst_ip {
-                        if !ip.is_private() && !ip.is_loopback() {
-                            if let Some((_, counts)) = self.addresses.get_mut(&ip) {
-                                *counts += 1;
-                            } else if let Ok(host) = lookup_addr(&IpAddr::V4(ip)) {
-                                self.addresses.insert(ip, (Some(host), 1));
-                            } else {
-                                self.addresses.insert(ip, (None, 1));
-                            }
+                        IpProto::Icmp(_) => {
+                            self.network.icmp += 1;
                         }
-                    };
+                    }
                 }
-                IpPacket::Icmp(p) => {
-                    self.network.icmp += 1;
-
-                    match p.src_ip {
-                        IpAddr::V4(_) => {
-                            self.network.ipv4 += 1;
+                IpPacket::V6(ipv6_packet) => {
+                    self.network.ipv6 += 1;
+                    match ipv6_packet.proto {
+                        IpProto::Tcp(_) => {
+                            self.transport.tcp += 1;
                         }
-
-                        IpAddr::V6(_) => {
-                            self.network.ipv6 += 1;
+                        IpProto::Udp(_) => {
+                            self.transport.udp += 1;
                         }
-                    };
-
-                    if let IpAddr::V4(ip) = p.src_ip {
-                        if !ip.is_private() && !ip.is_loopback() {
-                            if let Some((_, counts)) = self.addresses.get_mut(&ip) {
-                                *counts += 1;
-                            } else if let Ok(host) = lookup_addr(&IpAddr::V4(ip)) {
-                                self.addresses.insert(ip, (Some(host), 1));
-                            } else {
-                                self.addresses.insert(ip, (None, 1));
-                            }
+                        IpProto::Icmp(_) => {
+                            self.network.icmp += 1;
                         }
-                    };
-
-                    if let IpAddr::V4(ip) = p.dst_ip {
-                        if !ip.is_private() && !ip.is_loopback() {
-                            if let Some((_, counts)) = self.addresses.get_mut(&ip) {
-                                *counts += 1;
-                            } else if let Ok(host) = lookup_addr(&IpAddr::V4(ip)) {
-                                self.addresses.insert(ip, (Some(host), 1));
-                            } else {
-                                self.addresses.insert(ip, (None, 1));
-                            }
-                        }
-                    };
+                    }
                 }
             },
         }
+
         self.total += 1;
     }
 
