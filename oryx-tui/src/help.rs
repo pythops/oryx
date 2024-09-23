@@ -47,6 +47,10 @@ impl Help {
                     "Update the applied filters",
                 ),
                 (
+                    Cell::from("i").bold().yellow(),
+                    "Show more infos about the selected packet",
+                ),
+                (
                     Cell::from("ctrl + s").bold().yellow(),
                     "Export the capture to ~/oryx/capture file",
                 ),
@@ -88,7 +92,7 @@ impl Help {
             .direction(Direction::Vertical)
             .constraints([
                 Constraint::Fill(1),
-                Constraint::Length(17),
+                Constraint::Length(18),
                 Constraint::Fill(1),
             ])
             .flex(ratatui::layout::Flex::SpaceBetween)
