@@ -612,7 +612,7 @@ impl App {
                 } else if app_packets.len() > window_size {
                     let selected_packet_index = self.packets_table_state.selected().unwrap();
                     self.packet_index = Some(
-                        fuzzy.packet_end_index.saturating_sub(window_size) + selected_packet_index,
+                        self.packet_end_index.saturating_sub(window_size) + selected_packet_index,
                     );
                     &app_packets
                         [self.packet_end_index.saturating_sub(window_size)..self.packet_end_index]
