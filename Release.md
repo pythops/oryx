@@ -3,6 +3,7 @@
 ### Added
 
 - Show packet details
+- Detect potential SYN flood attack
 
 ### Changed
 
