@@ -1116,61 +1116,60 @@ impl App {
 
         if !self.syn_flood_attck_detected.load(Ordering::Relaxed) {
             return;
-        } else {
-            let syn_flood_block = Layout::default()
-                .direction(Direction::Vertical)
-                .constraints([Constraint::Length(10), Constraint::Fill(1)])
-                .flex(ratatui::layout::Flex::SpaceBetween)
-                .margin(2)
-                .split(block)[0];
-
-            let syn_flood_block = Layout::default()
-                .direction(Direction::Vertical)
-                .constraints([
-                    Constraint::Fill(1),
-                    Constraint::Max(60),
-                    Constraint::Fill(1),
-                ])
-                .flex(ratatui::layout::Flex::SpaceBetween)
-                .margin(2)
-                .split(syn_flood_block)[1];
-
-            let mut attacker_ips: Vec<(IpAddr, usize)> = {
-                let map = self.syn_flood_map.lock().unwrap();
-                map.clone().into_iter().collect()
-            };
-            attacker_ips.sort_by(|a, b| b.1.cmp(&a.1));
-
-            let top_3 = attacker_ips.into_iter().take(3);
-
-            let widths = [Constraint::Min(30), Constraint::Min(20)];
-
-            let rows = top_3.map(|(ip, count)| {
-                Row::new(vec![
-                    Line::from(ip.to_string()).centered(),
-                    Line::from(count.to_string()).centered(),
-                ])
-            });
-            let table = Table::new(rows, widths)
-                .column_spacing(2)
-                .flex(Flex::SpaceBetween)
-                .header(
-                    Row::new(vec![
-                        Line::from("IP Address").centered(),
-                        Line::from("Number of SYN pckets").centered(),
-                    ])
-                    .style(Style::new().bold())
-                    .bottom_margin(1),
-                )
-                .block(
-                    Block::new()
-                        .title(" SYN Flood Attack ")
-                        .borders(Borders::all())
-                        .title_alignment(Alignment::Center),
-                );
-
-            frame.render_widget(table, syn_flood_block);
         }
+        let syn_flood_block = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(10), Constraint::Fill(1)])
+            .flex(ratatui::layout::Flex::SpaceBetween)
+            .margin(2)
+            .split(block)[0];
+
+        let syn_flood_block = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Fill(1),
+                Constraint::Max(60),
+                Constraint::Fill(1),
+            ])
+            .flex(ratatui::layout::Flex::SpaceBetween)
+            .margin(2)
+            .split(syn_flood_block)[1];
+
+        let mut attacker_ips: Vec<(IpAddr, usize)> = {
+            let map = self.syn_flood_map.lock().unwrap();
+            map.clone().into_iter().collect()
+        };
+        attacker_ips.sort_by(|a, b| b.1.cmp(&a.1));
+
+        let top_3 = attacker_ips.into_iter().take(3);
+
+        let widths = [Constraint::Min(30), Constraint::Min(20)];
+
+        let rows = top_3.map(|(ip, count)| {
+            Row::new(vec![
+                Line::from(ip.to_string()).centered(),
+                Line::from(count.to_string()).centered(),
+            ])
+        });
+        let table = Table::new(rows, widths)
+            .column_spacing(2)
+            .flex(Flex::SpaceBetween)
+            .header(
+                Row::new(vec![
+                    Line::from("IP Address").centered(),
+                    Line::from("Number of SYN pckets").centered(),
+                ])
+                .style(Style::new().bold())
+                .bottom_margin(1),
+            )
+            .block(
+                Block::new()
+                    .title(" SYN Flood Attack ")
+                    .borders(Borders::all())
+                    .title_alignment(Alignment::Center),
+            );
+
+        frame.render_widget(table, syn_flood_block);
     }
 
     fn render_packet_infos_popup(&self, frame: &mut Frame) {
