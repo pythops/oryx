@@ -193,8 +193,12 @@ impl App {
             let packets = packets.clone();
             let syn_flood_map = syn_flood_map.clone();
             let syn_flood_attck_detected = syn_flood_attck_detected.clone();
-            let win_size = 10_000;
+            let win_size = 100_000;
             move || loop {
+                let start_index = {
+                    let packets = packets.lock().unwrap();
+                    packets.len().saturating_sub(1)
+                };
                 thread::sleep(Duration::from_secs(5));
                 let app_packets = {
                     let packets = packets.lock().unwrap();
@@ -202,6 +206,7 @@ impl App {
                 };
 
                 let mut map = syn_flood_map.lock().unwrap();
+                map.clear();
 
                 if app_packets.len() < win_size {
                     continue;
@@ -209,7 +214,7 @@ impl App {
 
                 let mut nb_syn_packets = 0;
 
-                app_packets[app_packets.len().wrapping_sub(win_size)..]
+                app_packets[start_index..app_packets.len().saturating_sub(1)]
                     .iter()
                     .for_each(|packet| {
                         if let AppPacket::Ip(ip_packet) = packet {
@@ -1140,6 +1145,8 @@ impl App {
             map.clone().into_iter().collect()
         };
         attacker_ips.sort_by(|a, b| b.1.cmp(&a.1));
+
+        attacker_ips.retain(|(_, count)| *count > 10_000);
 
         let top_3 = attacker_ips.into_iter().take(3);
 
