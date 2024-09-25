@@ -4,7 +4,7 @@
 
 ## 📸 Demo
 
-![](https://github.com/user-attachments/assets/f6960d39-1d03-42d5-9601-a41619998f2a)
+![](https://github.com/user-attachments/assets/32b19d28-c76c-4b93-a9c2-db14697176e7)
 
 ## ✨ Features
 
@@ -101,7 +101,7 @@ sudo oryx
 
 `ctrl + s`: Export the capture to `~/oryx/capture` file.
 
-`/`: Start fuzzy finding.
+`/`: Start fuzzy search.
 
 ## ⚖️ License
 
