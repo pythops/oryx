@@ -8,12 +8,11 @@ use ratatui::{
 };
 
 use std::{
+    ffi::CStr,
     fs::{self},
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
     path::PathBuf,
 };
-
-use std::ffi::CStr;
 
 use crate::app::FocusedBlock;
 

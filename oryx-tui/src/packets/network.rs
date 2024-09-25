@@ -1,4 +1,7 @@
-use core::fmt::Display;
+use core::{
+    fmt::Display,
+    net::{Ipv4Addr, Ipv6Addr},
+};
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Style, Stylize},
@@ -6,8 +9,6 @@ use ratatui::{
     widgets::{Block, Borders, Padding, Paragraph, Row, Table},
     Frame,
 };
-
-use core::net::{Ipv4Addr, Ipv6Addr};
 
 use super::transport::{TcpPacket, UdpPacket};
 

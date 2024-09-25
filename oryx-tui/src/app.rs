@@ -9,20 +9,27 @@ use ratatui::{
     },
     Frame,
 };
-use std::sync::{Arc, Mutex};
-use std::time::Duration;
-use std::{error, thread};
+use std::{
+    error,
+    sync::{Arc, Mutex},
+    thread,
+    time::Duration,
+};
 use tui_big_text::{BigText, PixelSize};
 
 use crate::alerts::alert::Alert;
 use crate::bandwidth::Bandwidth;
-use crate::filters::filter::Filter;
-use crate::filters::fuzzy::{self, Fuzzy};
+use crate::filters::{
+    filter::Filter,
+    fuzzy::{self, Fuzzy},
+};
 use crate::help::Help;
 use crate::interface::Interface;
 use crate::notification::Notification;
-use crate::packets::network::{IpPacket, IpProto};
-use crate::packets::packet::AppPacket;
+use crate::packets::{
+    network::{IpPacket, IpProto},
+    packet::AppPacket,
+};
 use crate::stats::Stats;
 
 pub type AppResult<T> = std::result::Result<T, Box<dyn error::Error>>;
