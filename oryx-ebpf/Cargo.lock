@@ -49,14 +49,14 @@ checksum = "e82e9f64c09f56aa7c80c3fa087997bd99a913f91d9c74d36cf5fd75dd5773e6"
 
 [[package]]
 name = "oryx-common"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "network-types",
 ]
 
 [[package]]
 name = "oryx-ebpf"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "aya-ebpf",
  "network-types",
