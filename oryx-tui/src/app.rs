@@ -1164,7 +1164,7 @@ impl App {
             .header(
                 Row::new(vec![
                     Line::from("IP Address").centered(),
-                    Line::from("Number of SYN pckets").centered(),
+                    Line::from("Number of SYN packets").centered(),
                 ])
                 .style(Style::new().bold())
                 .bottom_margin(1),
