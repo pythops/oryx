@@ -301,16 +301,13 @@ pub fn handle_key_events(
         }
     } else {
         match key_event.code {
-            //TODO: add terminate method on ingress and egress
             KeyCode::Char('q') => {
                 app.filter
                     .traffic_direction
-                    .terminate_egress
-                    .store(true, std::sync::atomic::Ordering::Relaxed);
+                    .terminate(TrafficDirection::Egress);
                 app.filter
                     .traffic_direction
-                    .terminate_ingress
-                    .store(true, std::sync::atomic::Ordering::Relaxed);
+                    .terminate(TrafficDirection::Ingress);
                 thread::sleep(Duration::from_millis(110));
                 app.quit();
             }
@@ -319,12 +316,10 @@ pub fn handle_key_events(
                 if key_event.modifiers == KeyModifiers::CONTROL {
                     app.filter
                         .traffic_direction
-                        .terminate_egress
-                        .store(true, std::sync::atomic::Ordering::Relaxed);
+                        .terminate(TrafficDirection::Egress);
                     app.filter
                         .traffic_direction
-                        .terminate_ingress
-                        .store(true, std::sync::atomic::Ordering::Relaxed);
+                        .terminate(TrafficDirection::Ingress);
                     thread::sleep(Duration::from_millis(110));
                     app.quit();
                 }
@@ -439,12 +434,10 @@ pub fn handle_key_events(
                 if key_event.modifiers == KeyModifiers::CONTROL {
                     app.filter
                         .traffic_direction
-                        .terminate_egress
-                        .store(true, std::sync::atomic::Ordering::Relaxed);
+                        .terminate(TrafficDirection::Ingress);
                     app.filter
                         .traffic_direction
-                        .terminate_ingress
-                        .store(true, std::sync::atomic::Ordering::Relaxed);
+                        .terminate(TrafficDirection::Egress);
                     thread::sleep(Duration::from_millis(150));
                     sender.send(Event::Reset)?;
                 }
@@ -506,8 +499,7 @@ pub fn handle_key_events(
                     {
                         app.filter
                             .traffic_direction
-                            .terminate_egress
-                            .store(true, std::sync::atomic::Ordering::Relaxed);
+                            .terminate(TrafficDirection::Egress);
                     }
 
                     // Add egress
@@ -550,8 +542,7 @@ pub fn handle_key_events(
                     {
                         app.filter
                             .traffic_direction
-                            .terminate_ingress
-                            .store(true, std::sync::atomic::Ordering::Relaxed);
+                            .terminate(TrafficDirection::Ingress);
                     }
 
                     // Add ingress

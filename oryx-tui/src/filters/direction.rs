@@ -1,6 +1,9 @@
 use std::{
     fmt::Display,
-    sync::{atomic::AtomicBool, Arc},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
 };
 
 use ratatui::{
@@ -50,6 +53,13 @@ impl TrafficDirectionFilter {
             applied_direction: Vec::new(),
             terminate_ingress: Arc::new(AtomicBool::new(false)),
             terminate_egress: Arc::new(AtomicBool::new(false)),
+        }
+    }
+
+    pub fn terminate(&mut self, direction: TrafficDirection) {
+        match direction {
+            TrafficDirection::Ingress => self.terminate_ingress.store(true, Ordering::Relaxed),
+            TrafficDirection::Egress => self.terminate_egress.store(true, Ordering::Relaxed),
         }
     }
 
