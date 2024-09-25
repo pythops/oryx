@@ -38,7 +38,7 @@ pub mod packets {
     pub mod transport;
 }
 
-pub mod alert {
+pub mod alerts {
     pub mod alert;
     pub mod syn_flood;
 }

@@ -14,7 +14,7 @@ use std::time::Duration;
 use std::{error, thread};
 use tui_big_text::{BigText, PixelSize};
 
-use crate::alert::alert::Alert;
+use crate::alerts::alert::Alert;
 use crate::bandwidth::Bandwidth;
 use crate::filters::filter::Filter;
 use crate::filters::fuzzy::{self, Fuzzy};
