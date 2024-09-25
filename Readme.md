@@ -101,7 +101,7 @@ sudo oryx
 
 `ctrl + s`: Export the capture to `~/oryx/capture` file.
 
-`/`: Start fuzzy finding.
+`/`: Start fuzzy search.
 
 ## ⚖️ License
 
