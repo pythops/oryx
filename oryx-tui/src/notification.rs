@@ -17,7 +17,6 @@ pub struct Notification {
 
 #[derive(Debug, Clone)]
 pub enum NotificationLevel {
-    Alert,
     Error,
     Warning,
     Info,
@@ -29,7 +28,6 @@ impl Notification {
             NotificationLevel::Info => (Color::Green, "Infos 󰋼 "),
             NotificationLevel::Warning => (Color::Yellow, "Warning  "),
             NotificationLevel::Error => (Color::Red, "Error  "),
-            NotificationLevel::Alert => (Color::Red, "Alert  "),
         };
 
         let mut text = Text::from(vec![

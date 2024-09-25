@@ -102,7 +102,8 @@ pub fn handle_key_events(
 
                 match app.mode {
                     Mode::Packet => app.mode = Mode::Stats,
-                    Mode::Stats => app.mode = Mode::Packet,
+                    Mode::Stats => app.mode = Mode::Alerts,
+                    Mode::Alerts => app.mode = Mode::Packet,
                 }
             }
 
@@ -740,7 +741,8 @@ pub fn handle_key_events(
 
                     match app.mode {
                         Mode::Packet => app.mode = Mode::Stats,
-                        Mode::Stats => app.mode = Mode::Packet,
+                        Mode::Stats => app.mode = Mode::Alerts,
+                        Mode::Alerts => app.mode = Mode::Packet,
                     };
                 } else {
                     match &app.focused_block {
@@ -829,8 +831,9 @@ pub fn handle_key_events(
                     };
 
                     match app.mode {
-                        Mode::Packet => app.mode = Mode::Stats,
+                        Mode::Packet => app.mode = Mode::Alerts,
                         Mode::Stats => app.mode = Mode::Packet,
+                        Mode::Alerts => app.mode = Mode::Stats,
                     };
                 } else {
                     match &app.focused_block {

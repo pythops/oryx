@@ -13,7 +13,9 @@ use ratatui::{
     },
     Frame,
 };
+use std::collections::HashMap;
 use std::net::IpAddr;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use std::{error, thread};
@@ -52,6 +54,7 @@ pub enum FocusedBlock {
 pub enum Mode {
     Packet,
     Stats,
+    Alerts,
 }
 
 #[derive(Debug)]
@@ -108,6 +111,9 @@ pub struct App {
     pub bandwidth: Arc<Mutex<Option<Bandwidth>>>,
     pub show_packet_infos_popup: bool,
     pub packet_index: Option<usize>,
+    pub syn_flood_map: Arc<Mutex<HashMap<IpAddr, usize>>>,
+    pub syn_flood_attck_detected: Arc<AtomicBool>,
+    pub alert_flash_count: usize,
 }
 
 impl Default for App {
@@ -121,6 +127,10 @@ impl App {
         let packets = Arc::new(Mutex::new(Vec::with_capacity(AppPacket::LEN * 1024 * 1024)));
         let stats = Arc::new(Mutex::new(Stats::default()));
         let fuzzy = Arc::new(Mutex::new(Fuzzy::default()));
+        let syn_flood_map: Arc<Mutex<HashMap<IpAddr, usize>>> =
+            Arc::new(Mutex::new(HashMap::new()));
+
+        let syn_flood_attck_detected = Arc::new(AtomicBool::new(false));
 
         let network_filter = NetworkFilter::new();
         let transport_filter = TransportFilter::new();
@@ -180,6 +190,74 @@ impl App {
             }
         });
 
+        thread::spawn({
+            let packets = packets.clone();
+            let syn_flood_map = syn_flood_map.clone();
+            let syn_flood_attck_detected = syn_flood_attck_detected.clone();
+            let win_size = 100_000;
+            move || loop {
+                let start_index = {
+                    let packets = packets.lock().unwrap();
+                    packets.len().saturating_sub(1)
+                };
+                thread::sleep(Duration::from_secs(5));
+                let app_packets = {
+                    let packets = packets.lock().unwrap();
+                    packets.clone()
+                };
+
+                let mut map = syn_flood_map.lock().unwrap();
+                map.clear();
+
+                if app_packets.len() < win_size {
+                    continue;
+                }
+
+                let mut nb_syn_packets = 0;
+
+                app_packets[start_index..app_packets.len().saturating_sub(1)]
+                    .iter()
+                    .for_each(|packet| {
+                        if let AppPacket::Ip(ip_packet) = packet {
+                            if let IpPacket::V4(ipv4_packet) = ip_packet {
+                                if let IpProto::Tcp(tcp_packet) = ipv4_packet.proto {
+                                    if tcp_packet.syn == 1 {
+                                        nb_syn_packets += 1;
+                                        if let Some(count) =
+                                            map.get_mut(&IpAddr::V4(ipv4_packet.src_ip))
+                                        {
+                                            *count += 1;
+                                        } else {
+                                            map.insert(IpAddr::V4(ipv4_packet.src_ip), 1);
+                                        }
+                                    }
+                                }
+                            }
+                            if let IpPacket::V6(ipv6_packet) = ip_packet {
+                                if let IpProto::Tcp(tcp_packet) = ipv6_packet.proto {
+                                    if tcp_packet.syn == 1 {
+                                        nb_syn_packets += 1;
+                                        if let Some(count) =
+                                            map.get_mut(&IpAddr::V6(ipv6_packet.src_ip))
+                                        {
+                                            *count += 1;
+                                        } else {
+                                            map.insert(IpAddr::V6(ipv6_packet.src_ip), 1);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    });
+
+                if (nb_syn_packets as f64 / win_size as f64) > 0.45 {
+                    syn_flood_attck_detected.store(true, std::sync::atomic::Ordering::Relaxed);
+                } else {
+                    syn_flood_attck_detected.store(false, std::sync::atomic::Ordering::Relaxed);
+                }
+            }
+        });
+
         Self {
             running: true,
             help: Help::new(),
@@ -207,6 +285,9 @@ impl App {
             bandwidth,
             show_packet_infos_popup: false,
             packet_index: None,
+            syn_flood_map,
+            syn_flood_attck_detected,
+            alert_flash_count: 1,
         }
     }
 
@@ -459,6 +540,7 @@ impl App {
                     }
                 }
                 Mode::Stats => self.render_stats_mode(frame, mode_block),
+                Mode::Alerts => self.render_alerts_mode(frame, mode_block),
             }
 
             // Update filters
@@ -858,6 +940,17 @@ impl App {
                                 Style::default().bg(Color::Green).fg(Color::White).bold(),
                             ),
                             Span::from(" Stats ").fg(Color::DarkGray),
+                            {
+                                if self.syn_flood_attck_detected.load(Ordering::Relaxed) {
+                                    if self.alert_flash_count % 12 == 0 {
+                                        Span::from(" Alert 󰐼 ").fg(Color::White).bg(Color::Red)
+                                    } else {
+                                        Span::from(" Alert 󰐼 ").fg(Color::Red)
+                                    }
+                                } else {
+                                    Span::from(" Alert ").fg(Color::DarkGray)
+                                }
+                            },
                         ])
                     })
                     .title_alignment(Alignment::Left)
@@ -967,6 +1060,17 @@ impl App {
                             " Stats ",
                             Style::default().bg(Color::Green).fg(Color::White).bold(),
                         ),
+                        {
+                            if self.syn_flood_attck_detected.load(Ordering::Relaxed) {
+                                if self.alert_flash_count % 12 == 0 {
+                                    Span::from(" Alert 󰐼 ").fg(Color::White).bg(Color::Red)
+                                } else {
+                                    Span::from(" Alert 󰐼 ").fg(Color::Red)
+                                }
+                            } else {
+                                Span::from(" Alert ").fg(Color::DarkGray)
+                            }
+                        },
                     ])
                 })
                 .title_alignment(Alignment::Left)
@@ -990,6 +1094,102 @@ impl App {
                 &self.interface.selected_interface.name.clone(),
             );
         }
+    }
+
+    fn render_alerts_mode(&self, frame: &mut Frame, block: Rect) {
+        frame.render_widget(
+            Block::default()
+                .title({
+                    Line::from(vec![
+                        Span::from(" Packet ").fg(Color::DarkGray),
+                        Span::from(" Stats ").fg(Color::DarkGray),
+                        {
+                            if self.syn_flood_attck_detected.load(Ordering::Relaxed) {
+                                if self.alert_flash_count % 12 == 0 {
+                                    Span::from(" Alert 󰐼 ").fg(Color::White).bg(Color::Red)
+                                } else {
+                                    Span::from(" Alert 󰐼 ").bg(Color::Red)
+                                }
+                            } else {
+                                Span::styled(
+                                    " Alert ",
+                                    Style::default().bg(Color::Green).fg(Color::White).bold(),
+                                )
+                            }
+                        },
+                    ])
+                })
+                .title_alignment(Alignment::Left)
+                .padding(Padding::top(1))
+                .borders(Borders::ALL)
+                .style(Style::default())
+                .border_type(BorderType::default())
+                .border_style(Style::default().green()),
+            block.inner(Margin {
+                horizontal: 1,
+                vertical: 0,
+            }),
+        );
+
+        if !self.syn_flood_attck_detected.load(Ordering::Relaxed) {
+            return;
+        }
+        let syn_flood_block = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(10), Constraint::Fill(1)])
+            .flex(ratatui::layout::Flex::SpaceBetween)
+            .margin(2)
+            .split(block)[0];
+
+        let syn_flood_block = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Fill(1),
+                Constraint::Max(60),
+                Constraint::Fill(1),
+            ])
+            .flex(ratatui::layout::Flex::SpaceBetween)
+            .margin(2)
+            .split(syn_flood_block)[1];
+
+        let mut attacker_ips: Vec<(IpAddr, usize)> = {
+            let map = self.syn_flood_map.lock().unwrap();
+            map.clone().into_iter().collect()
+        };
+        attacker_ips.sort_by(|a, b| b.1.cmp(&a.1));
+
+        attacker_ips.retain(|(_, count)| *count > 10_000);
+
+        let top_3 = attacker_ips.into_iter().take(3);
+
+        let widths = [Constraint::Min(30), Constraint::Min(20)];
+
+        let rows = top_3.map(|(ip, count)| {
+            Row::new(vec![
+                Line::from(ip.to_string()).centered().bold(),
+                Line::from(count.to_string()).centered(),
+            ])
+        });
+        let table = Table::new(rows, widths)
+            .column_spacing(2)
+            .flex(Flex::SpaceBetween)
+            .header(
+                Row::new(vec![
+                    Line::from("IP Address").centered(),
+                    Line::from("Number of SYN packets").centered(),
+                ])
+                .style(Style::new().bold())
+                .bottom_margin(1),
+            )
+            .block(
+                Block::new()
+                    .title(" SYN Flood Attack ")
+                    .borders(Borders::all())
+                    .border_style(Style::new().yellow())
+                    .title_alignment(Alignment::Center),
+            );
+
+        frame.render_widget(table, syn_flood_block);
     }
 
     fn render_packet_infos_popup(&self, frame: &mut Frame) {
@@ -1059,6 +1259,12 @@ impl App {
     pub fn tick(&mut self) {
         self.notifications.iter_mut().for_each(|n| n.ttl -= 1);
         self.notifications.retain(|n| n.ttl > 0);
+
+        if self.syn_flood_attck_detected.load(Ordering::Relaxed) {
+            self.alert_flash_count += 1;
+        } else {
+            self.alert_flash_count = 1;
+        }
     }
 
     pub fn quit(&mut self) {
