@@ -113,6 +113,7 @@ pub struct App {
     pub packet_index: Option<usize>,
     pub syn_flood_map: Arc<Mutex<HashMap<IpAddr, usize>>>,
     pub syn_flood_attck_detected: Arc<AtomicBool>,
+    pub alert_flash_count: usize,
 }
 
 impl Default for App {
@@ -286,6 +287,7 @@ impl App {
             packet_index: None,
             syn_flood_map,
             syn_flood_attck_detected,
+            alert_flash_count: 1,
         }
     }
 
@@ -938,14 +940,17 @@ impl App {
                                 Style::default().bg(Color::Green).fg(Color::White).bold(),
                             ),
                             Span::from(" Stats ").fg(Color::DarkGray),
-                            Span::from({
+                            {
                                 if self.syn_flood_attck_detected.load(Ordering::Relaxed) {
-                                    " Alert   "
+                                    if self.alert_flash_count % 12 == 0 {
+                                        Span::from(" Alert 󰐼 ").fg(Color::White).bg(Color::Red)
+                                    } else {
+                                        Span::from(" Alert 󰐼 ").fg(Color::Red)
+                                    }
                                 } else {
-                                    " Alert "
+                                    Span::from(" Alert ").fg(Color::DarkGray)
                                 }
-                            })
-                            .fg(Color::DarkGray),
+                            },
                         ])
                     })
                     .title_alignment(Alignment::Left)
@@ -1055,14 +1060,17 @@ impl App {
                             " Stats ",
                             Style::default().bg(Color::Green).fg(Color::White).bold(),
                         ),
-                        Span::from({
+                        {
                             if self.syn_flood_attck_detected.load(Ordering::Relaxed) {
-                                " Alert   "
+                                if self.alert_flash_count % 12 == 0 {
+                                    Span::from(" Alert 󰐼 ").fg(Color::White).bg(Color::Red)
+                                } else {
+                                    Span::from(" Alert 󰐼 ").fg(Color::Red)
+                                }
                             } else {
-                                " Alert "
+                                Span::from(" Alert ").fg(Color::DarkGray)
                             }
-                        })
-                        .fg(Color::DarkGray),
+                        },
                     ])
                 })
                 .title_alignment(Alignment::Left)
@@ -1095,16 +1103,20 @@ impl App {
                     Line::from(vec![
                         Span::from(" Packet ").fg(Color::DarkGray),
                         Span::from(" Stats ").fg(Color::DarkGray),
-                        Span::styled(
-                            {
-                                if self.syn_flood_attck_detected.load(Ordering::Relaxed) {
-                                    " Alert   "
+                        {
+                            if self.syn_flood_attck_detected.load(Ordering::Relaxed) {
+                                if self.alert_flash_count % 12 == 0 {
+                                    Span::from(" Alert 󰐼 ").fg(Color::White).bg(Color::Red)
                                 } else {
-                                    " Alert "
+                                    Span::from(" Alert 󰐼 ").bg(Color::Red)
                                 }
-                            },
-                            Style::default().bg(Color::Green).fg(Color::White).bold(),
-                        ),
+                            } else {
+                                Span::styled(
+                                    " Alert ",
+                                    Style::default().bg(Color::Green).fg(Color::White).bold(),
+                                )
+                            }
+                        },
                     ])
                 })
                 .title_alignment(Alignment::Left)
@@ -1247,6 +1259,12 @@ impl App {
     pub fn tick(&mut self) {
         self.notifications.iter_mut().for_each(|n| n.ttl -= 1);
         self.notifications.retain(|n| n.ttl > 0);
+
+        if self.syn_flood_attck_detected.load(Ordering::Relaxed) {
+            self.alert_flash_count += 1;
+        } else {
+            self.alert_flash_count = 1;
+        }
     }
 
     pub fn quit(&mut self) {
