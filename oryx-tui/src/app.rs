@@ -271,7 +271,7 @@ impl App {
 
             // interfaces
             self.interface
-                .render(frame, interface_block, &self.focused_block);
+                .render_on_setup(frame, interface_block, &self.focused_block);
 
             // Filters
             self.filter
@@ -309,64 +309,7 @@ impl App {
             };
 
             // Interface
-            let widths = [Constraint::Length(4), Constraint::Fill(1)];
-
-            let interface_infos = [
-                Row::new(vec![
-                    Span::styled("Name", Style::new().bold()),
-                    Span::from(self.interface.selected_interface.name.clone()),
-                ]),
-                Row::new(vec![
-                    Span::styled("Mac", Style::new().bold()),
-                    Span::from(
-                        self.interface
-                            .selected_interface
-                            .mac_address
-                            .clone()
-                            .unwrap_or("-".to_string()),
-                    ),
-                ]),
-                Row::new(vec![
-                    Span::styled("IPv4", Style::new().bold()),
-                    Span::from(
-                        self.interface
-                            .selected_interface
-                            .addresses
-                            .iter()
-                            .find(|a| matches!(a, IpAddr::V4(_) | IpAddr::V6(_)))
-                            .unwrap()
-                            .to_string(),
-                    ),
-                ]),
-                Row::new(vec![
-                    Span::styled("IPv6", Style::new().bold()),
-                    Span::from({
-                        match self
-                            .interface
-                            .selected_interface
-                            .addresses
-                            .iter()
-                            .find(|a| matches!(a, IpAddr::V6(_)))
-                        {
-                            Some(ip) => ip.to_string(),
-                            None => "-".to_string(),
-                        }
-                    }),
-                ]),
-            ];
-
-            let interface_table = Table::new(interface_infos, widths).column_spacing(3).block(
-                Block::default()
-                    .title(" Interface 󰲝 ")
-                    .title_style(Style::default().bold().green())
-                    .title_alignment(Alignment::Center)
-                    .padding(Padding::horizontal(2))
-                    .borders(Borders::ALL)
-                    .style(Style::default())
-                    .border_type(BorderType::default())
-                    .border_style(Style::default().green()),
-            );
-            frame.render_widget(interface_table, interface_block);
+            self.interface.render_on_sniffing(frame, interface_block);
 
             // Filters
             self.filter.render_on_sniffing(frame, filter_block);

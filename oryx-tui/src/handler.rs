@@ -907,18 +907,7 @@ pub fn handle_key_events(
                 } else {
                     match &app.focused_block {
                         FocusedBlock::Interface => {
-                            let i = match app.interface.state.selected() {
-                                Some(i) => {
-                                    if i < app.interface.interfaces.len() - 1 {
-                                        i + 1
-                                    } else {
-                                        i
-                                    }
-                                }
-                                None => 0,
-                            };
-
-                            app.interface.state.select(Some(i));
+                            app.interface.scroll_down();
                         }
 
                         FocusedBlock::NetworkFilter => {
@@ -975,18 +964,7 @@ pub fn handle_key_events(
                 } else {
                     match &app.focused_block {
                         FocusedBlock::Interface => {
-                            let i = match app.interface.state.selected() {
-                                Some(i) => {
-                                    if i > 1 {
-                                        i - 1
-                                    } else {
-                                        0
-                                    }
-                                }
-                                None => 0,
-                            };
-
-                            app.interface.state.select(Some(i));
+                            app.interface.scroll_up();
                         }
                         FocusedBlock::NetworkFilter => {
                             app.filter.network.scroll_up();
