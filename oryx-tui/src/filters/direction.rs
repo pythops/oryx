@@ -38,6 +38,12 @@ impl Display for TrafficDirection {
 
 impl Default for TrafficDirectionFilter {
     fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl TrafficDirectionFilter {
+    pub fn new() -> Self {
         TrafficDirectionFilter {
             state: TableState::default(),
             selected_direction: vec![TrafficDirection::Ingress, TrafficDirection::Egress],
@@ -46,9 +52,23 @@ impl Default for TrafficDirectionFilter {
             terminate_egress: Arc::new(AtomicBool::new(false)),
         }
     }
-}
 
-impl TrafficDirectionFilter {
+    pub fn select(&mut self) {
+        if let Some(i) = self.state.selected() {
+            let traffic_direction = match i {
+                0 => TrafficDirection::Ingress,
+                _ => TrafficDirection::Egress,
+            };
+
+            if self.selected_direction.contains(&traffic_direction) {
+                self.selected_direction
+                    .retain(|&direction| direction != traffic_direction);
+            } else {
+                self.selected_direction.push(traffic_direction);
+            }
+        }
+    }
+
     pub fn apply(&mut self) {
         self.applied_direction = self.selected_direction.clone();
         self.selected_direction.clear();

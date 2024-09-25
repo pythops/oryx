@@ -1,6 +1,3 @@
-use oryx_common::protocols::{
-    Protocol, NB_LINK_PROTOCOL, NB_NETWORK_PROTOCOL, NB_TRANSPORT_PROTOCOL,
-};
 use oryx_common::RawPacket;
 use ratatui::layout::{Alignment, Constraint, Direction, Flex, Layout, Margin, Rect};
 use ratatui::style::{Color, Style, Stylize};
@@ -22,11 +19,8 @@ use std::{error, thread};
 use tui_big_text::{BigText, PixelSize};
 
 use crate::bandwidth::Bandwidth;
-use crate::filters::direction::TrafficDirectionFilter;
+use crate::filters::filter::Filter;
 use crate::filters::fuzzy::{self, Fuzzy};
-use crate::filters::link::LinkFilter;
-use crate::filters::network::NetworkFilter;
-use crate::filters::transport::TransportFilter;
 use crate::help::Help;
 use crate::interface::Interface;
 use crate::notification::Notification;
@@ -63,25 +57,6 @@ pub struct DataEventHandler {
     pub handler: thread::JoinHandle<()>,
 }
 
-#[derive(Debug, Clone)]
-pub struct FilterChannel {
-    pub sender: kanal::Sender<(Protocol, bool)>,
-    pub receiver: kanal::Receiver<(Protocol, bool)>,
-}
-
-impl FilterChannel {
-    pub fn new() -> Self {
-        let (sender, receiver) = kanal::unbounded();
-        Self { sender, receiver }
-    }
-}
-
-impl Default for FilterChannel {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 #[derive(Debug)]
 pub struct App {
     pub running: bool,
@@ -90,12 +65,7 @@ pub struct App {
     // used in setup to know which block to  fall into after discarding help
     pub previous_focused_block: FocusedBlock,
     pub interface: Interface,
-    pub network_filter: NetworkFilter,
-    pub transport_filter: TransportFilter,
-    pub link_filter: LinkFilter,
-    pub traffic_direction_filter: TrafficDirectionFilter,
-    pub ingress_filter_channel: FilterChannel,
-    pub egress_filter_channel: FilterChannel,
+    pub filter: Filter,
     pub start_sniffing: bool,
     pub packets: Arc<Mutex<Vec<AppPacket>>>,
     pub packets_table_state: TableState,
@@ -131,10 +101,6 @@ impl App {
             Arc::new(Mutex::new(HashMap::new()));
 
         let syn_flood_attck_detected = Arc::new(AtomicBool::new(false));
-
-        let network_filter = NetworkFilter::new();
-        let transport_filter = TransportFilter::new();
-        let link_filter = LinkFilter::new();
 
         let (sender, receiver) = kanal::unbounded();
 
@@ -264,12 +230,7 @@ impl App {
             focused_block: FocusedBlock::Interface,
             previous_focused_block: FocusedBlock::Interface,
             interface: Interface::default(),
-            network_filter,
-            transport_filter,
-            link_filter,
-            traffic_direction_filter: TrafficDirectionFilter::default(),
-            ingress_filter_channel: FilterChannel::new(),
-            egress_filter_channel: FilterChannel::new(),
+            filter: Filter::new(),
             start_sniffing: false,
             packets,
             packets_table_state: TableState::default(),
@@ -294,30 +255,18 @@ impl App {
     pub fn render(&mut self, frame: &mut Frame) {
         // Setup
         if !self.start_sniffing {
-            let (
-                interface_block,
-                transport_filter_block,
-                network_filter_block,
-                link_filter_block,
-                traffic_direction_block,
-                start_block,
-            ) = {
+            let (interface_block, filter_block, start_block) = {
                 let chunks = Layout::default()
                     .direction(Direction::Vertical)
                     .constraints([
                         Constraint::Length(self.interface.interfaces.len() as u16 + 6),
-                        Constraint::Length(NB_TRANSPORT_PROTOCOL + 4),
-                        Constraint::Length(NB_NETWORK_PROTOCOL + 4),
-                        Constraint::Length(NB_LINK_PROTOCOL + 4),
-                        Constraint::Length(6),
+                        Constraint::Fill(1),
                         Constraint::Length(4),
                     ])
                     .margin(1)
                     .flex(Flex::SpaceAround)
                     .split(frame.area());
-                (
-                    chunks[0], chunks[1], chunks[2], chunks[3], chunks[4], chunks[5],
-                )
+                (chunks[0], chunks[1], chunks[2])
             };
 
             // interfaces
@@ -325,20 +274,8 @@ impl App {
                 .render(frame, interface_block, &self.focused_block);
 
             // Filters
-            self.network_filter
-                .render(frame, network_filter_block, &self.focused_block);
-
-            self.transport_filter
-                .render(frame, transport_filter_block, &self.focused_block);
-
-            self.link_filter
-                .render(frame, link_filter_block, &self.focused_block);
-
-            self.traffic_direction_filter.render(
-                frame,
-                traffic_direction_block,
-                &self.focused_block,
-            );
+            self.filter
+                .render_on_setup(frame, filter_block, &self.focused_block);
 
             // Start Button
             let start = BigText::builder()
@@ -429,107 +366,10 @@ impl App {
                     .border_type(BorderType::default())
                     .border_style(Style::default().green()),
             );
+            frame.render_widget(interface_table, interface_block);
 
             // Filters
-            let widths = [Constraint::Length(10), Constraint::Fill(1)];
-            let filters = {
-                [
-                    Row::new(vec![
-                        Line::styled("Transport", Style::new().bold()),
-                        Line::from_iter(TransportFilter::new().selected_protocols.iter().map(
-                            |filter| {
-                                if self.transport_filter.applied_protocols.contains(filter) {
-                                    Span::styled(
-                                        format!(" {}  ", filter),
-                                        Style::default().light_green(),
-                                    )
-                                } else {
-                                    Span::styled(
-                                        format!(" {}  ", filter),
-                                        Style::default().light_red(),
-                                    )
-                                }
-                            },
-                        )),
-                    ]),
-                    Row::new(vec![
-                        Line::styled("Network", Style::new().bold()),
-                        Line::from_iter(NetworkFilter::new().selected_protocols.iter().map(
-                            |filter| {
-                                if self.network_filter.applied_protocols.contains(filter) {
-                                    Span::styled(
-                                        format!(" {}  ", filter),
-                                        Style::default().light_green(),
-                                    )
-                                } else {
-                                    Span::styled(
-                                        format!(" {}  ", filter),
-                                        Style::default().light_red(),
-                                    )
-                                }
-                            },
-                        )),
-                    ]),
-                    Row::new(vec![
-                        Line::styled("Link", Style::new().bold()),
-                        Line::from_iter(LinkFilter::new().selected_protocols.iter().map(
-                            |filter| {
-                                if self.link_filter.applied_protocols.contains(filter) {
-                                    Span::styled(
-                                        format!(" {}  ", filter),
-                                        Style::default().light_green(),
-                                    )
-                                } else {
-                                    Span::styled(
-                                        format!(" {}  ", filter),
-                                        Style::default().light_red(),
-                                    )
-                                }
-                            },
-                        )),
-                    ]),
-                    Row::new(vec![
-                        Line::styled("Direction", Style::new().bold()),
-                        Line::from_iter(
-                            TrafficDirectionFilter::default()
-                                .selected_direction
-                                .iter()
-                                .map(|filter| {
-                                    if self
-                                        .traffic_direction_filter
-                                        .applied_direction
-                                        .contains(filter)
-                                    {
-                                        Span::styled(
-                                            format!("󰞁 {}  ", filter),
-                                            Style::default().light_green(),
-                                        )
-                                    } else {
-                                        Span::styled(
-                                            format!("󰿝 {}  ", filter),
-                                            Style::default().light_red(),
-                                        )
-                                    }
-                                }),
-                        ),
-                    ]),
-                ]
-            };
-
-            let filter_table = Table::new(filters, widths).column_spacing(3).block(
-                Block::default()
-                    .title(" Filters 󱪤 ")
-                    .title_style(Style::default().bold().green())
-                    .title_alignment(Alignment::Center)
-                    .padding(Padding::horizontal(2))
-                    .borders(Borders::ALL)
-                    .style(Style::default())
-                    .border_type(BorderType::default())
-                    .border_style(Style::default().green()),
-            );
-
-            frame.render_widget(interface_table, interface_block);
-            frame.render_widget(filter_table, filter_block);
+            self.filter.render_on_sniffing(frame, filter_block);
 
             // Packets/Stats
             match self.mode {
@@ -546,83 +386,7 @@ impl App {
             // Update filters
 
             if self.update_filters {
-                let layout = Layout::default()
-                    .direction(Direction::Vertical)
-                    .constraints([
-                        Constraint::Fill(1),
-                        Constraint::Length(40),
-                        Constraint::Fill(1),
-                    ])
-                    .flex(ratatui::layout::Flex::SpaceBetween)
-                    .split(mode_block);
-
-                let block = Layout::default()
-                    .direction(Direction::Horizontal)
-                    .constraints([
-                        Constraint::Fill(1),
-                        Constraint::Length(60),
-                        Constraint::Fill(1),
-                    ])
-                    .flex(ratatui::layout::Flex::SpaceBetween)
-                    .split(layout[1])[1];
-
-                let (
-                    transport_filter_block,
-                    network_filter_block,
-                    link_filter_block,
-                    traffic_direction_block,
-                    apply_block,
-                ) = {
-                    let chunks = Layout::default()
-                        .direction(Direction::Vertical)
-                        .constraints([
-                            Constraint::Length(NB_TRANSPORT_PROTOCOL + 4),
-                            Constraint::Length(NB_NETWORK_PROTOCOL + 4),
-                            Constraint::Length(NB_LINK_PROTOCOL + 4),
-                            Constraint::Length(6),
-                            Constraint::Length(4),
-                        ])
-                        .margin(1)
-                        .flex(Flex::SpaceBetween)
-                        .split(block);
-                    (chunks[0], chunks[1], chunks[2], chunks[3], chunks[4])
-                };
-
-                frame.render_widget(Clear, block);
-                frame.render_widget(
-                    Block::new()
-                        .borders(Borders::all())
-                        .border_type(BorderType::Thick)
-                        .border_style(Style::default().green()),
-                    block,
-                );
-
-                self.transport_filter
-                    .render(frame, transport_filter_block, &self.focused_block);
-
-                self.network_filter
-                    .render(frame, network_filter_block, &self.focused_block);
-
-                self.link_filter
-                    .render(frame, link_filter_block, &self.focused_block);
-
-                self.traffic_direction_filter.render(
-                    frame,
-                    traffic_direction_block,
-                    &self.focused_block,
-                );
-
-                let apply = BigText::builder()
-                    .pixel_size(PixelSize::Sextant)
-                    .style(if self.focused_block == FocusedBlock::Start {
-                        Style::default().white().bold()
-                    } else {
-                        Style::default().dark_gray()
-                    })
-                    .lines(vec!["APPLY".into()])
-                    .centered()
-                    .build();
-                frame.render_widget(apply, apply_block);
+                self.filter.update(frame, mode_block, &self.focused_block);
             }
         }
     }

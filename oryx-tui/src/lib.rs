@@ -16,6 +16,7 @@ pub mod ebpf;
 
 pub mod filters {
     pub mod direction;
+    pub mod filter;
     pub mod fuzzy;
     pub mod link;
     pub mod network;
