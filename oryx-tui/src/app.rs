@@ -1154,7 +1154,7 @@ impl App {
 
         let rows = top_3.map(|(ip, count)| {
             Row::new(vec![
-                Line::from(ip.to_string()).centered(),
+                Line::from(ip.to_string()).centered().bold(),
                 Line::from(count.to_string()).centered(),
             ])
         });
@@ -1173,6 +1173,7 @@ impl App {
                 Block::new()
                     .title(" SYN Flood Attack ")
                     .borders(Borders::all())
+                    .border_style(Style::new().yellow())
                     .title_alignment(Alignment::Center),
             );
 
