@@ -50,6 +50,12 @@ pub struct Bandwidth {
     map: Arc<Mutex<HashMap<String, BandwidthBuffer>>>,
 }
 
+impl Default for Bandwidth {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Bandwidth {
     pub fn new() -> Self {
         let map: Arc<Mutex<HashMap<String, BandwidthBuffer>>> =
