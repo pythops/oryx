@@ -1,7 +1,7 @@
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Margin, Rect},
     style::{Color, Style, Stylize},
-    text::{Line, Span},
+    text::{Line, Span, Text},
     widgets::{Block, BorderType, Borders, Padding},
     Frame,
 };
@@ -73,6 +73,19 @@ impl Alert {
         );
 
         if !self.detected {
+            let text_block = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([
+                    Constraint::Fill(1),
+                    Constraint::Length(3),
+                    Constraint::Fill(1),
+                ])
+                .flex(ratatui::layout::Flex::SpaceBetween)
+                .margin(2)
+                .split(block)[1];
+
+            let text = Text::from("No alerts").bold().centered();
+            frame.render_widget(text, text_block);
             return;
         }
 
