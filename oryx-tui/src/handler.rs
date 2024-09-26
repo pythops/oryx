@@ -177,7 +177,10 @@ pub fn handle_key_events(
                         }
 
                         KeyCode::Char('f') => {
-                            if app.focused_block != FocusedBlock::Help && app.start_sniffing {
+                            if app.focused_block != FocusedBlock::Help
+                                && app.start_sniffing
+                                && !app.update_filters
+                            {
                                 app.update_filters = true;
                                 app.focused_block = FocusedBlock::TransportFilter;
 
@@ -350,7 +353,10 @@ pub fn handle_key_events(
             }
 
             KeyCode::Char('f') => {
-                if app.focused_block != FocusedBlock::Help && app.start_sniffing {
+                if app.focused_block != FocusedBlock::Help
+                    && app.start_sniffing
+                    && !app.update_filters
+                {
                     app.update_filters = true;
 
                     app.focused_block = FocusedBlock::TransportFilter;
