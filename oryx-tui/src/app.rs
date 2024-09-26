@@ -13,7 +13,6 @@ use std::{
     error,
     sync::{Arc, Mutex},
     thread,
-    time::Duration,
 };
 use tui_big_text::{BigText, PixelSize};
 
@@ -82,7 +81,7 @@ pub struct App {
     pub packet_window_size: usize,
     pub update_filters: bool,
     pub data_channel_sender: kanal::Sender<[u8; RawPacket::LEN]>,
-    pub bandwidth: Arc<Mutex<Option<Bandwidth>>>,
+    pub bandwidth: Bandwidth,
     pub show_packet_infos_popup: bool,
     pub packet_index: Option<usize>,
     pub alert: Alert,
@@ -112,21 +111,6 @@ impl App {
             }
         });
 
-        let bandwidth = Arc::new(Mutex::new(Bandwidth::new().ok()));
-
-        thread::spawn({
-            let bandwidth = bandwidth.clone();
-            move || loop {
-                thread::sleep(Duration::from_secs(1));
-                {
-                    let mut bandwidth = bandwidth.lock().unwrap();
-                    if bandwidth.is_some() {
-                        let _ = bandwidth.as_mut().unwrap().refresh();
-                    }
-                }
-            }
-        });
-
         Self {
             running: true,
             help: Help::new(),
@@ -146,7 +130,7 @@ impl App {
             packet_window_size: 0,
             update_filters: false,
             data_channel_sender: sender,
-            bandwidth,
+            bandwidth: Bandwidth::new(),
             show_packet_infos_popup: false,
             packet_index: None,
             alert: Alert::new(packets.clone()),
@@ -638,7 +622,6 @@ impl App {
 
     pub fn render_stats_mode(&mut self, frame: &mut Frame, block: Rect) {
         let stats = self.stats.lock().unwrap();
-        let mut bandwidth = self.bandwidth.lock().unwrap();
 
         let (bandwidth_block, stats_block) = {
             let chunks = Layout::default()
@@ -675,13 +658,11 @@ impl App {
 
         stats.render(frame, stats_block);
 
-        if bandwidth.is_some() {
-            bandwidth.as_mut().unwrap().render(
-                frame,
-                bandwidth_block,
-                &self.interface.selected_interface.name.clone(),
-            );
-        }
+        self.bandwidth.render(
+            frame,
+            bandwidth_block,
+            &self.interface.selected_interface.name.clone(),
+        );
     }
 
     fn render_packet_infos_popup(&self, frame: &mut Frame) {

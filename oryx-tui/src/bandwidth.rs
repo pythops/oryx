@@ -1,6 +1,9 @@
 use std::collections::{HashMap, VecDeque};
 use std::fs::File;
 use std::io::{Read, Seek};
+use std::sync::{Arc, Mutex};
+use std::thread;
+use std::time::Duration;
 
 use ratatui::layout::{Alignment, Constraint, Direction, Layout, Rect};
 use ratatui::style::{Style, Stylize};
@@ -10,8 +13,6 @@ use ratatui::{
     widgets::{Block, Padding},
     Frame,
 };
-
-use crate::app::AppResult;
 
 #[derive(Clone, Debug)]
 pub struct BandwidthBuffer {
@@ -46,76 +47,87 @@ impl BandwidthBuffer {
 
 #[derive(Debug)]
 pub struct Bandwidth {
-    fd: File,
-    current: HashMap<String, (usize, usize)>,
-    pub map: HashMap<String, BandwidthBuffer>,
+    map: Arc<Mutex<HashMap<String, BandwidthBuffer>>>,
 }
 
 impl Bandwidth {
-    pub fn new() -> AppResult<Self> {
-        let mut fd = File::open("/proc/net/dev")?;
-        let mut current: HashMap<String, (usize, usize)> = HashMap::new();
-        let mut map: HashMap<String, BandwidthBuffer> = HashMap::new();
+    pub fn new() -> Self {
+        let map: Arc<Mutex<HashMap<String, BandwidthBuffer>>> =
+            Arc::new(Mutex::new(HashMap::new()));
 
-        let mut buffer = String::new();
-        fd.read_to_string(&mut buffer)?;
-        let mut lines = buffer.lines();
+        thread::spawn({
+            let map = map.clone();
+            move || {
+                //TODO: handle error
+                let mut fd = File::open("/proc/net/dev").unwrap();
+                let mut current: HashMap<String, (usize, usize)> = HashMap::new();
 
-        lines.next();
-        lines.next();
+                let mut buffer = String::new();
+                fd.read_to_string(&mut buffer).unwrap();
+                let mut lines = buffer.lines();
 
-        for line in lines {
-            let splits: Vec<&str> = line.split_whitespace().collect();
+                lines.next();
+                lines.next();
 
-            let mut interface_name = splits[0].to_string();
-            interface_name.pop();
+                for line in lines {
+                    let splits: Vec<&str> = line.split_whitespace().collect();
 
-            let bandwidth_buffer = BandwidthBuffer::new(20);
+                    let mut interface_name = splits[0].to_string();
+                    interface_name.pop();
 
-            let received: usize = splits[1].parse()?;
-            let sent: usize = splits[9].parse()?;
+                    let bandwidth_buffer = BandwidthBuffer::new(20);
 
-            current.insert(interface_name.clone(), (received, sent));
+                    let received: usize = splits[1].parse().unwrap();
+                    let sent: usize = splits[9].parse().unwrap();
 
-            map.insert(interface_name, bandwidth_buffer);
-        }
+                    current.insert(interface_name.clone(), (received, sent));
 
-        Ok(Self { fd, current, map })
-    }
+                    {
+                        let mut map = map.lock().unwrap();
+                        map.insert(interface_name, bandwidth_buffer);
+                    }
+                }
 
-    pub fn refresh(&mut self) -> AppResult<()> {
-        self.fd.seek(std::io::SeekFrom::Start(0))?;
-        let mut buffer = String::new();
-        self.fd.read_to_string(&mut buffer)?;
+                loop {
+                    thread::sleep(Duration::from_secs(1));
+                    fd.seek(std::io::SeekFrom::Start(0)).unwrap();
+                    let mut buffer = String::new();
+                    fd.read_to_string(&mut buffer).unwrap();
 
-        let mut lines = buffer.lines();
+                    let mut lines = buffer.lines();
 
-        lines.next();
-        lines.next();
+                    lines.next();
+                    lines.next();
 
-        for line in lines {
-            let splits: Vec<&str> = line.split_whitespace().collect();
+                    for line in lines {
+                        let splits: Vec<&str> = line.split_whitespace().collect();
 
-            let mut interface_name = splits[0].to_string();
-            interface_name.pop();
+                        let mut interface_name = splits[0].to_string();
+                        interface_name.pop();
 
-            let received: usize = splits[1].parse()?;
-            let sent: usize = splits[9].parse()?;
+                        let received: usize = splits[1].parse().unwrap();
+                        let sent: usize = splits[9].parse().unwrap();
 
-            if let Some(bandwidth_buffer) = self.map.get_mut(&interface_name) {
-                let current = self.current.get_mut(&interface_name).unwrap();
-                bandwidth_buffer.push((
-                    received.saturating_sub(current.0) / 1024,
-                    sent.saturating_sub(current.1) / 1024,
-                ));
-                current.0 = received;
-                current.1 = sent;
+                        let mut map = map.lock().unwrap();
+                        if let Some(bandwidth_buffer) = map.get_mut(&interface_name) {
+                            let current = current.get_mut(&interface_name).unwrap();
+                            bandwidth_buffer.push((
+                                received.saturating_sub(current.0) / 1024,
+                                sent.saturating_sub(current.1) / 1024,
+                            ));
+                            current.0 = received;
+                            current.1 = sent;
+                        }
+                    }
+                }
             }
-        }
-        Ok(())
+        });
+
+        Self { map }
     }
 
     pub fn render(&self, frame: &mut Frame, bandwidth_block: Rect, network_interface: &str) {
+        let map = self.map.lock().unwrap();
         let (incoming_block, outgoing_block) = {
             let chunks = Layout::default()
                 .direction(Direction::Horizontal)
@@ -125,7 +137,7 @@ impl Bandwidth {
             (chunks[0], chunks[1])
         };
         let (incoming_max_val, incoming_unit) =
-            if let Some(bandwidth_buffer) = self.map.get(network_interface) {
+            if let Some(bandwidth_buffer) = map.get(network_interface) {
                 match bandwidth_buffer.incoming_max {
                     n if (1024usize.pow(2)..1024usize.pow(3)).contains(&n) => {
                         ((n / 1024usize.pow(2)) as f64, "GB")
@@ -138,7 +150,7 @@ impl Bandwidth {
             };
 
         let (outgoing_max_val, outgoing_unit) =
-            if let Some(bandwidth_buffer) = self.map.get(network_interface) {
+            if let Some(bandwidth_buffer) = map.get(network_interface) {
                 match bandwidth_buffer.outgoing_max {
                     n if (1024usize.pow(2)..1024usize.pow(3)).contains(&n) => {
                         ((n / 1024usize.pow(2)) as f64, "GB")
@@ -151,7 +163,7 @@ impl Bandwidth {
             };
 
         let incoming_data = {
-            if let Some(v) = self.map.get(network_interface) {
+            if let Some(v) = map.get(network_interface) {
                 let values = v.get();
                 let x: Vec<(f64, f64)> = values
                     .iter()
@@ -174,7 +186,7 @@ impl Bandwidth {
         };
 
         let outgoing_data = {
-            if let Some(v) = self.map.get(network_interface) {
+            if let Some(v) = map.get(network_interface) {
                 let values = v.get();
                 let x: Vec<(f64, f64)> = values
                     .iter()
