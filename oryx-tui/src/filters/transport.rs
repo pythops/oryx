@@ -1,4 +1,4 @@
-use oryx_common::protocols::TransportProtocol;
+use oryx_common::protocols::{TransportProtocol, NB_TRANSPORT_PROTOCOL};
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Flex, Layout, Rect},
     style::{Color, Style, Stylize},
@@ -29,6 +29,52 @@ impl TransportFilter {
             applied_protocols: Vec::new(),
         }
     }
+
+    pub fn select(&mut self) {
+        if let Some(i) = self.state.selected() {
+            let protocol = match i {
+                0 => TransportProtocol::TCP,
+                _ => TransportProtocol::UDP,
+            };
+
+            if self.selected_protocols.contains(&protocol) {
+                self.selected_protocols.retain(|&p| p != protocol);
+            } else {
+                self.selected_protocols.push(protocol);
+            }
+        }
+    }
+
+    pub fn scroll_down(&mut self) {
+        let i = match self.state.selected() {
+            Some(i) => {
+                if i < (NB_TRANSPORT_PROTOCOL - 1).into() {
+                    i + 1
+                } else {
+                    i
+                }
+            }
+            None => 0,
+        };
+
+        self.state.select(Some(i));
+    }
+
+    pub fn scroll_up(&mut self) {
+        let i = match self.state.selected() {
+            Some(i) => {
+                if i > 1 {
+                    i - 1
+                } else {
+                    0
+                }
+            }
+            None => 0,
+        };
+
+        self.state.select(Some(i));
+    }
+
     pub fn apply(&mut self) {
         self.applied_protocols = self.selected_protocols.clone();
         self.selected_protocols.clear();

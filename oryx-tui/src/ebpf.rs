@@ -1,22 +1,24 @@
-use std::os::fd::AsRawFd;
-use std::sync::atomic::AtomicBool;
-use std::sync::Arc;
-use std::thread::spawn;
-use std::time::Duration;
-use std::{io, thread};
+use std::{
+    io,
+    os::fd::AsRawFd,
+    sync::{atomic::AtomicBool, Arc},
+    thread::{self, spawn},
+    time::Duration,
+};
 
-use aya::maps::ring_buf::RingBufItem;
-use aya::maps::{Array, MapData, RingBuf};
-use aya::programs::{tc, SchedClassifier, TcAttachType};
-use aya::{include_bytes_aligned, Bpf};
-use mio::{Events, Interest, Poll, Registry, Token};
-use oryx_common::protocols::Protocol;
-use oryx_common::RawPacket;
+use aya::{
+    include_bytes_aligned,
+    maps::{ring_buf::RingBufItem, Array, MapData, RingBuf},
+    programs::{tc, SchedClassifier, TcAttachType},
+    Bpf,
+};
+use oryx_common::{protocols::Protocol, RawPacket};
 
-use crate::event::Event;
-use crate::notification::{Notification, NotificationLevel};
-use mio::event::Source;
-use mio::unix::SourceFd;
+use crate::{
+    event::Event,
+    notification::{Notification, NotificationLevel},
+};
+use mio::{event::Source, unix::SourceFd, Events, Interest, Poll, Registry, Token};
 
 pub struct Ebpf;
 

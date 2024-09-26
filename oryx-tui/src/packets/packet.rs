@@ -1,14 +1,13 @@
-use core::fmt::Display;
-
-use core::net::Ipv4Addr;
-use std::mem;
+use std::{fmt::Display, mem, net::Ipv4Addr};
 
 use network_types::ip::IpHdr;
 use oryx_common::{ProtoHdr, RawPacket};
 
-use super::link::{ArpPacket, ArpType, MacAddr};
-use super::network::{IcmpPacket, IcmpType, IpPacket, IpProto, Ipv4Packet, Ipv6Packet};
-use super::transport::{TcpPacket, UdpPacket};
+use super::{
+    link::{ArpPacket, ArpType, MacAddr},
+    network::{IcmpPacket, IcmpType, IpPacket, IpProto, Ipv4Packet, Ipv6Packet},
+    transport::{TcpPacket, UdpPacket},
+};
 
 #[derive(Debug, Copy, Clone)]
 pub enum AppPacket {

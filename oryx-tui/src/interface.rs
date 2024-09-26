@@ -2,18 +2,17 @@ use libc::{AF_INET, AF_INET6, IFF_UP};
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Flex, Layout, Rect},
     style::{Color, Style, Stylize},
-    text::Line,
-    widgets::{Block, BorderType, Borders, Row, Table, TableState},
+    text::{Line, Span},
+    widgets::{Block, BorderType, Borders, Padding, Row, Table, TableState},
     Frame,
 };
 
 use std::{
+    ffi::CStr,
     fs::{self},
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
     path::PathBuf,
 };
-
-use std::ffi::CStr;
 
 use crate::app::FocusedBlock;
 
@@ -122,7 +121,41 @@ impl Interface {
         }
     }
 
-    pub fn render(&mut self, frame: &mut Frame, block: Rect, focused_block: &FocusedBlock) {
+    pub fn scroll_down(&mut self) {
+        let i = match self.state.selected() {
+            Some(i) => {
+                if i < self.interfaces.len() - 1 {
+                    i + 1
+                } else {
+                    i
+                }
+            }
+            None => 0,
+        };
+
+        self.state.select(Some(i));
+    }
+    pub fn scroll_up(&mut self) {
+        let i = match self.state.selected() {
+            Some(i) => {
+                if i > 1 {
+                    i - 1
+                } else {
+                    0
+                }
+            }
+            None => 0,
+        };
+
+        self.state.select(Some(i));
+    }
+
+    pub fn render_on_setup(
+        &mut self,
+        frame: &mut Frame,
+        block: Rect,
+        focused_block: &FocusedBlock,
+    ) {
         let layout = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([
@@ -209,5 +242,63 @@ impl Interface {
             }),
             &mut self.state,
         );
+    }
+
+    pub fn render_on_sniffing(&mut self, frame: &mut Frame, block: Rect) {
+        let widths = [Constraint::Length(4), Constraint::Fill(1)];
+
+        let interface_infos = [
+            Row::new(vec![
+                Span::styled("Name", Style::new().bold()),
+                Span::from(self.selected_interface.name.clone()),
+            ]),
+            Row::new(vec![
+                Span::styled("Mac", Style::new().bold()),
+                Span::from(
+                    self.selected_interface
+                        .mac_address
+                        .clone()
+                        .unwrap_or("-".to_string()),
+                ),
+            ]),
+            Row::new(vec![
+                Span::styled("IPv4", Style::new().bold()),
+                Span::from(
+                    self.selected_interface
+                        .addresses
+                        .iter()
+                        .find(|a| matches!(a, IpAddr::V4(_) | IpAddr::V6(_)))
+                        .unwrap()
+                        .to_string(),
+                ),
+            ]),
+            Row::new(vec![
+                Span::styled("IPv6", Style::new().bold()),
+                Span::from({
+                    match self
+                        .selected_interface
+                        .addresses
+                        .iter()
+                        .find(|a| matches!(a, IpAddr::V6(_)))
+                    {
+                        Some(ip) => ip.to_string(),
+                        None => "-".to_string(),
+                    }
+                }),
+            ]),
+        ];
+
+        let table = Table::new(interface_infos, widths).column_spacing(3).block(
+            Block::default()
+                .title(" Interface 󰲝 ")
+                .title_style(Style::default().bold().green())
+                .title_alignment(Alignment::Center)
+                .padding(Padding::horizontal(2))
+                .borders(Borders::ALL)
+                .style(Style::default())
+                .border_type(BorderType::default())
+                .border_style(Style::default().green()),
+        );
+        frame.render_widget(table, block);
     }
 }

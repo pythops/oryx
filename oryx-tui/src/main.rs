@@ -4,12 +4,13 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 use std::io;
 
 use clap::{crate_description, crate_version, Command};
-use oryx_tui::app::{App, AppResult, TICK_RATE};
-use oryx_tui::event::{Event, EventHandler};
-use oryx_tui::handler::handle_key_events;
-use oryx_tui::tui::Tui;
-use ratatui::backend::CrosstermBackend;
-use ratatui::Terminal;
+use oryx_tui::{
+    app::{App, AppResult, TICK_RATE},
+    event::{Event, EventHandler},
+    handler::handle_key_events,
+    tui::Tui,
+};
+use ratatui::{backend::CrosstermBackend, Terminal};
 
 fn main() -> AppResult<()> {
     Command::new("oryx")

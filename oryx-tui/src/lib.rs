@@ -16,6 +16,7 @@ pub mod ebpf;
 
 pub mod filters {
     pub mod direction;
+    pub mod filter;
     pub mod fuzzy;
     pub mod link;
     pub mod network;
@@ -35,4 +36,9 @@ pub mod packets {
     pub mod network;
     pub mod packet;
     pub mod transport;
+}
+
+pub mod alerts {
+    pub mod alert;
+    pub mod syn_flood;
 }

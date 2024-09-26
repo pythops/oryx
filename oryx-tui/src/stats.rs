@@ -1,17 +1,21 @@
 use dns_lookup::lookup_addr;
-use std::collections::HashMap;
-use std::net::{IpAddr, Ipv4Addr};
+use std::{
+    collections::HashMap,
+    net::{IpAddr, Ipv4Addr},
+};
 
-use ratatui::layout::{Alignment, Constraint, Direction, Flex, Layout, Rect};
-use ratatui::style::{Color, Style};
-use ratatui::text::Line;
 use ratatui::{
+    layout::{Alignment, Constraint, Direction, Flex, Layout, Rect},
+    style::{Color, Style},
+    text::Line,
     widgets::{Bar, BarChart, BarGroup, Block, Padding},
     Frame,
 };
 
-use crate::packets::network::{IpPacket, IpProto};
-use crate::packets::packet::AppPacket;
+use crate::packets::{
+    network::{IpPacket, IpProto},
+    packet::AppPacket,
+};
 
 #[derive(Debug)]
 pub struct Stats {

@@ -1,8 +1,9 @@
-use crate::app::AppResult;
-use crate::notification::Notification;
+use crate::{app::AppResult, notification::Notification};
 use crossterm::event::{self, Event as CrosstermEvent, KeyEvent, KeyEventKind, MouseEvent};
-use std::thread;
-use std::time::{Duration, Instant};
+use std::{
+    thread,
+    time::{Duration, Instant},
+};
 
 #[derive(Clone)]
 pub enum Event {
