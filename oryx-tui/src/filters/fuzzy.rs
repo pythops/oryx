@@ -1,3 +1,9 @@
+use std::{
+    sync::{Arc, Mutex},
+    thread,
+    time::Duration,
+};
+
 use ratatui::{
     style::{Style, Stylize},
     text::{Line, Span},
@@ -5,7 +11,7 @@ use ratatui::{
 };
 use tui_input::Input;
 
-use crate::packets::packet::AppPacket;
+use crate::{app::TICK_RATE, packets::packet::AppPacket};
 
 #[derive(Debug, Clone, Default)]
 pub struct Fuzzy {
@@ -18,6 +24,38 @@ pub struct Fuzzy {
 }
 
 impl Fuzzy {
+    pub fn new(packets: Arc<Mutex<Vec<AppPacket>>>) -> Arc<Mutex<Self>> {
+        let fuzzy = Arc::new(Mutex::new(Self::default()));
+
+        thread::spawn({
+            let fuzzy = fuzzy.clone();
+            let packets = packets.clone();
+            move || {
+                let mut last_index = 0;
+                let mut pattern = String::new();
+                loop {
+                    thread::sleep(Duration::from_millis(TICK_RATE));
+                    let packets = packets.lock().unwrap();
+                    let mut fuzzy = fuzzy.lock().unwrap();
+
+                    if fuzzy.is_enabled() && !fuzzy.filter.value().is_empty() {
+                        let current_pattern = fuzzy.filter.value().to_owned();
+                        if current_pattern != pattern {
+                            fuzzy.find(packets.as_slice());
+                            pattern = current_pattern;
+                            last_index = packets.len();
+                        } else {
+                            fuzzy.append(&packets.as_slice()[last_index..]);
+                            last_index = packets.len();
+                        }
+                    }
+                }
+            }
+        });
+
+        fuzzy
+    }
+
     pub fn find(&mut self, packets: &[AppPacket]) {
         self.packets = packets
             .iter()

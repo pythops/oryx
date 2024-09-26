@@ -98,7 +98,6 @@ impl App {
     pub fn new() -> Self {
         let packets = Arc::new(Mutex::new(Vec::with_capacity(AppPacket::LEN * 1024 * 1024)));
         let stats = Arc::new(Mutex::new(Stats::default()));
-        let fuzzy = Arc::new(Mutex::new(Fuzzy::default()));
 
         let (sender, receiver) = kanal::unbounded();
 
@@ -128,32 +127,6 @@ impl App {
             }
         });
 
-        thread::spawn({
-            let fuzzy = fuzzy.clone();
-            let packets = packets.clone();
-            move || {
-                let mut last_index = 0;
-                let mut pattern = String::new();
-                loop {
-                    thread::sleep(Duration::from_millis(TICK_RATE));
-                    let packets = packets.lock().unwrap();
-                    let mut fuzzy = fuzzy.lock().unwrap();
-
-                    if fuzzy.is_enabled() && !fuzzy.filter.value().is_empty() {
-                        let current_pattern = fuzzy.filter.value().to_owned();
-                        if current_pattern != pattern {
-                            fuzzy.find(packets.as_slice());
-                            pattern = current_pattern;
-                            last_index = packets.len();
-                        } else {
-                            fuzzy.append(&packets.as_slice()[last_index..]);
-                            last_index = packets.len();
-                        }
-                    }
-                }
-            }
-        });
-
         Self {
             running: true,
             help: Help::new(),
@@ -164,7 +137,7 @@ impl App {
             start_sniffing: false,
             packets: packets.clone(),
             packets_table_state: TableState::default(),
-            fuzzy,
+            fuzzy: Fuzzy::new(packets.clone()),
             notifications: Vec::new(),
             manuall_scroll: false,
             mode: Mode::Packet,
