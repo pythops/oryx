@@ -26,30 +26,19 @@ fn handle_key_events_help(key_event: KeyEvent, app: &mut App) {
     }
 }
 
-fn handle_key_events_start(key_event: KeyEvent, app: &mut App, block: &mut StartMenuBlock) {
-    match key_event.code {
-        KeyCode::Tab => {
-            block.next(app);
-        }
-        KeyCode::BackTab => {
-            block.previous(app);
-        }
-        KeyCode::Char('k') | KeyCode::Up => {
-            block.scroll_up(app);
-        }
-        KeyCode::Char('j') | KeyCode::Down => {
-            block.scroll_up(app);
-        }
 
-        _ => {}
-    }
-}
+pub fn handle_key_events(
+    key_event: KeyEvent,
+    app: &mut App,
+    sender: kanal::Sender<Event>,
+) -> AppResult<()> {
 
-fn handle_global_keys(key_event: KeyEvent, app: &mut App) -> AppResult<()> {
+    // handle global key events
     if !app.is_editing {
         match key_event.code {
             KeyCode::Char('?') => {
                 app.focused_block = FocusedBlock::Help;
+                return Ok(())
             }
             KeyCode::Char('q') => {
                 app.detach_interfaces();
@@ -62,35 +51,49 @@ fn handle_global_keys(key_event: KeyEvent, app: &mut App) -> AppResult<()> {
                     app.quit();
                 }
             }
+            KeyCode::Char('r') => {
+                if key_event.modifiers == KeyModifiers::CONTROL {
+                    app.detach_interfaces();
+                    sender.send(Event::Reset)?;
+                    return Ok(())
+                }
+            }
 
             _ => {}
         }
     }
-    return Ok(());
-}
-
-pub fn handle_key_events(
-    key_event: KeyEvent,
-    app: &mut App,
-    sender: kanal::Sender<Event>,
-) -> AppResult<()> {
-    handle_global_keys(key_event, app);
     match app.focused_block {
         FocusedBlock::Help => handle_key_events_help(key_event, app),
-        FocusedBlock::StartMenuBlock(start_block) => {
-            handle_key_events_start(key_event, app, &mut start_block)
-        }
-        FocusedBlock::Main(mode_block) => mode_block.handle_key_events(key_event, app),
+        FocusedBlock::StartMenuBlock( &mut start_block) => start_block.handle_key_events(key_event, app),
+        FocusedBlock::Main( &mut mode_block) => mode_block.handle_key_events(key_event, app),
     }
-    // old
+    return Ok(())
+}
 
-    if app.show_packet_infos_popup {
-        if key_event.code == KeyCode::Esc {
-            app.show_packet_infos_popup = false;
-        }
 
-        return Ok(());
-    }
+
+
+
+
+
+
+
+
+
+///////////////////////
+// old
+pub fn old_handle_key_events(
+        key_event: KeyEvent,
+        app: &mut App,
+        sender: kanal::Sender<Event>,
+    ) -> AppResult<()> {
+    // if app.show_packet_infos_popup {
+    //     if key_event.code == KeyCode::Esc {
+    //         app.show_packet_infos_popup = false;
+    //     }
+
+    //     return Ok(());
+    // }
 
     // let fuzzy = app.fuzzy.clone();
     // let mut fuzzy = fuzzy.lock().unwrap();
@@ -123,10 +126,10 @@ pub fn handle_key_events(
                 if app.focused_block == FocusedBlock::Help {
                     return Ok(());
                 }
-                if !fuzzy.is_paused() && !app.update_filters {
-                    fuzzy
-                        .filter
-                        .handle_event(&crossterm::event::Event::Key(key_event));
+                // if !fuzzy.is_paused() && !app.update_filters {
+                //     fuzzy
+                //         .filter
+                //         .handle_event(&crossterm::event::Event::Key(key_event));
                 } else {
                     match key_event.code {
                         KeyCode::Char('/') => {
@@ -402,15 +405,15 @@ pub fn handle_key_events(
 
             //     app.show_packet_infos_popup = true;
             // }
-            KeyCode::Char('r') => {
-                if app.focused_block == FocusedBlock::Help || app.update_filters {
-                    return Ok(());
-                }
-                if key_event.modifiers == KeyModifiers::CONTROL {
-                    app.detach_interfaces();
-                    sender.send(Event::Reset)?;
-                }
-            }
+            // KeyCode::Char('r') => {
+            //     if app.focused_block == FocusedBlock::Help || app.update_filters {
+            //         return Ok(());
+            //     }
+            //     if key_event.modifiers == KeyModifiers::CONTROL {
+            //         app.detach_interfaces();
+            //         sender.send(Event::Reset)?;
+            //     }
+            // }
 
             KeyCode::Enter => {
                 if app.focused_block == FocusedBlock::Start && !app.start_sniffing {

@@ -104,58 +104,89 @@ impl Mode {
             }
 
             _ => {
-                let fuzzy = app.fuzzy.clone();
-                let mut fuzzy = fuzzy.lock().unwrap();
-                if fuzzy.is_enabled() {
-                    match key_event.code {
-                        KeyCode::Esc => {
-                            if fuzzy.is_paused() {
-                                if app.manuall_scroll {
-                                    app.manuall_scroll = false;
-                                } else {
-                                    fuzzy.disable();
+                match self {
+                    Mode::Packet => {
+                        let fuzzy = app.fuzzy.clone();
+                        let mut fuzzy = fuzzy.lock().unwrap();
+                        if fuzzy.is_enabled() {
+                            match key_event.code {
+                                KeyCode::Esc => {
+                                    if fuzzy.is_paused() {
+                                        if app.manuall_scroll {
+                                            app.manuall_scroll = false;
+                                        } else {
+                                            fuzzy.disable();
+                                        }
+                                    } else {
+                                        fuzzy.pause();
+                                    }
                                 }
-                            } else {
-                                fuzzy.pause();
-                            }
-                        }
-                        _ => {
-                            if !fuzzy.is_paused() && !app.update_filters {
-                                fuzzy
-                                    .filter
-                                    .handle_event(&crossterm::event::Event::Key(key_event));
-                            }
-                        }
-                    }
-                } else {
-                    match self {
-                        Mode::Packet => match key_event.code {
-                            KeyCode::Char('i') => {
-                                if !app.packet_index.is_none() && !fuzzy.packets.is_empty() {
-                                    app.show_packet_infos_popup = true;
+                                _ => {
+                                    if !fuzzy.is_paused() && !app.update_filters {
+                                        fuzzy
+                                            .filter
+                                            .handle_event(&crossterm::event::Event::Key(key_event));
+                                    }
                                 }
                             }
-                            KeyCode::Char('/') => {
-                                fuzzy.enable();
-                                fuzzy.unpause();
-                            }
-                            KeyCode::Char('j') | KeyCode::Down => {
-                                if !app.manuall_scroll {
-                                    app.manuall_scroll = true;
-                                    // Record the last position. Usefull for selecting the packets to display
-                                    fuzzy.packet_end_index = fuzzy.packets.len();
+                        } else {
+                            match key_event.code {
+                                KeyCode::Char('i') => {
+                                    if !app.packet_index.is_none() && !fuzzy.packets.is_empty() {
+                                        app.show_packet_infos_popup = true;
+                                    }
+                                }
+                                KeyCode::Char('/') => {
+                                    if fuzzy.is_enabled() {
+                                    } else {
+                                        fuzzy.enable();
+                                        fuzzy.unpause();
+                                        app.is_editing = true;
+                                    }
+                                }
+                                KeyCode::Char('j') | KeyCode::Down => {
+                                    if !app.manuall_scroll {
+                                        app.manuall_scroll = true;
+                                        // Record the last position. Usefull for selecting the packets to display
+                                        fuzzy.packet_end_index = fuzzy.packets.len();
+                                        let i = match fuzzy.scroll_state.selected() {
+                                            Some(i) => {
+                                                if i < app.packet_window_size - 1 {
+                                                    i + 1
+                                                } else if i == app.packet_window_size - 1
+                                                    && fuzzy.packets.len() > fuzzy.packet_end_index
+                                                {
+                                                    // shift the window by one
+                                                    fuzzy.packet_end_index += 1;
+                                                    i + 1
+                                                } else {
+                                                    i
+                                                }
+                                            }
+                                            None => fuzzy.packets.len(),
+                                        };
+
+                                        fuzzy.scroll_state.select(Some(i));
+                                    }
+                                }
+                                KeyCode::Char('k') | KeyCode::Up => {
+                                    if !app.manuall_scroll {
+                                        app.manuall_scroll = true;
+                                        // Record the last position. Usefull for selecting the packets to display
+                                        fuzzy.packet_end_index = fuzzy.packets.len();
+                                    }
                                     let i = match fuzzy.scroll_state.selected() {
                                         Some(i) => {
-                                            if i < app.packet_window_size - 1 {
-                                                i + 1
-                                            } else if i == app.packet_window_size - 1
-                                                && fuzzy.packets.len() > fuzzy.packet_end_index
+                                            if i > 1 {
+                                                i - 1
+                                            } else if i == 0
+                                                && fuzzy.packet_end_index > app.packet_window_size
                                             {
-                                                // shit the window by one
-                                                fuzzy.packet_end_index += 1;
-                                                i + 1
+                                                // shift the window by one
+                                                fuzzy.packet_end_index -= 1;
+                                                0
                                             } else {
-                                                i
+                                                0
                                             }
                                         }
                                         None => fuzzy.packets.len(),
@@ -163,41 +194,26 @@ impl Mode {
 
                                     fuzzy.scroll_state.select(Some(i));
                                 }
-                            }
-                            KeyCode::Char('k') | KeyCode::Up => {
-                                if !app.manuall_scroll {
-                                    app.manuall_scroll = true;
-                                    // Record the last position. Usefull for selecting the packets to display
-                                    fuzzy.packet_end_index = fuzzy.packets.len();
-                                }
-                                let i = match fuzzy.scroll_state.selected() {
-                                    Some(i) => {
-                                        if i > 1 {
-                                            i - 1
-                                        } else if i == 0
-                                            && fuzzy.packet_end_index > app.packet_window_size
-                                        {
-                                            // shit the window by one
-                                            fuzzy.packet_end_index -= 1;
-                                            0
-                                        } else {
-                                            0
-                                        }
+                                KeyCode::Esc => {
+                                    if app.show_packet_infos_popup {
+                                        app.show_packet_infos_popup = false;
+                                    } else if app.manuall_scroll {
+                                        app.manuall_scroll = false;
+                                    } else if !fuzzy.is_paused() {
+                                        fuzzy.pause();
+                                        app.is_editing = false;
                                     }
-                                    None => fuzzy.packets.len(),
-                                };
-
-                                fuzzy.scroll_state.select(Some(i));
+                                }
+                                _ => {}
                             }
-
-                            _ => {}
-                        },
-                        Mode::Firewall => match key_event.code {
-                            KeyCode::Char('n') => {}
-                            _ => {}
-                        },
-                        _ => {}
+                        }
                     }
+
+                    Mode::Firewall => match key_event.code {
+                        KeyCode::Char('n') => app.is_editing = true,
+                        _ => {}
+                    },
+                    _ => {}
                 }
             }
         }
