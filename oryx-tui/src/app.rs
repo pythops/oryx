@@ -13,13 +13,19 @@ use std::{
     error,
     sync::{Arc, Mutex},
     thread,
+    time::Duration,
 };
 use tui_big_text::{BigText, PixelSize};
 
 use crate::filters::{
+    direction::{TrafficDirection, TrafficDirectionFilter},
     filter::Filter,
     fuzzy::{self, Fuzzy},
+    link::LinkFilter,
+    network::NetworkFilter,
+    transport::TransportFilter,
 };
+
 use crate::help::Help;
 use crate::interface::Interface;
 use crate::notification::Notification;
@@ -36,15 +42,91 @@ pub type AppResult<T> = std::result::Result<T, Box<dyn error::Error>>;
 pub const TICK_RATE: u64 = 40;
 
 #[derive(Debug, Copy, Clone, PartialEq)]
-pub enum FocusedBlock {
+pub enum StartMenuBlock {
     Interface,
     TransportFilter,
     NetworkFilter,
     LinkFilter,
     TrafficDirection,
     Start,
+}
+
+impl StartMenuBlock {
+    pub fn next(&mut self, app: &mut App) {
+        self.unselect(app);
+        *self = match self {
+            StartMenuBlock::Interface => StartMenuBlock::TransportFilter,
+            StartMenuBlock::TransportFilter => StartMenuBlock::NetworkFilter,
+            StartMenuBlock::NetworkFilter => StartMenuBlock::LinkFilter,
+            StartMenuBlock::LinkFilter => StartMenuBlock::TrafficDirection,
+            StartMenuBlock::TrafficDirection => StartMenuBlock::Start,
+            StartMenuBlock::Start => StartMenuBlock::Interface,
+        };
+        self.select(app);
+    }
+    pub fn app_component(self, app: &mut App) -> Option<&mut TableState> {
+        match self {
+            StartMenuBlock::Interface => Some(&mut app.interface.state),
+            StartMenuBlock::TransportFilter => Some(&mut app.filter.transport.state),
+            StartMenuBlock::NetworkFilter => Some(&mut app.filter.network.state),
+            StartMenuBlock::LinkFilter => Some(&mut app.filter.link.state),
+            StartMenuBlock::TrafficDirection => Some(&mut app.filter.traffic_direction.state),
+            StartMenuBlock::Start => None,
+        }
+    }
+    pub fn previous(&mut self, app: &mut App) {
+        self.unselect(app);
+        *self = match self {
+            StartMenuBlock::Interface => StartMenuBlock::Start,
+            StartMenuBlock::TransportFilter => StartMenuBlock::Interface,
+            StartMenuBlock::NetworkFilter => StartMenuBlock::TransportFilter,
+            StartMenuBlock::LinkFilter => StartMenuBlock::NetworkFilter,
+            StartMenuBlock::TrafficDirection => StartMenuBlock::LinkFilter,
+            StartMenuBlock::Start => StartMenuBlock::TrafficDirection,
+        };
+        self.select(app);
+    }
+
+    fn select(self, app: &mut App) {
+        match self.app_component(app) {
+            Some(p) => {
+                p.select(Some(0));
+            }
+            None => {}
+        }
+    }
+    fn unselect(self, app: &mut App) {
+        match self.app_component(app) {
+            Some(p) => {
+                p.select(None);
+            }
+            None => {}
+        }
+    }
+    pub fn scroll_up(self,app: &mut App){
+        match self {
+            StartMenuBlock::Interface => app.interface.scroll_up(),
+            StartMenuBlock::TransportFilter =>  (*app).filter.transport.scroll_up(),
+            StartMenuBlock::NetworkFilter =>   (*app).filter.network.scroll_up(),
+            StartMenuBlock::LinkFilter =>  (*app).filter.link.scroll_up(),
+            StartMenuBlock::TrafficDirection => (*app).filter.traffic_direction.state.select(Some(0)),
+           _ => {}
+    }
+    pub fn scroll_down(self,app: &mut App){
+        match self {
+            StartMenuBlock::Interface => app.interface.scroll_down(),
+            StartMenuBlock::TransportFilter =>  (*app).filter.transport.scroll_down(),
+            StartMenuBlock::NetworkFilter =>   (*app).filter.network.scroll_down(),
+            StartMenuBlock::LinkFilter =>  (*app).filter.link.scroll_down(),
+            StartMenuBlock::TrafficDirection => (*app).filter.traffic_direction.state.select(Some(1)),
+           _ => {}
+    }
+}
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum FocusedBlock {
+    StartMenuBlock(StartMenuBlock),
     Help,
-    Main,
+    Main(Mode),
 }
 
 #[derive(Debug)]
@@ -79,6 +161,7 @@ pub struct App {
     pub packet_index: Option<usize>,
     pub alert: Alert,
     pub firewall: Firewall,
+    pub is_editing: bool,
 }
 
 impl Default for App {
@@ -108,8 +191,8 @@ impl App {
         Self {
             running: true,
             help: Help::new(),
-            focused_block: FocusedBlock::Interface,
-            previous_focused_block: FocusedBlock::Interface,
+            focused_block: FocusedBlock::StartMenuBlock(StartMenuBlock::Interface),
+            previous_focused_block: FocusedBlock::StartMenuBlock(StartMenuBlock::Interface),
             interface: Interface::default(),
             filter: Filter::new(),
             start_sniffing: false,
@@ -129,6 +212,7 @@ impl App {
             packet_index: None,
             alert: Alert::new(packets.clone()),
             firewall: Firewall::new(),
+            is_editing: false,
         }
     }
 
@@ -221,7 +305,15 @@ impl App {
             }
         }
     }
-
+    pub fn detach_interfaces(&mut self) {
+        self.filter
+            .traffic_direction
+            .terminate(TrafficDirection::Egress);
+        self.filter
+            .traffic_direction
+            .terminate(TrafficDirection::Ingress);
+        thread::sleep(Duration::from_millis(150));
+    }
     pub fn render_packets_mode(&mut self, frame: &mut Frame, packet_mode_block: Rect) {
         let app_packets = self.packets.lock().unwrap();
         let mut fuzzy = self.fuzzy.lock().unwrap();

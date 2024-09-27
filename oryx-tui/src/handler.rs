@@ -3,7 +3,7 @@ use std::{thread, time::Duration};
 use tui_input::backend::crossterm::EventHandler;
 
 use crate::{
-    app::{App, AppResult, FocusedBlock},
+    app::{App, AppResult, FocusedBlock, StartMenuBlock},
     ebpf::Ebpf,
     event::Event,
     export::export,
@@ -19,11 +19,71 @@ use ratatui::{
     widgets::TableState,
 };
 
+fn handle_key_events_help(key_event: KeyEvent, app: &mut App) {
+    match key_event.code {
+        KeyCode::Esc => app.focused_block = app.previous_focused_block,
+        _ => {}
+    }
+}
+
+fn handle_key_events_start(key_event: KeyEvent, app: &mut App, block: &mut StartMenuBlock) {
+    match key_event.code {
+        KeyCode::Tab => {
+            block.next(app);
+        }
+        KeyCode::BackTab => {
+            block.previous(app);
+        }
+        KeyCode::Char('k') | KeyCode::Up => {
+            block.scroll_up(app);
+        }
+        KeyCode::Char('j') | KeyCode::Down => {
+            block.scroll_up(app);
+        }
+
+        _ => {}
+    }
+}
+
+fn handle_global_keys(key_event: KeyEvent, app: &mut App) -> AppResult<()> {
+    if !app.is_editing {
+        match key_event.code {
+            KeyCode::Char('?') => {
+                app.focused_block = FocusedBlock::Help;
+            }
+            KeyCode::Char('q') => {
+                app.detach_interfaces();
+                app.quit();
+            }
+
+            KeyCode::Char('c') | KeyCode::Char('C') => {
+                if key_event.modifiers == KeyModifiers::CONTROL {
+                    app.detach_interfaces();
+                    app.quit();
+                }
+            }
+
+            _ => {}
+        }
+    }
+    return Ok(());
+}
+
 pub fn handle_key_events(
     key_event: KeyEvent,
     app: &mut App,
     sender: kanal::Sender<Event>,
 ) -> AppResult<()> {
+    handle_global_keys(key_event, app);
+    match app.focused_block {
+        FocusedBlock::Help => handle_key_events_help(key_event, app),
+        FocusedBlock::StartMenuBlock(start_block) => {
+            handle_key_events_start(key_event, app, &mut start_block)
+        }
+        FocusedBlock::Main(mode_block) => mode_block.handle_key_events(key_event, app),
+    }
+    // old
+
     if app.show_packet_infos_popup {
         if key_event.code == KeyCode::Esc {
             app.show_packet_infos_popup = false;
@@ -32,120 +92,32 @@ pub fn handle_key_events(
         return Ok(());
     }
 
-    let fuzzy = app.fuzzy.clone();
-    let mut fuzzy = fuzzy.lock().unwrap();
+    // let fuzzy = app.fuzzy.clone();
+    // let mut fuzzy = fuzzy.lock().unwrap();
 
-    if fuzzy.is_enabled() {
-        match key_event.code {
-            KeyCode::Esc => {
-                if app.focused_block == FocusedBlock::Help {
-                    app.focused_block = FocusedBlock::Main;
-                    return Ok(());
-                }
+    // if fuzzy.is_enabled() {
+    //     match key_event.code {
+    //         KeyCode::Esc => {
+    //             // if app.focused_block == FocusedBlock::Help {
+    //             //     app.focused_block = FocusedBlock::Main;
+    //             //     return Ok(());
+    //             // }
 
-                if app.update_filters {
-                    app.update_filters = false;
-                    return Ok(());
-                }
+    //             if app.update_filters {
+    //                 app.update_filters = false;
+    //                 return Ok(());
+    //             }
 
-                if fuzzy.is_paused() {
-                    if app.manuall_scroll {
-                        app.manuall_scroll = false;
-                    } else {
-                        fuzzy.disable();
-                    }
-                } else {
-                    fuzzy.pause();
-                }
-            }
-
-            KeyCode::Tab => {
-                if app.focused_block == FocusedBlock::Help {
-                    return Ok(());
-                }
-
-                if app.update_filters {
-                    match &app.focused_block {
-                        FocusedBlock::TransportFilter => {
-                            app.focused_block = FocusedBlock::NetworkFilter;
-                            app.filter.network.state.select(Some(0));
-                            app.filter.transport.state.select(Some(0));
-                        }
-
-                        FocusedBlock::NetworkFilter => {
-                            app.focused_block = FocusedBlock::LinkFilter;
-                            app.filter.link.state.select(Some(0));
-                            app.filter.network.state.select(None);
-                        }
-
-                        FocusedBlock::LinkFilter => {
-                            app.focused_block = FocusedBlock::TrafficDirection;
-                            app.filter.traffic_direction.state.select(Some(0));
-                            app.filter.link.state.select(None);
-                        }
-
-                        FocusedBlock::TrafficDirection => {
-                            app.focused_block = FocusedBlock::Start;
-                            app.filter.traffic_direction.state.select(None);
-                        }
-
-                        FocusedBlock::Start => {
-                            app.focused_block = FocusedBlock::TransportFilter;
-                        }
-                        _ => {}
-                    };
-
-                    return Ok(());
-                }
-
-                match app.mode {
-                    Mode::Packet => app.mode = Mode::Stats,
-                    Mode::Stats => app.mode = Mode::Alerts,
-                    Mode::Alerts => app.mode = Mode::Firewall,
-                    Mode::Firewall => app.mode = Mode::Packet,
-                }
-            }
-
-            KeyCode::BackTab => {
-                if app.start_sniffing {
-                    if app.focused_block == FocusedBlock::Help {
-                        return Ok(());
-                    }
-
-                    if app.update_filters {
-                        match &app.focused_block {
-                            FocusedBlock::TransportFilter => {
-                                app.focused_block = FocusedBlock::Start;
-                                app.filter.transport.state.select(None);
-                            }
-
-                            FocusedBlock::NetworkFilter => {
-                                app.focused_block = FocusedBlock::TransportFilter;
-                                app.filter.transport.state.select(Some(0));
-                                app.filter.network.state.select(None);
-                            }
-
-                            FocusedBlock::LinkFilter => {
-                                app.focused_block = FocusedBlock::NetworkFilter;
-                                app.filter.network.state.select(Some(0));
-                                app.filter.link.state.select(None);
-                            }
-
-                            FocusedBlock::TrafficDirection => {
-                                app.focused_block = FocusedBlock::LinkFilter;
-                                app.filter.link.state.select(Some(0));
-                                app.filter.traffic_direction.state.select(None);
-                            }
-
-                            FocusedBlock::Start => {
-                                app.focused_block = FocusedBlock::TrafficDirection;
-                                app.filter.traffic_direction.state.select(Some(0));
-                            }
-                            _ => {}
-                        }
-                    }
-                }
-            }
+    //             if fuzzy.is_paused() {
+    //                 if app.manuall_scroll {
+    //                     app.manuall_scroll = false;
+    //                 } else {
+    //                     fuzzy.disable();
+    //                 }
+    //             } else {
+    //                 fuzzy.pause();
+    //             }
+    //         }
 
             _ => {
                 if app.focused_block == FocusedBlock::Help {
@@ -163,21 +135,20 @@ pub fn handle_key_events(
                             }
                         }
 
-                        KeyCode::Char('?') => {
-                            app.focused_block = FocusedBlock::Help;
-                        }
+                        // KeyCode::Char('?') => {
+                        //     app.focused_block = FocusedBlock::Help;
+                        // }
 
-                        KeyCode::Char('i') => {
-                            if app.focused_block == FocusedBlock::Help || app.update_filters {
-                                return Ok(());
-                            }
-                            if app.packet_index.is_none() || fuzzy.packets.is_empty() {
-                                return Ok(());
-                            }
+                        // KeyCode::Char('i') => {
+                        //     if app.focused_block == FocusedBlock::Help || app.update_filters {
+                        //         return Ok(());
+                        //     }
+                        //     if app.packet_index.is_none() || fuzzy.packets.is_empty() {
+                        //         return Ok(());
+                        //     }
 
-                            app.show_packet_infos_popup = true;
-                        }
-
+                        //     app.show_packet_infos_popup = true;
+                        // }
                         KeyCode::Char('f') => {
                             if app.focused_block != FocusedBlock::Help
                                 && app.start_sniffing
@@ -204,101 +175,101 @@ pub fn handle_key_events(
 
                         KeyCode::Char('j') | KeyCode::Down => {
                             if !app.update_filters {
-                                if !app.manuall_scroll {
-                                    app.manuall_scroll = true;
-                                    // Record the last position. Usefull for selecting the packets to display
-                                    fuzzy.packet_end_index = fuzzy.packets.len();
-                                }
-                                let i = match fuzzy.scroll_state.selected() {
-                                    Some(i) => {
-                                        if i < app.packet_window_size - 1 {
-                                            i + 1
-                                        } else if i == app.packet_window_size - 1
-                                            && fuzzy.packets.len() > fuzzy.packet_end_index
-                                        {
-                                            // shit the window by one
-                                            fuzzy.packet_end_index += 1;
-                                            i + 1
-                                        } else {
-                                            i
-                                        }
-                                    }
-                                    None => fuzzy.packets.len(),
-                                };
+                                // if !app.manuall_scroll {
+                                //     app.manuall_scroll = true;
+                                //     // Record the last position. Usefull for selecting the packets to display
+                                //     fuzzy.packet_end_index = fuzzy.packets.len();
+                                // }
+                                // let i = match fuzzy.scroll_state.selected() {
+                                //     Some(i) => {
+                                //         if i < app.packet_window_size - 1 {
+                                //             i + 1
+                                //         } else if i == app.packet_window_size - 1
+                                //             && fuzzy.packets.len() > fuzzy.packet_end_index
+                                //         {
+                                //             // shit the window by one
+                                //             fuzzy.packet_end_index += 1;
+                                //             i + 1
+                                //         } else {
+                                //             i
+                                //         }
+                                //     }
+                                //     None => fuzzy.packets.len(),
+                                // };
 
-                                fuzzy.scroll_state.select(Some(i));
+                                // fuzzy.scroll_state.select(Some(i));
                             } else {
                                 match &app.focused_block {
-                                    FocusedBlock::NetworkFilter => {
-                                        app.filter.network.scroll_down();
-                                    }
+                                    // FocusedBlock::NetworkFilter => {
+                                    //     app.filter.network.scroll_down();
+                                    // }
 
-                                    FocusedBlock::TransportFilter => {
-                                        app.filter.transport.scroll_down();
-                                    }
+                                    // FocusedBlock::TransportFilter => {
+                                    //     app.filter.transport.scroll_down();
+                                    // }
 
-                                    FocusedBlock::LinkFilter => {
-                                        app.filter.link.scroll_down();
-                                    }
+                                    // FocusedBlock::LinkFilter => {
+                                    //     app.filter.link.scroll_down();
+                                    // }
 
-                                    FocusedBlock::TrafficDirection => {
-                                        app.filter.traffic_direction.state.select(Some(1));
-                                    }
-
+                                    // FocusedBlock::TrafficDirection => {
+                                    //     app.filter.traffic_direction.state.select(Some(1));
+                                    // }
                                     _ => {}
                                 };
                             }
                         }
                         KeyCode::Char('k') | KeyCode::Up => {
                             if !app.update_filters {
-                                if !app.manuall_scroll {
-                                    app.manuall_scroll = true;
-                                    // Record the last position. Usefull for selecting the packets to display
-                                    fuzzy.packet_end_index = fuzzy.packets.len();
-                                }
-                                let i = match fuzzy.scroll_state.selected() {
-                                    Some(i) => {
-                                        if i > 1 {
-                                            i - 1
-                                        } else if i == 0
-                                            && fuzzy.packet_end_index > app.packet_window_size
-                                        {
-                                            // shit the window by one
-                                            fuzzy.packet_end_index -= 1;
-                                            0
-                                        } else {
-                                            0
-                                        }
-                                    }
-                                    None => fuzzy.packets.len(),
-                                };
+                                // if !app.manuall_scroll {
+                                //     app.manuall_scroll = true;
+                                //     // Record the last position. Usefull for selecting the packets to display
+                                //     fuzzy.packet_end_index = fuzzy.packets.len();
+                                // }
+                                // let i = match fuzzy.scroll_state.selected() {
+                                //     Some(i) => {
+                                //         if i > 1 {
+                                //             i - 1
+                                //         } else if i == 0
+                                //             && fuzzy.packet_end_index > app.packet_window_size
+                                //         {
+                                //             // shit the window by one
+                                //             fuzzy.packet_end_index -= 1;
+                                //             0
+                                //         } else {
+                                //             0
+                                //         }
+                                //     }
+                                //     None => fuzzy.packets.len(),
+                                // };
 
-                                fuzzy.scroll_state.select(Some(i));
+                                // fuzzy.scroll_state.select(Some(i));
                             } else {
-                                match &app.focused_block {
-                                    FocusedBlock::NetworkFilter => {
-                                        app.filter.network.scroll_up();
-                                    }
+                                // match &app.focused_block {
+                                //     FocusedBlock::NetworkFilter => {
+                                //         app.filter.network.scroll_up();
+                                //     }
 
-                                    FocusedBlock::TransportFilter => {
-                                        app.filter.transport.scroll_up();
-                                    }
+                                //     FocusedBlock::TransportFilter => {
+                                //         app.filter.transport.scroll_up();
+                                //     }
 
-                                    FocusedBlock::LinkFilter => {
-                                        app.filter.link.scroll_up();
-                                    }
+                                //     FocusedBlock::LinkFilter => {
+                                //         app.filter.link.scroll_up();
+                                //     }
 
-                                    FocusedBlock::TrafficDirection => {
-                                        app.filter.traffic_direction.state.select(Some(0));
-                                    }
+                                //     FocusedBlock::TrafficDirection => {
+                                //         app.filter.traffic_direction.state.select(Some(0));
+                                //     }
 
-                                    FocusedBlock::Help => {
-                                        app.help.scroll_up();
-                                    }
-                                    _ => {}
+                                //     FocusedBlock::Help => {
+                                //         app.help.scroll_up();
+                                //     }
+                                //     _ => {}
                                 }
                             }
                         }
+
                         _ => {}
                     }
                 }
@@ -306,30 +277,29 @@ pub fn handle_key_events(
         }
     } else {
         match key_event.code {
-            KeyCode::Char('q') => {
-                app.filter
-                    .traffic_direction
-                    .terminate(TrafficDirection::Egress);
-                app.filter
-                    .traffic_direction
-                    .terminate(TrafficDirection::Ingress);
-                thread::sleep(Duration::from_millis(110));
-                app.quit();
-            }
+            // KeyCode::Char('q') => {
+            //     app.filter
+            //         .traffic_direction
+            //         .terminate(TrafficDirection::Egress);
+            //     app.filter
+            //         .traffic_direction
+            //         .terminate(TrafficDirection::Ingress);
+            //     thread::sleep(Duration::from_millis(110));
+            //     app.quit();
+            // }
 
-            KeyCode::Char('c') | KeyCode::Char('C') => {
-                if key_event.modifiers == KeyModifiers::CONTROL {
-                    app.filter
-                        .traffic_direction
-                        .terminate(TrafficDirection::Egress);
-                    app.filter
-                        .traffic_direction
-                        .terminate(TrafficDirection::Ingress);
-                    thread::sleep(Duration::from_millis(110));
-                    app.quit();
-                }
-            }
-
+            // KeyCode::Char('c') | KeyCode::Char('C') => {
+            //     if key_event.modifiers == KeyModifiers::CONTROL {
+            //         app.filter
+            //             .traffic_direction
+            //             .terminate(TrafficDirection::Egress);
+            //         app.filter
+            //             .traffic_direction
+            //             .terminate(TrafficDirection::Ingress);
+            //         thread::sleep(Duration::from_millis(110));
+            //         app.quit();
+            //     }
+            // }
             KeyCode::Esc => {
                 if app.focused_block == FocusedBlock::Help {
                     if app.start_sniffing {
@@ -350,10 +320,9 @@ pub fn handle_key_events(
                 }
             }
 
-            KeyCode::Char('?') => {
-                app.focused_block = FocusedBlock::Help;
-            }
-
+            // KeyCode::Char('?') => {
+            //     app.focused_block = FocusedBlock::Help;
+            // }
             KeyCode::Char('f') => {
                 if app.focused_block != FocusedBlock::Help
                     && app.start_sniffing
@@ -412,41 +381,33 @@ pub fn handle_key_events(
                 }
             }
 
-            KeyCode::Char('/') => {
-                if app.focused_block == FocusedBlock::Help || app.update_filters {
-                    return Ok(());
-                }
-                if app.start_sniffing {
-                    fuzzy.enable();
-                    fuzzy.unpause();
-                }
-            }
+            // KeyCode::Char('/') => {
+            //     if app.focused_block == FocusedBlock::Help || app.update_filters {
+            //         return Ok(());
+            //     }
+            //     if app.start_sniffing {
+            //         fuzzy.enable();
+            //         fuzzy.unpause();
+            //     }
+            // }
+            // KeyCode::Char('i') => {
+            //     if app.focused_block == FocusedBlock::Help || app.update_filters {
+            //         return Ok(());
+            //     }
+            //     let packets = app.packets.lock().unwrap();
 
-            KeyCode::Char('i') => {
-                if app.focused_block == FocusedBlock::Help || app.update_filters {
-                    return Ok(());
-                }
-                let packets = app.packets.lock().unwrap();
+            //     if app.packet_index.is_none() || packets.is_empty() {
+            //         return Ok(());
+            //     }
 
-                if app.packet_index.is_none() || packets.is_empty() {
-                    return Ok(());
-                }
-
-                app.show_packet_infos_popup = true;
-            }
-
+            //     app.show_packet_infos_popup = true;
+            // }
             KeyCode::Char('r') => {
                 if app.focused_block == FocusedBlock::Help || app.update_filters {
                     return Ok(());
                 }
                 if key_event.modifiers == KeyModifiers::CONTROL {
-                    app.filter
-                        .traffic_direction
-                        .terminate(TrafficDirection::Ingress);
-                    app.filter
-                        .traffic_direction
-                        .terminate(TrafficDirection::Egress);
-                    thread::sleep(Duration::from_millis(150));
+                    app.detach_interfaces();
                     sender.send(Event::Reset)?;
                 }
             }
@@ -663,185 +624,184 @@ pub fn handle_key_events(
                 }
             }
 
-            KeyCode::Tab => {
-                if app.start_sniffing {
-                    if app.focused_block == FocusedBlock::Help {
-                        return Ok(());
-                    }
+            // KeyCode::Tab => {
+            //     if app.start_sniffing {
+            //         if app.focused_block == FocusedBlock::Help {
+            //             return Ok(());
+            //         }
 
-                    if app.update_filters {
-                        match &app.focused_block {
-                            FocusedBlock::TransportFilter => {
-                                app.focused_block = FocusedBlock::NetworkFilter;
-                                app.filter.network.state.select(Some(0));
-                                app.filter.transport.state.select(None);
-                            }
+            //         if app.update_filters {
+            //             match &app.focused_block {
+            //                 FocusedBlock::TransportFilter => {
+            //                     app.focused_block = FocusedBlock::NetworkFilter;
+            //                     app.filter.network.state.select(Some(0));
+            //                     app.filter.transport.state.select(None);
+            //                 }
 
-                            FocusedBlock::NetworkFilter => {
-                                app.focused_block = FocusedBlock::LinkFilter;
-                                app.filter.link.state.select(Some(0));
-                                app.filter.network.state.select(None);
-                            }
+            //                 FocusedBlock::NetworkFilter => {
+            //                     app.focused_block = FocusedBlock::LinkFilter;
+            //                     app.filter.link.state.select(Some(0));
+            //                     app.filter.network.state.select(None);
+            //                 }
 
-                            FocusedBlock::LinkFilter => {
-                                app.focused_block = FocusedBlock::TrafficDirection;
-                                app.filter.traffic_direction.state.select(Some(0));
-                                app.filter.link.state.select(None);
-                            }
+            //                 FocusedBlock::LinkFilter => {
+            //                     app.focused_block = FocusedBlock::TrafficDirection;
+            //                     app.filter.traffic_direction.state.select(Some(0));
+            //                     app.filter.link.state.select(None);
+            //                 }
 
-                            FocusedBlock::TrafficDirection => {
-                                app.focused_block = FocusedBlock::Start;
-                                app.filter.traffic_direction.state.select(None);
-                            }
+            //                 FocusedBlock::TrafficDirection => {
+            //                     app.focused_block = FocusedBlock::Start;
+            //                     app.filter.traffic_direction.state.select(None);
+            //                 }
 
-                            FocusedBlock::Start => {
-                                app.focused_block = FocusedBlock::TransportFilter;
-                                app.filter.transport.state.select(Some(0));
-                            }
-                            _ => {}
-                        };
+            //                 FocusedBlock::Start => {
+            //                     app.focused_block = FocusedBlock::TransportFilter;
+            //                     app.filter.transport.state.select(Some(0));
+            //                 }
+            //                 _ => {}
+            //             };
 
-                        return Ok(());
-                    }
+            //             return Ok(());
+            //         }
 
-                    match app.mode {
-                        Mode::Packet => app.mode = Mode::Stats,
-                        Mode::Stats => app.mode = Mode::Alerts,
-                        Mode::Alerts => app.mode = Mode::Firewall,
-                        Mode::Firewall => app.mode = Mode::Packet,
-                    };
-                } else {
-                    match &app.focused_block {
-                        FocusedBlock::Interface => {
-                            app.focused_block = FocusedBlock::TransportFilter;
-                            app.previous_focused_block = app.focused_block;
-                            app.interface.state.select(None);
-                            app.filter.transport.state.select(Some(0));
-                        }
+            //         match app.mode {
+            //             Mode::Packet => app.mode = Mode::Stats,
+            //             Mode::Stats => app.mode = Mode::Alerts,
+            //             Mode::Alerts => app.mode = Mode::Firewall,
+            //             Mode::Firewall => app.mode = Mode::Packet,
+            //         };
+            //     } else {
+            //         match &app.focused_block {
+            //             FocusedBlock::Interface => {
+            //                 app.focused_block = FocusedBlock::TransportFilter;
+            //                 app.previous_focused_block = app.focused_block;
+            //                 app.interface.state.select(None);
+            //                 app.filter.transport.state.select(Some(0));
+            //             }
 
-                        FocusedBlock::TransportFilter => {
-                            app.focused_block = FocusedBlock::NetworkFilter;
-                            app.previous_focused_block = app.focused_block;
-                            app.filter.network.state.select(Some(0));
-                            app.filter.transport.state.select(None);
-                        }
+            //             FocusedBlock::TransportFilter => {
+            //                 app.focused_block = FocusedBlock::NetworkFilter;
+            //                 app.previous_focused_block = app.focused_block;
+            //                 app.filter.network.state.select(Some(0));
+            //                 app.filter.transport.state.select(None);
+            //             }
 
-                        FocusedBlock::NetworkFilter => {
-                            app.focused_block = FocusedBlock::LinkFilter;
-                            app.previous_focused_block = app.focused_block;
-                            app.filter.link.state.select(Some(0));
-                            app.filter.network.state.select(None);
-                        }
+            //             FocusedBlock::NetworkFilter => {
+            //                 app.focused_block = FocusedBlock::LinkFilter;
+            //                 app.previous_focused_block = app.focused_block;
+            //                 app.filter.link.state.select(Some(0));
+            //                 app.filter.network.state.select(None);
+            //             }
 
-                        FocusedBlock::LinkFilter => {
-                            app.focused_block = FocusedBlock::TrafficDirection;
-                            app.previous_focused_block = app.focused_block;
-                            app.filter.traffic_direction.state.select(Some(0));
-                            app.filter.link.state.select(None);
-                        }
+            //             FocusedBlock::LinkFilter => {
+            //                 app.focused_block = FocusedBlock::TrafficDirection;
+            //                 app.previous_focused_block = app.focused_block;
+            //                 app.filter.traffic_direction.state.select(Some(0));
+            //                 app.filter.link.state.select(None);
+            //             }
 
-                        FocusedBlock::TrafficDirection => {
-                            app.focused_block = FocusedBlock::Start;
-                            app.previous_focused_block = app.focused_block;
-                            app.filter.traffic_direction.state.select(None);
-                        }
+            //             FocusedBlock::TrafficDirection => {
+            //                 app.focused_block = FocusedBlock::Start;
+            //                 app.previous_focused_block = app.focused_block;
+            //                 app.filter.traffic_direction.state.select(None);
+            //             }
 
-                        FocusedBlock::Start => {
-                            app.focused_block = FocusedBlock::Interface;
-                            app.previous_focused_block = app.focused_block;
-                            app.interface.state.select(Some(0));
-                        }
-                        _ => {}
-                    }
-                }
-            }
+            //             FocusedBlock::Start => {
+            //                 app.focused_block = FocusedBlock::Interface;
+            //                 app.previous_focused_block = app.focused_block;
+            //                 app.interface.state.select(Some(0));
+            //             }
+            //             _ => {}
+            //         }
+            //     }
+            // }
 
-            KeyCode::BackTab => {
-                if app.start_sniffing {
-                    if app.focused_block == FocusedBlock::Help {
-                        return Ok(());
-                    }
+            // KeyCode::BackTab => {
+            //     if app.start_sniffing {
+            //         if app.focused_block == FocusedBlock::Help {
+            //             return Ok(());
+            //         }
 
-                    if app.update_filters {
-                        match &app.focused_block {
-                            FocusedBlock::TransportFilter => {
-                                app.focused_block = FocusedBlock::Start;
-                                app.filter.transport.state.select(None);
-                            }
+            //         if app.update_filters {
+            //             match &app.focused_block {
+            //                 FocusedBlock::TransportFilter => {
+            //                     app.focused_block = FocusedBlock::Start;
+            //                     app.filter.transport.state.select(None);
+            //                 }
 
-                            FocusedBlock::NetworkFilter => {
-                                app.focused_block = FocusedBlock::TransportFilter;
-                                app.filter.transport.state.select(Some(0));
-                                app.filter.network.state.select(None);
-                            }
+            //                 FocusedBlock::NetworkFilter => {
+            //                     app.focused_block = FocusedBlock::TransportFilter;
+            //                     app.filter.transport.state.select(Some(0));
+            //                     app.filter.network.state.select(None);
+            //                 }
 
-                            FocusedBlock::LinkFilter => {
-                                app.focused_block = FocusedBlock::NetworkFilter;
-                                app.filter.network.state.select(Some(0));
-                                app.filter.link.state.select(None);
-                            }
+            //                 FocusedBlock::LinkFilter => {
+            //                     app.focused_block = FocusedBlock::NetworkFilter;
+            //                     app.filter.network.state.select(Some(0));
+            //                     app.filter.link.state.select(None);
+            //                 }
 
-                            FocusedBlock::TrafficDirection => {
-                                app.focused_block = FocusedBlock::LinkFilter;
-                                app.filter.link.state.select(Some(0));
-                                app.filter.traffic_direction.state.select(None);
-                            }
+            //                 FocusedBlock::TrafficDirection => {
+            //                     app.focused_block = FocusedBlock::LinkFilter;
+            //                     app.filter.link.state.select(Some(0));
+            //                     app.filter.traffic_direction.state.select(None);
+            //                 }
 
-                            FocusedBlock::Start => {
-                                app.focused_block = FocusedBlock::TrafficDirection;
-                                app.filter.traffic_direction.state.select(Some(0));
-                            }
-                            _ => {}
-                        }
-                        return Ok(());
-                    };
+            //                 FocusedBlock::Start => {
+            //                     app.focused_block = FocusedBlock::TrafficDirection;
+            //                     app.filter.traffic_direction.state.select(Some(0));
+            //                 }
+            //                 _ => {}
+            //             }
+            //             return Ok(());
+            //         };
 
-                    match app.mode {
-                        Mode::Packet => app.mode = Mode::Alerts,
-                        Mode::Stats => app.mode = Mode::Packet,
-                        Mode::Alerts => app.mode = Mode::Firewall,
-                        Mode::Firewall => app.mode = Mode::Packet,
-                    };
-                } else {
-                    match &app.focused_block {
-                        FocusedBlock::Interface => {
-                            app.focused_block = FocusedBlock::Start;
-                            app.interface.state.select(None);
-                        }
+            //         match app.mode {
+            //             Mode::Packet => app.mode = Mode::Alerts,
+            //             Mode::Stats => app.mode = Mode::Packet,
+            //             Mode::Alerts => app.mode = Mode::Firewall,
+            //             Mode::Firewall => app.mode = Mode::Packet,
+            //         };
+            //     } else {
+            //         match &app.focused_block {
+            //             FocusedBlock::Interface => {
+            //                 app.focused_block = FocusedBlock::Start;
+            //                 app.interface.state.select(None);
+            //             }
 
-                        FocusedBlock::TransportFilter => {
-                            app.focused_block = FocusedBlock::Interface;
-                            app.interface.state.select(Some(0));
-                            app.filter.transport.state.select(None);
-                        }
+            //             FocusedBlock::TransportFilter => {
+            //                 app.focused_block = FocusedBlock::Interface;
+            //                 app.interface.state.select(Some(0));
+            //                 app.filter.transport.state.select(None);
+            //             }
 
-                        FocusedBlock::NetworkFilter => {
-                            app.focused_block = FocusedBlock::TransportFilter;
-                            app.filter.transport.state.select(Some(0));
-                            app.filter.network.state.select(None);
-                        }
+            //             FocusedBlock::NetworkFilter => {
+            //                 app.focused_block = FocusedBlock::TransportFilter;
+            //                 app.filter.transport.state.select(Some(0));
+            //                 app.filter.network.state.select(None);
+            //             }
 
-                        FocusedBlock::LinkFilter => {
-                            app.focused_block = FocusedBlock::NetworkFilter;
-                            app.filter.network.state.select(Some(0));
-                            app.filter.link.state.select(None);
-                        }
+            //             FocusedBlock::LinkFilter => {
+            //                 app.focused_block = FocusedBlock::NetworkFilter;
+            //                 app.filter.network.state.select(Some(0));
+            //                 app.filter.link.state.select(None);
+            //             }
 
-                        FocusedBlock::TrafficDirection => {
-                            app.focused_block = FocusedBlock::LinkFilter;
-                            app.filter.link.state.select(Some(0));
-                            app.filter.traffic_direction.state.select(None);
-                        }
+            //             FocusedBlock::TrafficDirection => {
+            //                 app.focused_block = FocusedBlock::LinkFilter;
+            //                 app.filter.link.state.select(Some(0));
+            //                 app.filter.traffic_direction.state.select(None);
+            //             }
 
-                        FocusedBlock::Start => {
-                            app.focused_block = FocusedBlock::TrafficDirection;
-                            app.filter.traffic_direction.state.select(Some(0));
-                        }
-                        _ => {}
-                    }
-                }
-            }
-
+            //             FocusedBlock::Start => {
+            //                 app.focused_block = FocusedBlock::TrafficDirection;
+            //                 app.filter.traffic_direction.state.select(Some(0));
+            //             }
+            //             _ => {}
+            //         }
+            //     }
+            // }
             KeyCode::Char(' ') => {
                 if !app.start_sniffing || app.update_filters {
                     match &app.focused_block {
@@ -907,29 +867,29 @@ pub fn handle_key_events(
                     app.packets_table_state.select(Some(i));
                 } else {
                     match &app.focused_block {
-                        FocusedBlock::Interface => {
-                            app.interface.scroll_down();
-                        }
+                        // FocusedBlock::Interface => {
+                        //     app.interface.scroll_down();
+                        // }
 
-                        FocusedBlock::NetworkFilter => {
-                            app.filter.network.scroll_down();
-                        }
+                        // FocusedBlock::NetworkFilter => {
+                        //     app.filter.network.scroll_down();
+                        // }
 
-                        FocusedBlock::TransportFilter => {
-                            app.filter.transport.scroll_down();
-                        }
+                        // FocusedBlock::TransportFilter => {
+                        //     app.filter.transport.scroll_down();
+                        // }
 
-                        FocusedBlock::LinkFilter => {
-                            app.filter.link.scroll_down();
-                        }
+                        // FocusedBlock::LinkFilter => {
+                        //     app.filter.link.scroll_down();
+                        // }
 
-                        FocusedBlock::TrafficDirection => {
-                            app.filter.traffic_direction.state.select(Some(1));
-                        }
+                        // FocusedBlock::TrafficDirection => {
+                        //     app.filter.traffic_direction.state.select(Some(1));
+                        // }
 
-                        FocusedBlock::Help => {
-                            app.help.scroll_down();
-                        }
+                        // FocusedBlock::Help => {
+                        //     app.help.scroll_down();
+                        // }
                         _ => {}
                     }
                 }
@@ -964,25 +924,21 @@ pub fn handle_key_events(
                     app.packets_table_state.select(Some(i));
                 } else {
                     match &app.focused_block {
-                        FocusedBlock::Interface => {
-                            app.interface.scroll_up();
-                        }
-                        FocusedBlock::NetworkFilter => {
-                            app.filter.network.scroll_up();
-                        }
-
-                        FocusedBlock::TransportFilter => {
-                            app.filter.transport.scroll_up();
-                        }
-
-                        FocusedBlock::LinkFilter => {
-                            app.filter.link.scroll_up();
-                        }
-
-                        FocusedBlock::TrafficDirection => {
-                            app.filter.traffic_direction.state.select(Some(0));
-                        }
-
+                        // FocusedBlock::Interface => {
+                        //     app.interface.scroll_up();
+                        // }
+                        // FocusedBlock::NetworkFilter => {
+                        //     app.filter.network.scroll_up();
+                        // }
+                        // FocusedBlock::TransportFilter => {
+                        //     app.filter.transport.scroll_up();
+                        // }
+                        // FocusedBlock::LinkFilter => {
+                        //     app.filter.link.scroll_up();
+                        // }
+                        // FocusedBlock::TrafficDirection => {
+                        //     app.filter.traffic_direction.state.select(Some(0));
+                        // }
                         FocusedBlock::Help => {
                             app.help.scroll_up();
                         }
