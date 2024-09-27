@@ -1,7 +1,7 @@
 use oryx_common::RawPacket;
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Flex, Layout, Margin, Rect},
-    style::{Color, Style, Stylize},
+    style::{Style, Stylize},
     text::{Line, Span},
     widgets::{
         Block, BorderType, Borders, Cell, Clear, HighlightSpacing, Padding, Paragraph, Row,
@@ -16,8 +16,6 @@ use std::{
 };
 use tui_big_text::{BigText, PixelSize};
 
-use crate::alerts::alert::Alert;
-use crate::bandwidth::Bandwidth;
 use crate::filters::{
     filter::Filter,
     fuzzy::{self, Fuzzy},
@@ -30,6 +28,8 @@ use crate::packets::{
     packet::AppPacket,
 };
 use crate::stats::Stats;
+use crate::{alerts::alert::Alert, firewall::Firewall};
+use crate::{bandwidth::Bandwidth, mode::Mode};
 
 pub type AppResult<T> = std::result::Result<T, Box<dyn error::Error>>;
 
@@ -45,13 +45,6 @@ pub enum FocusedBlock {
     Start,
     Help,
     Main,
-}
-
-#[derive(Debug, PartialEq)]
-pub enum Mode {
-    Packet,
-    Stats,
-    Alerts,
 }
 
 #[derive(Debug)]
@@ -85,6 +78,7 @@ pub struct App {
     pub show_packet_infos_popup: bool,
     pub packet_index: Option<usize>,
     pub alert: Alert,
+    pub firewall: Firewall,
 }
 
 impl Default for App {
@@ -134,6 +128,7 @@ impl App {
             show_packet_infos_popup: false,
             packet_index: None,
             alert: Alert::new(packets.clone()),
+            firewall: Firewall::new(),
         }
     }
 
@@ -200,6 +195,13 @@ impl App {
             self.filter.render_on_sniffing(frame, filter_block);
 
             // Packets/Stats
+            if self.mode == Mode::Alerts {
+                self.mode
+                    .render(frame, mode_block, self.alert.title_span(true));
+            } else {
+                self.mode
+                    .render(frame, mode_block, self.alert.title_span(false));
+            };
             match self.mode {
                 Mode::Packet => {
                     self.render_packets_mode(frame, mode_block);
@@ -209,6 +211,7 @@ impl App {
                 }
                 Mode::Stats => self.render_stats_mode(frame, mode_block),
                 Mode::Alerts => self.alert.render(frame, mode_block),
+                Mode::Firewall => self.firewall.render(frame, mode_block),
             }
 
             // Update filters
@@ -523,25 +526,7 @@ impl App {
             .flex(Flex::SpaceBetween)
             .highlight_style(Style::new().bg(ratatui::style::Color::DarkGray))
             .highlight_spacing(HighlightSpacing::Always)
-            .block(
-                Block::default()
-                    .title({
-                        Line::from(vec![
-                            Span::styled(
-                                " Packet ",
-                                Style::default().bg(Color::Green).fg(Color::White).bold(),
-                            ),
-                            Span::from(" Stats ").fg(Color::DarkGray),
-                            self.alert.title_span(),
-                        ])
-                    })
-                    .title_alignment(Alignment::Left)
-                    .padding(Padding::top(1))
-                    .borders(Borders::ALL)
-                    .style(Style::default())
-                    .border_type(BorderType::default())
-                    .border_style(Style::default().green()),
-            );
+            .block(Block::new().padding(Padding::top(2)));
 
         if fuzzy.is_enabled() {
             frame.render_stateful_widget(table, packet_block, &mut fuzzy.scroll_state);
@@ -631,30 +616,6 @@ impl App {
                 .split(block);
             (chunks[0], chunks[1])
         };
-
-        frame.render_widget(
-            Block::default()
-                .title({
-                    Line::from(vec![
-                        Span::from(" Packet ").fg(Color::DarkGray),
-                        Span::styled(
-                            " Stats ",
-                            Style::default().bg(Color::Green).fg(Color::White).bold(),
-                        ),
-                        self.alert.title_span(),
-                    ])
-                })
-                .title_alignment(Alignment::Left)
-                .padding(Padding::top(1))
-                .borders(Borders::ALL)
-                .style(Style::default())
-                .border_type(BorderType::default())
-                .border_style(Style::default().green()),
-            block.inner(Margin {
-                horizontal: 1,
-                vertical: 0,
-            }),
-        );
 
         stats.render(frame, stats_block);
 

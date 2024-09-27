@@ -3,11 +3,12 @@ use std::{thread, time::Duration};
 use tui_input::backend::crossterm::EventHandler;
 
 use crate::{
-    app::{App, AppResult, FocusedBlock, Mode},
+    app::{App, AppResult, FocusedBlock},
     ebpf::Ebpf,
     event::Event,
     export::export,
     filters::direction::TrafficDirection,
+    mode::Mode,
     notification::{Notification, NotificationLevel},
 };
 use ratatui::{
@@ -100,7 +101,8 @@ pub fn handle_key_events(
                 match app.mode {
                     Mode::Packet => app.mode = Mode::Stats,
                     Mode::Stats => app.mode = Mode::Alerts,
-                    Mode::Alerts => app.mode = Mode::Packet,
+                    Mode::Alerts => app.mode = Mode::Firewall,
+                    Mode::Firewall => app.mode = Mode::Packet,
                 }
             }
 
@@ -705,7 +707,8 @@ pub fn handle_key_events(
                     match app.mode {
                         Mode::Packet => app.mode = Mode::Stats,
                         Mode::Stats => app.mode = Mode::Alerts,
-                        Mode::Alerts => app.mode = Mode::Packet,
+                        Mode::Alerts => app.mode = Mode::Firewall,
+                        Mode::Firewall => app.mode = Mode::Packet,
                     };
                 } else {
                     match &app.focused_block {
@@ -796,7 +799,8 @@ pub fn handle_key_events(
                     match app.mode {
                         Mode::Packet => app.mode = Mode::Alerts,
                         Mode::Stats => app.mode = Mode::Packet,
-                        Mode::Alerts => app.mode = Mode::Stats,
+                        Mode::Alerts => app.mode = Mode::Firewall,
+                        Mode::Firewall => app.mode = Mode::Packet,
                     };
                 } else {
                     match &app.focused_block {

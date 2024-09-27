@@ -42,3 +42,7 @@ pub mod alerts {
     pub mod alert;
     pub mod syn_flood;
 }
+
+pub mod firewall;
+
+pub mod mode;
