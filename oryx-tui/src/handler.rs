@@ -41,19 +41,19 @@ pub fn handle_key_events(
                 return Ok(())
             }
             KeyCode::Char('q') => {
-                app.detach_interfaces();
+                app.detach_ebpf();
                 app.quit();
             }
 
             KeyCode::Char('c') | KeyCode::Char('C') => {
                 if key_event.modifiers == KeyModifiers::CONTROL {
-                    app.detach_interfaces();
+                    app.detach_ebpf();
                     app.quit();
                 }
             }
             KeyCode::Char('r') => {
                 if key_event.modifiers == KeyModifiers::CONTROL {
-                    app.detach_interfaces();
+                    app.detach_ebpf();
                     sender.send(Event::Reset)?;
                     return Ok(())
                 }

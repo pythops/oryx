@@ -46,3 +46,5 @@ pub mod alerts {
 pub mod firewall;
 
 pub mod mode;
+
+pub mod startmenu;

@@ -194,14 +194,31 @@ impl Mode {
 
                                     fuzzy.scroll_state.select(Some(i));
                                 }
+                                KeyCode::Char('f') => {
+                                    app.update_filters = true;
+                                    app.focused_block = StartMenuBlock::TransportFilter;
+                                    app.focused_block.select();
+
+                                    app.filter.network.selected_protocols =
+                                        app.filter.network.applied_protocols.clone();
+
+                                    app.filter.transport.selected_protocols =
+                                        app.filter.transport.applied_protocols.clone();
+
+                                    app.filter.link.selected_protocols =
+                                        app.filter.link.applied_protocols.clone();
+
+                                    app.filter.traffic_direction.selected_direction =
+                                        app.filter.traffic_direction.applied_direction.clone();
+                                }
                                 KeyCode::Esc => {
                                     if app.show_packet_infos_popup {
                                         app.show_packet_infos_popup = false;
-                                    } else if app.manuall_scroll {
-                                        app.manuall_scroll = false;
                                     } else if !fuzzy.is_paused() {
                                         fuzzy.pause();
                                         app.is_editing = false;
+                                    } else if app.manuall_scroll {
+                                        app.manuall_scroll = false;
                                     }
                                 }
                                 _ => {}
