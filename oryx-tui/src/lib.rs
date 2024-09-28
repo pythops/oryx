@@ -20,7 +20,9 @@ pub mod filters {
     pub mod fuzzy;
     pub mod link;
     pub mod network;
+    pub mod start_menu;
     pub mod transport;
+    pub mod update_menu;
 }
 
 pub mod notification;
@@ -46,5 +48,3 @@ pub mod alerts {
 pub mod firewall;
 
 pub mod mode;
-
-pub mod startmenu;

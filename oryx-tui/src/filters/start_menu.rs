@@ -101,12 +101,41 @@ impl StartMenuBlock {
             KeyCode::Char('j') | KeyCode::Down => {
                 self.scroll_down(app);
             }
-            KeyCode::Esc => {
-                if app.update_filters {
-                    app.update_filters = false
-                }
-            }
             _ => {}
         }
+    }
+    pub fn render(&mut self, frame: &mut Frame, app: &mut App) {
+        let (interface_block, filter_block, start_block) = {
+            let chunks = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([
+                    Constraint::Length(app.interface.interfaces.len() as u16 + 6),
+                    Constraint::Fill(1),
+                    Constraint::Length(4),
+                ])
+                .margin(1)
+                .flex(Flex::SpaceAround)
+                .split(frame.area());
+            (chunks[0], chunks[1], chunks[2])
+        };
+
+        // interfaces
+        app.interface.render_on_setup(frame, interface_block, &self);
+
+        // Filters
+        app.filter.render_on_setup(frame, filter_block, &self);
+
+        // Start Button
+        let start = BigText::builder()
+            .pixel_size(PixelSize::Sextant)
+            .style(if self.focused_block == FocusedBlock::Start {
+                Style::default().white().bold()
+            } else {
+                Style::default().dark_gray()
+            })
+            .lines(vec!["START".into()])
+            .centered()
+            .build();
+        frame.render_widget(start, start_block);
     }
 }

@@ -23,7 +23,9 @@ use crate::filters::{
     fuzzy::{self, Fuzzy},
     link::LinkFilter,
     network::NetworkFilter,
+    start_menu::StartMenuBlock,
     transport::TransportFilter,
+    update_menu::UpdateFilterMenuBLock,
 };
 
 use crate::help::Help;
@@ -33,7 +35,7 @@ use crate::packets::{
     network::{IpPacket, IpProto},
     packet::AppPacket,
 };
-use crate::startmenu::StartMenuBlock;
+
 use crate::stats::Stats;
 use crate::{alerts::alert::Alert, firewall::Firewall};
 use crate::{bandwidth::Bandwidth, mode::Mode};
@@ -44,6 +46,7 @@ pub const TICK_RATE: u64 = 40;
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum FocusedBlock {
     StartMenuBlock(StartMenuBlock),
+    UpdateFilterMenuBlock(UpdateFilterMenuBLock),
     Help,
     Main(Mode),
 }
@@ -137,93 +140,52 @@ impl App {
 
     pub fn render(&mut self, frame: &mut Frame) {
         // Setup
-        if !self.start_sniffing {
-            let (interface_block, filter_block, start_block) = {
-                let chunks = Layout::default()
-                    .direction(Direction::Vertical)
-                    .constraints([
-                        Constraint::Length(self.interface.interfaces.len() as u16 + 6),
-                        Constraint::Fill(1),
-                        Constraint::Length(4),
-                    ])
-                    .margin(1)
-                    .flex(Flex::SpaceAround)
-                    .split(frame.area());
-                (chunks[0], chunks[1], chunks[2])
-            };
-
-            // interfaces
-            self.interface
-                .render_on_setup(frame, interface_block, &self.focused_block);
-
-            // Filters
-            self.filter
-                .render_on_setup(frame, filter_block, &self.focused_block);
-
-            // Start Button
-            let start = BigText::builder()
-                .pixel_size(PixelSize::Sextant)
-                .style(if self.focused_block == FocusedBlock::Start {
-                    Style::default().white().bold()
-                } else {
-                    Style::default().dark_gray()
-                })
-                .lines(vec!["START".into()])
-                .centered()
-                .build();
-            frame.render_widget(start, start_block);
-        } else {
-            // Sniffing
-            let (settings_block, mode_block) = {
-                let chunks = Layout::default()
-                    .direction(Direction::Vertical)
-                    .constraints([Constraint::Length(8), Constraint::Fill(1)])
-                    .split(frame.area());
-                (chunks[0], chunks[1])
-            };
-            // Settings
-            let (filter_block, interface_block) = {
-                let chunks = Layout::default()
-                    .direction(Direction::Horizontal)
-                    .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
-                    .margin(1)
-                    .split(settings_block);
-                (chunks[0], chunks[1])
-            };
-
-            // Interface
-            self.interface.render_on_sniffing(frame, interface_block);
-
-            // Filters
-            self.filter.render_on_sniffing(frame, filter_block);
-
-            // Packets/Stats
-            if self.mode == Mode::Alerts {
-                self.mode
-                    .render(frame, mode_block, self.alert.title_span(true));
-            } else {
-                self.mode
-                    .render(frame, mode_block, self.alert.title_span(false));
-            };
-            match self.mode {
-                Mode::Packet => {
-                    self.render_packets_mode(frame, mode_block);
-                    if self.show_packet_infos_popup {
-                        self.render_packet_infos_popup(frame);
-                    }
+        match self.focused_block {
+            FocusedBlock::StartMenuBlock(b) => b.render(frame, &mut self),
+            FocusedBlock::Main(mode) => self.render_main_section(frame, mode),
+            _ => {
+                match self.previous_focused_block {
+                    FocusedBlock::StartMenuBlock(b) => b.render(frame, &mut self),
+                    FocusedBlock::Main(mode) => self.render_main_section(frame, mode),
+                    _ => {}
                 }
-                Mode::Stats => self.render_stats_mode(frame, mode_block),
-                Mode::Alerts => self.alert.render(frame, mode_block),
-                Mode::Firewall => self.firewall.render(frame, mode_block),
-            }
-
-            // Update filters
-
-            if self.update_filters {
-                self.filter.update(frame, mode_block, &self.focused_block);
+                match self.focused_block {
+                    FocusedBlock::UpdateFilterMenuBlock(b) => b.render(frame, self),
+                    FocusedBlock::Help => self.help.render(frame),
+                    _ => {}
+                }
             }
         }
     }
+
+    fn render_main_section(&mut self, frame: &mut Frame, mode: Mode) {
+        // Build layout
+        let (settings_block, mode_block) = {
+            let chunks: std::rc::Rc<[Rect]> = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([Constraint::Length(8), Constraint::Fill(1)])
+                .split(frame.area());
+            (chunks[0], chunks[1])
+        };
+        let (filter_block, interface_block) = {
+            let chunks = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+                .margin(1)
+                .split(settings_block);
+            (chunks[0], chunks[1])
+        };
+
+        // Render settings
+        // Interface
+        self.interface.render_on_sniffing(frame, interface_block);
+        // Filters
+        self.filter.render_on_sniffing(frame, filter_block);
+
+        // Render  mode section
+        mode.render(frame, mode_block, self);
+    }
+
     pub fn detach_ebpf(&mut self) {
         self.filter
             .traffic_direction
@@ -232,456 +194,6 @@ impl App {
             .traffic_direction
             .terminate(TrafficDirection::Ingress);
         thread::sleep(Duration::from_millis(150));
-    }
-    pub fn render_packets_mode(&mut self, frame: &mut Frame, packet_mode_block: Rect) {
-        let app_packets = self.packets.lock().unwrap();
-        let mut fuzzy = self.fuzzy.lock().unwrap();
-        let fuzzy_packets = fuzzy.clone().packets.clone();
-
-        //TODO: ugly
-        let pattern = fuzzy.clone();
-        let pattern = pattern.filter.value();
-
-        let (packet_block, fuzzy_block) = {
-            if fuzzy.is_enabled() {
-                let chunks = Layout::default()
-                    .direction(Direction::Vertical)
-                    .constraints([Constraint::Fill(1), Constraint::Length(3)])
-                    .horizontal_margin(1)
-                    .split(packet_mode_block);
-                (chunks[0], chunks[1])
-            } else {
-                let chunks = Layout::default()
-                    .direction(Direction::Vertical)
-                    .constraints([Constraint::Fill(1), Constraint::Length(1)])
-                    .horizontal_margin(1)
-                    .split(packet_mode_block);
-                (chunks[0], chunks[1])
-            }
-        };
-
-        let widths = [
-            Constraint::Min(19),    // Source Address
-            Constraint::Length(11), // Source Port
-            Constraint::Min(19),    // Destination Address
-            Constraint::Length(16), // Destination Port
-            Constraint::Length(8),  // Protocol
-            Constraint::Length(2),  // Protocol
-        ];
-
-        // The size of the window where to display packets
-        let window_size = packet_mode_block.height.saturating_sub(5) as usize;
-        self.packet_window_size = window_size;
-
-        // This points always to the end of the window
-        if self.packet_end_index < window_size {
-            self.packet_end_index = window_size;
-        }
-
-        if fuzzy.packet_end_index < window_size {
-            fuzzy.packet_end_index = window_size;
-        }
-
-        let packets_to_display = match self.manuall_scroll {
-            true => {
-                if fuzzy.is_enabled() & !fuzzy.filter.value().is_empty() {
-                    if fuzzy_packets.len() > window_size {
-                        if let Some(selected_index) = fuzzy.scroll_state.selected() {
-                            self.packet_index = Some(
-                                fuzzy.packet_end_index.saturating_sub(window_size) + selected_index,
-                            );
-                        }
-                        &fuzzy_packets[fuzzy.packet_end_index.saturating_sub(window_size)
-                            ..fuzzy.packet_end_index]
-                    } else {
-                        if let Some(selected_index) = fuzzy.scroll_state.selected() {
-                            self.packet_index = Some(selected_index);
-                        } else {
-                            self.packet_index = None;
-                        }
-                        &fuzzy_packets
-                    }
-                } else if app_packets.len() > window_size {
-                    if let Some(selected_index) = self.packets_table_state.selected() {
-                        self.packet_index = Some(
-                            self.packet_end_index.saturating_sub(window_size) + selected_index,
-                        );
-                    }
-                    &app_packets
-                        [self.packet_end_index.saturating_sub(window_size)..self.packet_end_index]
-                } else {
-                    if let Some(selected_index) = self.packets_table_state.selected() {
-                        self.packet_index = Some(selected_index);
-                    }
-                    &app_packets
-                }
-            }
-            false => {
-                if fuzzy.is_enabled() & !fuzzy.filter.value().is_empty() {
-                    if fuzzy_packets.len() > window_size {
-                        self.packet_index = Some(fuzzy_packets.len().saturating_sub(1));
-                        &fuzzy_packets[fuzzy_packets.len().saturating_sub(window_size)..]
-                    } else {
-                        self.packet_index = Some(fuzzy_packets.len().saturating_sub(1));
-                        &fuzzy_packets
-                    }
-                } else if app_packets.len() > window_size {
-                    self.packet_index = Some(app_packets.len().saturating_sub(1));
-                    &app_packets[app_packets.len().saturating_sub(window_size)..]
-                } else {
-                    self.packet_index = Some(app_packets.len().saturating_sub(1));
-                    &app_packets
-                }
-            }
-        };
-
-        // Style the packets
-        let packets: Vec<Row> = if fuzzy.is_enabled() & !fuzzy.filter.value().is_empty() {
-            packets_to_display
-                .iter()
-                .map(|app_packet| match app_packet {
-                    AppPacket::Arp(packet) => Row::new(vec![
-                        fuzzy::highlight(pattern, packet.src_mac.to_string()).blue(),
-                        Cell::from(Line::from("-").centered()).yellow(),
-                        fuzzy::highlight(pattern, packet.dst_mac.to_string()).blue(),
-                        Cell::from(Line::from("-").centered()).yellow(),
-                        fuzzy::highlight(pattern, "ARP".to_string()).cyan(),
-                    ]),
-                    AppPacket::Ip(packet) => match packet {
-                        IpPacket::V4(ipv4_packet) => match ipv4_packet.proto {
-                            IpProto::Tcp(p) => Row::new(vec![
-                                fuzzy::highlight(pattern, ipv4_packet.src_ip.to_string()).blue(),
-                                fuzzy::highlight(pattern, p.src_port.to_string()).yellow(),
-                                fuzzy::highlight(pattern, ipv4_packet.dst_ip.to_string()).blue(),
-                                fuzzy::highlight(pattern, p.dst_port.to_string()).yellow(),
-                                fuzzy::highlight(pattern, "TCP".to_string()).cyan(),
-                            ]),
-                            IpProto::Udp(p) => Row::new(vec![
-                                fuzzy::highlight(pattern, ipv4_packet.src_ip.to_string()).blue(),
-                                fuzzy::highlight(pattern, p.src_port.to_string()).yellow(),
-                                fuzzy::highlight(pattern, ipv4_packet.dst_ip.to_string()).blue(),
-                                fuzzy::highlight(pattern, p.dst_port.to_string()).yellow(),
-                                fuzzy::highlight(pattern, "UDP".to_string()).cyan(),
-                            ]),
-                            IpProto::Icmp(_) => Row::new(vec![
-                                fuzzy::highlight(pattern, ipv4_packet.src_ip.to_string()).blue(),
-                                Cell::from(Line::from("-").centered()).yellow(),
-                                fuzzy::highlight(pattern, ipv4_packet.dst_ip.to_string()).blue(),
-                                Cell::from(Line::from("-").centered()).yellow(),
-                                fuzzy::highlight(pattern, "ICMP".to_string()).cyan(),
-                            ]),
-                        },
-                        IpPacket::V6(ipv6_packet) => match ipv6_packet.proto {
-                            IpProto::Tcp(p) => Row::new(vec![
-                                fuzzy::highlight(pattern, ipv6_packet.src_ip.to_string()).blue(),
-                                fuzzy::highlight(pattern, p.src_port.to_string()).yellow(),
-                                fuzzy::highlight(pattern, ipv6_packet.dst_ip.to_string()).blue(),
-                                fuzzy::highlight(pattern, p.dst_port.to_string()).yellow(),
-                                fuzzy::highlight(pattern, "TCP".to_string()).cyan(),
-                            ]),
-                            IpProto::Udp(p) => Row::new(vec![
-                                fuzzy::highlight(pattern, ipv6_packet.src_ip.to_string()).blue(),
-                                fuzzy::highlight(pattern, p.src_port.to_string()).yellow(),
-                                fuzzy::highlight(pattern, ipv6_packet.dst_ip.to_string()).blue(),
-                                fuzzy::highlight(pattern, p.dst_port.to_string()).yellow(),
-                                fuzzy::highlight(pattern, "UDP".to_string()).cyan(),
-                            ]),
-                            IpProto::Icmp(_) => Row::new(vec![
-                                fuzzy::highlight(pattern, ipv6_packet.src_ip.to_string()).blue(),
-                                Cell::from(Line::from("-").centered()).yellow(),
-                                fuzzy::highlight(pattern, ipv6_packet.dst_ip.to_string()).blue(),
-                                Cell::from(Line::from("-").centered()).yellow(),
-                                fuzzy::highlight(pattern, "ICMP".to_string()).cyan(),
-                            ]),
-                        },
-                    },
-                })
-                .collect()
-        } else {
-            packets_to_display
-                .iter()
-                .map(|app_packet| match app_packet {
-                    AppPacket::Arp(packet) => Row::new(vec![
-                        Span::from(packet.src_mac.to_string())
-                            .into_centered_line()
-                            .blue(),
-                        Span::from("-").into_centered_line().yellow(),
-                        Span::from(packet.dst_mac.to_string())
-                            .into_centered_line()
-                            .blue(),
-                        Span::from("-").into_centered_line().yellow(),
-                        Span::from("ARP".to_string()).into_centered_line().cyan(),
-                    ]),
-                    AppPacket::Ip(packet) => match packet {
-                        IpPacket::V4(ipv4_packet) => match ipv4_packet.proto {
-                            IpProto::Tcp(p) => Row::new(vec![
-                                Span::from(ipv4_packet.src_ip.to_string())
-                                    .into_centered_line()
-                                    .blue(),
-                                Span::from(p.src_port.to_string())
-                                    .into_centered_line()
-                                    .yellow(),
-                                Span::from(ipv4_packet.dst_ip.to_string())
-                                    .into_centered_line()
-                                    .blue(),
-                                Span::from(p.dst_port.to_string())
-                                    .into_centered_line()
-                                    .yellow(),
-                                Span::from("TCP".to_string()).into_centered_line().cyan(),
-                            ]),
-                            IpProto::Udp(p) => Row::new(vec![
-                                Span::from(ipv4_packet.src_ip.to_string())
-                                    .into_centered_line()
-                                    .blue(),
-                                Span::from(p.src_port.to_string())
-                                    .into_centered_line()
-                                    .yellow(),
-                                Span::from(ipv4_packet.dst_ip.to_string())
-                                    .into_centered_line()
-                                    .blue(),
-                                Span::from(p.dst_port.to_string())
-                                    .into_centered_line()
-                                    .yellow(),
-                                Span::from("UDP".to_string()).into_centered_line().cyan(),
-                            ]),
-                            IpProto::Icmp(_) => Row::new(vec![
-                                Span::from(ipv4_packet.src_ip.to_string())
-                                    .into_centered_line()
-                                    .blue(),
-                                Span::from("-").into_centered_line().yellow(),
-                                Span::from(ipv4_packet.dst_ip.to_string())
-                                    .into_centered_line()
-                                    .blue(),
-                                Span::from("-").into_centered_line().yellow(),
-                                Span::from("ICMP".to_string()).into_centered_line().cyan(),
-                            ]),
-                        },
-                        IpPacket::V6(ipv6_packet) => match ipv6_packet.proto {
-                            IpProto::Tcp(p) => Row::new(vec![
-                                Span::from(ipv6_packet.src_ip.to_string())
-                                    .into_centered_line()
-                                    .blue(),
-                                Span::from(p.src_port.to_string())
-                                    .into_centered_line()
-                                    .yellow(),
-                                Span::from(ipv6_packet.dst_ip.to_string())
-                                    .into_centered_line()
-                                    .blue(),
-                                Span::from(p.dst_port.to_string())
-                                    .into_centered_line()
-                                    .yellow(),
-                                Span::from("TCP".to_string()).into_centered_line().cyan(),
-                            ]),
-                            IpProto::Udp(p) => Row::new(vec![
-                                Span::from(ipv6_packet.src_ip.to_string())
-                                    .into_centered_line()
-                                    .blue(),
-                                Span::from(p.src_port.to_string())
-                                    .into_centered_line()
-                                    .yellow(),
-                                Span::from(ipv6_packet.dst_ip.to_string())
-                                    .into_centered_line()
-                                    .blue(),
-                                Span::from(p.dst_port.to_string())
-                                    .into_centered_line()
-                                    .yellow(),
-                                Span::from("UDP".to_string()).into_centered_line().cyan(),
-                            ]),
-                            IpProto::Icmp(_) => Row::new(vec![
-                                Span::from(ipv6_packet.src_ip.to_string())
-                                    .into_centered_line()
-                                    .blue(),
-                                Span::from("-").into_centered_line().yellow(),
-                                Span::from(ipv6_packet.dst_ip.to_string())
-                                    .into_centered_line()
-                                    .blue(),
-                                Span::from("-").into_centered_line().yellow(),
-                                Span::from("ICMP".to_string()).into_centered_line().cyan(),
-                            ]),
-                        },
-                    },
-                })
-                .collect()
-        };
-
-        // Always select the last packet
-        if !self.manuall_scroll {
-            if fuzzy.is_enabled() {
-                fuzzy.scroll_state.select(Some(packets_to_display.len()));
-            } else {
-                self.packets_table_state
-                    .select(Some(packets_to_display.len()));
-            }
-        }
-
-        let table = Table::new(packets, widths)
-            .header(
-                Row::new(vec![
-                    Line::from("Source Address").centered(),
-                    Line::from("Source Port").centered(),
-                    Line::from("Destination Address").centered(),
-                    Line::from("Destination Port").centered(),
-                    Line::from("Protocol").centered(),
-                    {
-                        if self.manuall_scroll {
-                            Line::from(" ").centered().yellow()
-                        } else {
-                            Line::from("").centered()
-                        }
-                    },
-                ])
-                .style(Style::new().bold())
-                .bottom_margin(1),
-            )
-            .column_spacing(2)
-            .flex(Flex::SpaceBetween)
-            .highlight_style(Style::new().bg(ratatui::style::Color::DarkGray))
-            .highlight_spacing(HighlightSpacing::Always)
-            .block(Block::new().padding(Padding::top(2)));
-
-        if fuzzy.is_enabled() {
-            frame.render_stateful_widget(table, packet_block, &mut fuzzy.scroll_state);
-        } else {
-            frame.render_stateful_widget(table, packet_block, &mut self.packets_table_state);
-        }
-
-        // Scrollbar
-
-        let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
-            .begin_symbol(Some("↑"))
-            .end_symbol(Some("↓"));
-
-        let mut scrollbar_state = if fuzzy.is_enabled() && fuzzy_packets.len() > window_size {
-            ScrollbarState::new(fuzzy_packets.len()).position({
-                if self.manuall_scroll {
-                    if fuzzy.packet_end_index == window_size {
-                        0
-                    } else {
-                        fuzzy.packet_end_index
-                    }
-                } else {
-                    fuzzy.packets.len()
-                }
-            })
-        } else if !fuzzy.is_enabled() && app_packets.len() > window_size {
-            ScrollbarState::new(app_packets.len()).position({
-                if self.manuall_scroll {
-                    if self.packet_end_index == window_size {
-                        0
-                    } else {
-                        self.packet_end_index
-                    }
-                } else {
-                    app_packets.len()
-                }
-            })
-        } else {
-            ScrollbarState::default()
-        };
-
-        frame.render_stateful_widget(
-            scrollbar,
-            packet_block.inner(Margin {
-                vertical: 1,
-                horizontal: 0,
-            }),
-            &mut scrollbar_state,
-        );
-
-        if fuzzy.is_enabled() {
-            let fuzzy = Paragraph::new(format!("> {}", fuzzy.filter.value()))
-                .alignment(Alignment::Left)
-                .style(Style::default().white())
-                .block(
-                    Block::new()
-                        .borders(Borders::all())
-                        .title(" Search  ")
-                        .title_style({
-                            if fuzzy.is_paused() {
-                                Style::default().bold().green()
-                            } else {
-                                Style::default().bold().yellow()
-                            }
-                        })
-                        .border_style({
-                            if fuzzy.is_paused() {
-                                Style::default().green()
-                            } else {
-                                Style::default().yellow()
-                            }
-                        }),
-                );
-
-            frame.render_widget(fuzzy, fuzzy_block);
-        }
-    }
-
-    pub fn render_stats_mode(&mut self, frame: &mut Frame, block: Rect) {
-        let stats = self.stats.lock().unwrap();
-
-        let (bandwidth_block, stats_block) = {
-            let chunks = Layout::default()
-                .direction(Direction::Vertical)
-                .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
-                .margin(2)
-                .split(block);
-            (chunks[0], chunks[1])
-        };
-
-        stats.render(frame, stats_block);
-
-        self.bandwidth.render(
-            frame,
-            bandwidth_block,
-            &self.interface.selected_interface.name.clone(),
-        );
-    }
-
-    fn render_packet_infos_popup(&self, frame: &mut Frame) {
-        let layout = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Fill(1),
-                Constraint::Length(36),
-                Constraint::Fill(1),
-            ])
-            .flex(ratatui::layout::Flex::SpaceBetween)
-            .split(frame.area());
-
-        let block = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints([
-                Constraint::Fill(1),
-                Constraint::Max(80),
-                Constraint::Fill(1),
-            ])
-            .flex(ratatui::layout::Flex::SpaceBetween)
-            .split(layout[1])[1];
-
-        let fuzzy = self.fuzzy.lock().unwrap();
-        let packets = self.packets.lock().unwrap();
-
-        let packet = if fuzzy.is_enabled() {
-            fuzzy.packets[self.packet_index.unwrap()]
-        } else {
-            packets[self.packet_index.unwrap()]
-        };
-
-        frame.render_widget(Clear, block);
-        frame.render_widget(
-            Block::new()
-                .title(" Packet Infos 󰋼  ")
-                .title_style(Style::new().bold().green())
-                .title_alignment(Alignment::Center)
-                .borders(Borders::all())
-                .border_style(Style::new().green())
-                .border_type(BorderType::Thick),
-            block,
-        );
-        match packet {
-            AppPacket::Ip(ip_packet) => ip_packet.render(block, frame),
-            AppPacket::Arp(arp_packet) => arp_packet.render(block, frame),
-        };
     }
 
     pub fn process(

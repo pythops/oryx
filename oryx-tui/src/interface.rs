@@ -225,11 +225,13 @@ impl Interface {
                 .title_style(Style::default().bold().fg(Color::Green))
                 .title_alignment(Alignment::Center)
                 .borders(Borders::LEFT)
-                .border_type(if *focused_block == FocusedBlock::Interface {
-                    BorderType::Thick
-                } else {
-                    BorderType::default()
-                })
+                .border_type(
+                    if *focused_block == FocusedBlock::StartMenuBlock(Interface) {
+                        BorderType::Thick
+                    } else {
+                        BorderType::default()
+                    },
+                )
                 .border_style(Style::default().fg(Color::Green)),
             area,
         );
