@@ -15,6 +15,8 @@ use ratatui::{
 
 use crate::app::FocusedBlock;
 
+use super::{start_menu::StartMenuBlock, update_menu::UpdateFilterMenuBlock};
+
 #[derive(Debug)]
 pub struct TrafficDirectionFilter {
     pub state: TableState,
@@ -130,10 +132,12 @@ impl TrafficDirectionFilter {
                 .title_style(Style::default().bold().fg(Color::Green))
                 .title_alignment(Alignment::Center)
                 .borders(Borders::LEFT)
-                .border_type(if *focused_block == FocusedBlock::TrafficDirection {
-                    BorderType::Thick
-                } else {
-                    BorderType::default()
+                .border_type(match *focused_block {
+                    FocusedBlock::StartMenuBlock(StartMenuBlock::TrafficDirection)
+                    | FocusedBlock::UpdateFilterMenuBlock(
+                        UpdateFilterMenuBlock::TrafficDirection,
+                    ) => BorderType::Thick,
+                    _ => BorderType::default(),
                 })
                 .border_style(Style::default().fg(Color::Green)),
             area,

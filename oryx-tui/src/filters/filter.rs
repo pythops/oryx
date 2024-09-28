@@ -5,10 +5,9 @@ use ratatui::{
     layout::{Alignment, Constraint, Direction, Flex, Layout, Rect},
     style::{Style, Stylize},
     text::{Line, Span},
-    widgets::{Block, BorderType, Borders, Clear, Padding, Row, Table},
+    widgets::{Block, BorderType, Borders, Padding, Row, Table},
     Frame,
 };
-use tui_big_text::{BigText, PixelSize};
 
 use crate::app::FocusedBlock;
 

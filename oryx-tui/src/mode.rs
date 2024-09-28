@@ -1,13 +1,24 @@
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use crate::{
+    app::{App, FocusedBlock},
+    filters::{fuzzy, update_menu::UpdateFilterMenuBlock},
+    packets::{
+        network::{IpPacket, IpProto},
+        packet::AppPacket,
+    },
+};
+use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
-    layout::{Alignment, Rect},
+    layout::{Alignment, Constraint, Direction, Flex, Layout, Margin, Rect},
     style::{Color, Style, Stylize},
     text::{Line, Span},
-    widgets::{Block, BorderType, Borders, Padding},
+    widgets::{
+        Block, BorderType, Borders, Cell, Clear, HighlightSpacing, Padding, Paragraph, Row,
+        Scrollbar, ScrollbarOrientation, ScrollbarState, Table,
+    },
     Frame,
 };
+use tui_input::backend::crossterm::EventHandler;
 
-use crate::app::App;
 #[derive(Debug, Clone, PartialEq)]
 pub enum Mode {
     Packet,
@@ -136,8 +147,10 @@ impl Mode {
                                 }
                                 KeyCode::Char('f') => {
                                     app.update_filters = true;
-                                    app.focused_block = UpdateFilterMenuBLock::TransportFilter;
-                                    app.focused_block.select();
+                                    app.focused_block = FocusedBlock::UpdateFilterMenuBlock(
+                                        UpdateFilterMenuBlock::TransportFilter,
+                                    );
+                                    UpdateFilterMenuBlock::TransportFilter.select(app);
 
                                     app.filter.network.selected_protocols =
                                         app.filter.network.applied_protocols.clone();
@@ -176,13 +189,19 @@ impl Mode {
         }
     }
 
-    pub fn render(&self, frame: &mut Frame, area: Rect, &app: App) {
-        self.render_header(frame, area, app.alert.title_span(mode == Mode::Alerts));
+    pub fn render(&self, frame: &mut Frame, area: Rect, app: &mut App) {
+        self.render_header(frame, area, app.alert.title_span(*self == Mode::Alerts));
         match self {
-            Mode::Packet => self.render_packets_mode(frame, mode_block, app),
-            Mode::Stats => self.render_stats_mode(frame, mode_block, app),
-            Mode::Alerts => app.alert.render(frame, mode_block),
-            Mode::Firewall => app.firewall.render(frame, mode_block),
+            Mode::Packet => {
+                self.render_packets_mode(frame, area, app);
+                // show packet info popup if needed
+                if app.show_packet_infos_popup {
+                    self.render_packet_infos_popup(frame, app);
+                }
+            }
+            Mode::Stats => self.render_stats_mode(frame, area, app),
+            Mode::Alerts => app.alert.render(frame, area),
+            Mode::Firewall => app.firewall.render(frame, area),
         }
     }
 
@@ -246,7 +265,7 @@ impl Mode {
             area,
         );
     }
-    fn render_stats_mode(self, frame: &mut Frame, block: Rect, &app: App) {
+    fn render_stats_mode(&self, frame: &mut Frame, block: Rect, app: &App) {
         let stats = app.stats.lock().unwrap();
 
         let (bandwidth_block, stats_block) = {
@@ -267,7 +286,7 @@ impl Mode {
         );
     }
 
-    fn render_packets_mode(self, frame: &mut Frame, area: Rect, app: &mut App) {
+    fn render_packets_mode(&self, frame: &mut Frame, area: Rect, app: &mut App) {
         let app_packets = app.packets.lock().unwrap();
         let mut fuzzy = app.fuzzy.lock().unwrap();
         let fuzzy_packets = fuzzy.clone().packets.clone();
@@ -647,13 +666,9 @@ impl Mode {
 
             frame.render_widget(fuzzy, fuzzy_block);
         }
-        // show packet info popup if needed
-        if app.show_packet_infos_popup {
-            self.render_packet_infos_popup(frame, app);
-        }
     }
 
-    fn render_packet_infos_popup(self, frame: &mut Frame, &app: App) {
+    fn render_packet_infos_popup(&self, frame: &mut Frame, app: &mut App) {
         let layout = Layout::default()
             .direction(Direction::Vertical)
             .constraints([

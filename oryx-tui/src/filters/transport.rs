@@ -8,6 +8,8 @@ use ratatui::{
 
 use crate::app::FocusedBlock;
 
+use super::{start_menu::StartMenuBlock, update_menu::UpdateFilterMenuBlock};
+
 #[derive(Debug)]
 pub struct TransportFilter {
     pub state: TableState,
@@ -129,10 +131,12 @@ impl TransportFilter {
                 .title_style(Style::default().bold().fg(Color::Green))
                 .title_alignment(Alignment::Center)
                 .borders(Borders::LEFT)
-                .border_type(if *focused_block == FocusedBlock::TransportFilter {
-                    BorderType::Thick
-                } else {
-                    BorderType::default()
+                .border_type(match *focused_block {
+                    FocusedBlock::StartMenuBlock(StartMenuBlock::TransportFilter)
+                    | FocusedBlock::UpdateFilterMenuBlock(UpdateFilterMenuBlock::TransportFilter) => {
+                        BorderType::Thick
+                    }
+                    _ => BorderType::default(),
                 })
                 .border_style(Style::default().fg(Color::Green)),
             area,

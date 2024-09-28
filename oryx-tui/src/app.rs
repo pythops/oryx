@@ -1,12 +1,7 @@
 use oryx_common::RawPacket;
 use ratatui::{
-    layout::{Alignment, Constraint, Direction, Flex, Layout, Margin, Rect},
-    style::{Style, Stylize},
-    text::{Line, Span},
-    widgets::{
-        Block, BorderType, Borders, Cell, Clear, HighlightSpacing, Padding, Paragraph, Row,
-        Scrollbar, ScrollbarOrientation, ScrollbarState, Table, TableState,
-    },
+    layout::{Constraint, Direction, Layout, Rect},
+    widgets::TableState,
     Frame,
 };
 use std::{
@@ -15,26 +10,16 @@ use std::{
     thread,
     time::Duration,
 };
-use tui_big_text::{BigText, PixelSize};
 
 use crate::filters::{
-    direction::{TrafficDirection, TrafficDirectionFilter},
-    filter::Filter,
-    fuzzy::{self, Fuzzy},
-    link::LinkFilter,
-    network::NetworkFilter,
-    start_menu::StartMenuBlock,
-    transport::TransportFilter,
-    update_menu::UpdateFilterMenuBLock,
+    direction::TrafficDirection, filter::Filter, fuzzy::Fuzzy, start_menu::StartMenuBlock,
+    update_menu::UpdateFilterMenuBlock,
 };
 
 use crate::help::Help;
 use crate::interface::Interface;
 use crate::notification::Notification;
-use crate::packets::{
-    network::{IpPacket, IpProto},
-    packet::AppPacket,
-};
+use crate::packets::packet::AppPacket;
 
 use crate::stats::Stats;
 use crate::{alerts::alert::Alert, firewall::Firewall};
@@ -43,10 +28,10 @@ pub type AppResult<T> = std::result::Result<T, Box<dyn error::Error>>;
 
 pub const TICK_RATE: u64 = 40;
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum FocusedBlock {
     StartMenuBlock(StartMenuBlock),
-    UpdateFilterMenuBlock(UpdateFilterMenuBLock),
+    UpdateFilterMenuBlock(UpdateFilterMenuBlock),
     Help,
     Main(Mode),
 }
@@ -140,13 +125,13 @@ impl App {
 
     pub fn render(&mut self, frame: &mut Frame) {
         // Setup
-        match self.focused_block {
-            FocusedBlock::StartMenuBlock(b) => b.render(frame, &mut self),
-            FocusedBlock::Main(mode) => self.render_main_section(frame, mode),
+        match self.focused_block.clone() {
+            FocusedBlock::StartMenuBlock(b) => b.render(frame, self),
+            FocusedBlock::Main(mode) => self.render_main_section(frame, &mode),
             _ => {
-                match self.previous_focused_block {
-                    FocusedBlock::StartMenuBlock(b) => b.render(frame, &mut self),
-                    FocusedBlock::Main(mode) => self.render_main_section(frame, mode),
+                match self.previous_focused_block.clone() {
+                    FocusedBlock::StartMenuBlock(b) => b.render(frame, self),
+                    FocusedBlock::Main(mode) => self.render_main_section(frame, &mode),
                     _ => {}
                 }
                 match self.focused_block {
@@ -158,7 +143,7 @@ impl App {
         }
     }
 
-    fn render_main_section(&mut self, frame: &mut Frame, mode: Mode) {
+    fn render_main_section(&mut self, frame: &mut Frame, mode: &Mode) {
         // Build layout
         let (settings_block, mode_block) = {
             let chunks: std::rc::Rc<[Rect]> = Layout::default()

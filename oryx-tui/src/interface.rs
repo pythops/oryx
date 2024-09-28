@@ -14,7 +14,7 @@ use std::{
     path::PathBuf,
 };
 
-use crate::app::FocusedBlock;
+use crate::{app::FocusedBlock, filters::start_menu::StartMenuBlock};
 
 #[derive(Debug, Clone)]
 pub struct NetworkInterface {
@@ -226,7 +226,7 @@ impl Interface {
                 .title_alignment(Alignment::Center)
                 .borders(Borders::LEFT)
                 .border_type(
-                    if *focused_block == FocusedBlock::StartMenuBlock(Interface) {
+                    if *focused_block == FocusedBlock::StartMenuBlock(StartMenuBlock::Interface) {
                         BorderType::Thick
                     } else {
                         BorderType::default()

@@ -8,6 +8,8 @@ use ratatui::{
 
 use crate::app::FocusedBlock;
 
+use super::{start_menu::StartMenuBlock, update_menu::UpdateFilterMenuBlock};
+
 #[derive(Debug)]
 pub struct NetworkFilter {
     pub state: TableState,
@@ -144,13 +146,13 @@ impl NetworkFilter {
                 .title_style(Style::default().bold().fg(Color::Green))
                 .title_alignment(Alignment::Center)
                 .borders(Borders::LEFT)
-                .border_type(
-                    if *focused_block == FocusedBlock::StartMenuBlock(NetworkFilter) {
+                .border_type(match *focused_block {
+                    FocusedBlock::StartMenuBlock(StartMenuBlock::NetworkFilter)
+                    | FocusedBlock::UpdateFilterMenuBlock(UpdateFilterMenuBlock::NetworkFilter) => {
                         BorderType::Thick
-                    } else {
-                        BorderType::default()
-                    },
-                )
+                    }
+                    _ => BorderType::default(),
+                })
                 .border_style(Style::default().fg(Color::Green)),
             area,
         );

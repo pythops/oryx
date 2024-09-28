@@ -1,7 +1,17 @@
+use crossterm::event::{KeyCode, KeyEvent};
+use ratatui::prelude::Stylize;
+use ratatui::{
+    layout::{Constraint, Direction, Flex, Layout},
+    style::Style,
+    widgets::{Block, BorderType, Borders, Clear, TableState},
+    Frame,
+};
+use tui_big_text::{BigText, PixelSize};
+
 use crate::app::App;
 
 #[derive(Debug, Copy, Clone, PartialEq)]
-pub enum UpdateFilterMenuBLock {
+pub enum UpdateFilterMenuBlock {
     TransportFilter,
     NetworkFilter,
     LinkFilter,
@@ -9,42 +19,42 @@ pub enum UpdateFilterMenuBLock {
     Start,
 }
 
-impl UpdateFilterMenuBLock {
+impl UpdateFilterMenuBlock {
     pub fn next(&mut self, app: &mut App) {
         self.unselect(app);
         *self = match self {
-            UpdateFilterMenuBLock::TransportFilter => UpdateFilterMenuBLock::NetworkFilter,
-            UpdateFilterMenuBLock::NetworkFilter => UpdateFilterMenuBLock::LinkFilter,
-            UpdateFilterMenuBLock::LinkFilter => UpdateFilterMenuBLock::TrafficDirection,
-            UpdateFilterMenuBLock::TrafficDirection => UpdateFilterMenuBLock::Start,
-            UpdateFilterMenuBLock::Start => UpdateFilterMenuBLock::TransportFilter,
+            UpdateFilterMenuBlock::TransportFilter => UpdateFilterMenuBlock::NetworkFilter,
+            UpdateFilterMenuBlock::NetworkFilter => UpdateFilterMenuBlock::LinkFilter,
+            UpdateFilterMenuBlock::LinkFilter => UpdateFilterMenuBlock::TrafficDirection,
+            UpdateFilterMenuBlock::TrafficDirection => UpdateFilterMenuBlock::Start,
+            UpdateFilterMenuBlock::Start => UpdateFilterMenuBlock::TransportFilter,
         };
         self.select(app);
     }
     pub fn app_component(self, app: &mut App) -> Option<&mut TableState> {
         match self {
-            UpdateFilterMenuBLock::TransportFilter => Some(&mut (*app).filter.transport.state),
-            UpdateFilterMenuBLock::NetworkFilter => Some(&mut (*app).filter.network.state),
-            UpdateFilterMenuBLock::LinkFilter => Some(&mut (*app).filter.link.state),
-            UpdateFilterMenuBLock::TrafficDirection => {
+            UpdateFilterMenuBlock::TransportFilter => Some(&mut (*app).filter.transport.state),
+            UpdateFilterMenuBlock::NetworkFilter => Some(&mut (*app).filter.network.state),
+            UpdateFilterMenuBlock::LinkFilter => Some(&mut (*app).filter.link.state),
+            UpdateFilterMenuBlock::TrafficDirection => {
                 Some(&mut (*app).filter.traffic_direction.state)
             }
-            UpdateFilterMenuBLock::Start => None,
+            UpdateFilterMenuBlock::Start => None,
         }
     }
     pub fn previous(&mut self, app: &mut App) {
         self.unselect(app);
         *self = match self {
-            UpdateFilterMenuBLock::TransportFilter => UpdateFilterMenuBLock::Start,
-            UpdateFilterMenuBLock::NetworkFilter => UpdateFilterMenuBLock::TransportFilter,
-            UpdateFilterMenuBLock::LinkFilter => UpdateFilterMenuBLock::NetworkFilter,
-            UpdateFilterMenuBLock::TrafficDirection => UpdateFilterMenuBLock::LinkFilter,
-            UpdateFilterMenuBLock::Start => UpdateFilterMenuBLock::TrafficDirection,
+            UpdateFilterMenuBlock::TransportFilter => UpdateFilterMenuBlock::Start,
+            UpdateFilterMenuBlock::NetworkFilter => UpdateFilterMenuBlock::TransportFilter,
+            UpdateFilterMenuBlock::LinkFilter => UpdateFilterMenuBlock::NetworkFilter,
+            UpdateFilterMenuBlock::TrafficDirection => UpdateFilterMenuBlock::LinkFilter,
+            UpdateFilterMenuBlock::Start => UpdateFilterMenuBlock::TrafficDirection,
         };
         self.select(app);
     }
 
-    fn select(self, app: &mut App) {
+    pub fn select(self, app: &mut App) {
         match self.app_component(app) {
             Some(p) => {
                 p.select(Some(0));
@@ -62,10 +72,10 @@ impl UpdateFilterMenuBLock {
     }
     pub fn scroll_up(self, app: &mut App) {
         match self {
-            UpdateFilterMenuBLock::TransportFilter => (*app).filter.transport.scroll_up(),
-            UpdateFilterMenuBLock::NetworkFilter => (*app).filter.network.scroll_up(),
-            UpdateFilterMenuBLock::LinkFilter => (*app).filter.link.scroll_up(),
-            UpdateFilterMenuBLock::TrafficDirection => {
+            UpdateFilterMenuBlock::TransportFilter => (*app).filter.transport.scroll_up(),
+            UpdateFilterMenuBlock::NetworkFilter => (*app).filter.network.scroll_up(),
+            UpdateFilterMenuBlock::LinkFilter => (*app).filter.link.scroll_up(),
+            UpdateFilterMenuBlock::TrafficDirection => {
                 (*app).filter.traffic_direction.state.select(Some(0))
             }
             _ => {}
@@ -74,10 +84,10 @@ impl UpdateFilterMenuBLock {
 
     pub fn scroll_down(self, app: &mut App) {
         match self {
-            UpdateFilterMenuBLock::TransportFilter => (*app).filter.transport.scroll_down(),
-            UpdateFilterMenuBLock::NetworkFilter => (*app).filter.network.scroll_down(),
-            UpdateFilterMenuBLock::LinkFilter => (*app).filter.link.scroll_down(),
-            UpdateFilterMenuBLock::TrafficDirection => {
+            UpdateFilterMenuBlock::TransportFilter => (*app).filter.transport.scroll_down(),
+            UpdateFilterMenuBlock::NetworkFilter => (*app).filter.network.scroll_down(),
+            UpdateFilterMenuBlock::LinkFilter => (*app).filter.link.scroll_down(),
+            UpdateFilterMenuBlock::TrafficDirection => {
                 (*app).filter.traffic_direction.state.select(Some(1))
             }
             _ => {}
@@ -99,13 +109,13 @@ impl UpdateFilterMenuBLock {
             }
 
             KeyCode::Esc => {
-                app.focused_block = app.previous_focused_block;
+                app.focused_block = app.previous_focused_block.clone();
                 app.update_filters = false;
             }
             _ => {}
         }
     }
-    pub fn render(&mut self, frame: &mut Frame, app: App) {
+    pub fn render(&self, frame: &mut Frame, app: &mut App) {
         let layout = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
@@ -136,9 +146,9 @@ impl UpdateFilterMenuBLock {
             let chunks = Layout::default()
                 .direction(Direction::Vertical)
                 .constraints([
-                    Constraint::Length(NB_TRANSPORT_PROTOCOL + 4),
-                    Constraint::Length(NB_NETWORK_PROTOCOL + 4),
-                    Constraint::Length(NB_LINK_PROTOCOL + 4),
+                    Constraint::Length(oryx_common::protocols::NB_TRANSPORT_PROTOCOL + 4),
+                    Constraint::Length(oryx_common::protocols::NB_NETWORK_PROTOCOL + 4),
+                    Constraint::Length(oryx_common::protocols::NB_LINK_PROTOCOL + 4),
                     Constraint::Length(6),
                     Constraint::Length(4),
                 ])
@@ -159,19 +169,23 @@ impl UpdateFilterMenuBLock {
 
         app.filter
             .transport
-            .render(frame, transport_filter_block, self);
+            .render(frame, transport_filter_block, &app.focused_block);
 
-        app.filter.network.render(frame, network_filter_block, self);
+        app.filter
+            .network
+            .render(frame, network_filter_block, &app.focused_block);
 
-        app.filter.link.render(frame, link_filter_block, self);
+        app.filter
+            .link
+            .render(frame, link_filter_block, &app.focused_block);
 
         app.filter
             .traffic_direction
-            .render(frame, traffic_direction_block, self);
+            .render(frame, traffic_direction_block, &app.focused_block);
 
         let apply = BigText::builder()
             .pixel_size(PixelSize::Sextant)
-            .style(if *self == UpdateFilterMenuBLock::Start {
+            .style(if *self == UpdateFilterMenuBlock::Start {
                 Style::default().white().bold()
             } else {
                 Style::default().dark_gray()

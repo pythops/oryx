@@ -1,4 +1,13 @@
 use crate::app::App;
+use crossterm::event::{KeyCode, KeyEvent};
+use ratatui::prelude::Stylize;
+use ratatui::{
+    layout::{Constraint, Direction, Flex, Layout},
+    style::Style,
+    widgets::TableState,
+    Frame,
+};
+use tui_big_text::{BigText, PixelSize};
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum StartMenuBlock {
@@ -104,7 +113,7 @@ impl StartMenuBlock {
             _ => {}
         }
     }
-    pub fn render(&mut self, frame: &mut Frame, app: &mut App) {
+    pub fn render(&self, frame: &mut Frame, app: &mut App) {
         let (interface_block, filter_block, start_block) = {
             let chunks = Layout::default()
                 .direction(Direction::Vertical)
@@ -120,15 +129,17 @@ impl StartMenuBlock {
         };
 
         // interfaces
-        app.interface.render_on_setup(frame, interface_block, &self);
+        app.interface
+            .render_on_setup(frame, interface_block, &app.focused_block);
 
         // Filters
-        app.filter.render_on_setup(frame, filter_block, &self);
+        app.filter
+            .render_on_setup(frame, filter_block, &app.focused_block);
 
         // Start Button
         let start = BigText::builder()
             .pixel_size(PixelSize::Sextant)
-            .style(if self.focused_block == FocusedBlock::Start {
+            .style(if *self == StartMenuBlock::Start {
                 Style::default().white().bold()
             } else {
                 Style::default().dark_gray()

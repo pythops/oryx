@@ -1,10 +1,10 @@
 use std::net::IpAddr;
 
 use ratatui::{
-    layout::{Alignment, Constraint, Direction, Flex, Layout, Margin, Rect},
-    style::{Color, Style, Stylize},
-    text::{Line, Span, Text},
-    widgets::{Block, BorderType, Borders, Padding, Row, Table},
+    layout::{Alignment, Constraint, Flex, Rect},
+    style::{Style, Stylize},
+    text::Line,
+    widgets::{Block, Borders, Padding, Row, Table},
     Frame,
 };
 

@@ -1,27 +1,12 @@
-use oryx_common::protocols::{LinkProtocol, NetworkProtocol, Protocol, TransportProtocol};
-use std::{thread, time::Duration};
-use tui_input::backend::crossterm::EventHandler;
-
 use crate::{
-    app::{App, AppResult, FocusedBlock, StartMenuBlock},
-    ebpf::Ebpf,
+    app::{App, AppResult, FocusedBlock},
     event::Event,
-    export::export,
-    filters::direction::TrafficDirection,
-    mode::Mode,
-    notification::{Notification, NotificationLevel},
 };
-use ratatui::{
-    crossterm::{
-        self,
-        event::{KeyCode, KeyEvent, KeyModifiers},
-    },
-    widgets::TableState,
-};
+use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 fn handle_key_events_help(key_event: KeyEvent, app: &mut App) {
     match key_event.code {
-        KeyCode::Esc => app.focused_block = app.previous_focused_block,
+        KeyCode::Esc => app.focused_block = app.previous_focused_block.clone(),
         _ => {}
     }
 }
@@ -60,15 +45,15 @@ pub fn handle_key_events(
             _ => {}
         }
     }
-    match app.focused_block {
+    match app.focused_block.clone() {
         FocusedBlock::Help => handle_key_events_help(key_event, app),
-        FocusedBlock::StartMenuBlock(&mut start_block) => {
+        FocusedBlock::StartMenuBlock(mut start_block) => {
             start_block.handle_key_events(key_event, app)
         }
-        FocusedBlock::UpdateFilterMenuBlock(&mut update_block) => {
+        FocusedBlock::UpdateFilterMenuBlock(mut update_block) => {
             update_block.handle_key_events(key_event, app)
         }
-        FocusedBlock::Main(&mut mode_block) => mode_block.handle_key_events(key_event, app),
+        FocusedBlock::Main(mut mode_block) => mode_block.handle_key_events(key_event, app),
     }
     return Ok(());
 }
