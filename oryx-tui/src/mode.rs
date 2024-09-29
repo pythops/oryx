@@ -58,6 +58,7 @@ impl Mode {
                     Mode::Packet => {
                         let fuzzy = app.fuzzy.clone();
                         let mut fuzzy = fuzzy.lock().unwrap();
+                        let app_packets = app.packets.lock().unwrap();
                         if fuzzy.is_enabled() {
                             match key_event.code {
                                 KeyCode::Esc => {
@@ -98,51 +99,51 @@ impl Mode {
                                     if !app.manuall_scroll {
                                         app.manuall_scroll = true;
                                         // Record the last position. Usefull for selecting the packets to display
-                                        fuzzy.packet_end_index = fuzzy.packets.len();
-                                        let i = match fuzzy.scroll_state.selected() {
-                                            Some(i) => {
-                                                if i < app.packet_window_size - 1 {
-                                                    i + 1
-                                                } else if i == app.packet_window_size - 1
-                                                    && fuzzy.packets.len() > fuzzy.packet_end_index
-                                                {
-                                                    // shift the window by one
-                                                    fuzzy.packet_end_index += 1;
-                                                    i + 1
-                                                } else {
-                                                    i
-                                                }
-                                            }
-                                            None => fuzzy.packets.len(),
-                                        };
-
-                                        fuzzy.scroll_state.select(Some(i));
+                                        app.packet_end_index = app_packets.len();
                                     }
+                                    let i = match app.packets_table_state.selected() {
+                                        Some(i) => {
+                                            if i < app.packet_window_size - 1 {
+                                                i + 1
+                                            } else if i == app.packet_window_size - 1
+                                                && app_packets.len() > app.packet_end_index
+                                            {
+                                                // shit the window by one
+                                                app.packet_end_index += 1;
+                                                i + 1
+                                            } else {
+                                                i
+                                            }
+                                        }
+                                        None => app_packets.len(),
+                                    };
+
+                                    app.packets_table_state.select(Some(i));
                                 }
                                 KeyCode::Char('k') | KeyCode::Up => {
                                     if !app.manuall_scroll {
                                         app.manuall_scroll = true;
                                         // Record the last position. Usefull for selecting the packets to display
-                                        fuzzy.packet_end_index = fuzzy.packets.len();
+                                        app.packet_end_index = app_packets.len();
                                     }
-                                    let i = match fuzzy.scroll_state.selected() {
+                                    let i = match app.packets_table_state.selected() {
                                         Some(i) => {
                                             if i > 1 {
                                                 i - 1
                                             } else if i == 0
-                                                && fuzzy.packet_end_index > app.packet_window_size
+                                                && app.packet_end_index > app.packet_window_size
                                             {
-                                                // shift the window by one
-                                                fuzzy.packet_end_index -= 1;
+                                                // shit the window by one
+                                                app.packet_end_index -= 1;
                                                 0
                                             } else {
                                                 0
                                             }
                                         }
-                                        None => fuzzy.packets.len(),
+                                        None => app.packet_window_size,
                                     };
 
-                                    fuzzy.scroll_state.select(Some(i));
+                                    app.packets_table_state.select(Some(i));
                                 }
                                 KeyCode::Char('f') => {
                                     app.update_filters = true;
