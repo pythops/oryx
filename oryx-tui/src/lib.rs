@@ -31,6 +31,7 @@ pub mod export;
 pub mod bandwidth;
 
 pub mod packets {
+    pub mod info;
     pub mod link;
     pub mod network;
     pub mod packet;

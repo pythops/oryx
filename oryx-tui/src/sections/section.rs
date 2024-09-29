@@ -15,8 +15,8 @@ use ratatui::{
     style::{Color, Style, Stylize},
     text::{Line, Span},
     widgets::{
-        Block, BorderType, Borders, Cell, Clear, HighlightSpacing, Padding, Paragraph, Row,
-        Scrollbar, ScrollbarOrientation, ScrollbarState, Table,
+        Block, BorderType, Borders, Cell, HighlightSpacing, Padding, Paragraph, Row, Scrollbar,
+        ScrollbarOrientation, ScrollbarState, Table,
     },
     Frame,
 };
@@ -87,7 +87,7 @@ impl Section {
                             match key_event.code {
                                 KeyCode::Char('i') => {
                                     if !app.packet_index.is_none() && !fuzzy.packets.is_empty() {
-                                        app.show_packet_infos_popup = true;
+                                        app.phase.popup = Some(PopupEnum::PacketInfo);
                                     }
                                 }
                                 KeyCode::Char('/') => {
@@ -218,13 +218,7 @@ impl Section {
             app.alert.title_span(*self == Section::Alerts),
         );
         match self {
-            Section::Packet => {
-                self.render_packets_section(frame, section_block, app);
-                // show packet info popup if needed
-                if app.show_packet_infos_popup {
-                    self.render_packet_infos_popup(frame, app);
-                }
-            }
+            Section::Packet => self.render_packets_section(frame, section_block, app),
             Section::Stats => self.render_stats_section(frame, section_block, app),
             Section::Alerts => app.alert.render(frame, section_block),
             Section::Firewall => app.firewall.render(frame, section_block),
@@ -692,52 +686,5 @@ impl Section {
 
             frame.render_widget(fuzzy, fuzzy_block);
         }
-    }
-
-    fn render_packet_infos_popup(&self, frame: &mut Frame, app: &mut App) {
-        let layout = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Fill(1),
-                Constraint::Length(36),
-                Constraint::Fill(1),
-            ])
-            .flex(ratatui::layout::Flex::SpaceBetween)
-            .split(frame.area());
-
-        let block = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints([
-                Constraint::Fill(1),
-                Constraint::Max(80),
-                Constraint::Fill(1),
-            ])
-            .flex(ratatui::layout::Flex::SpaceBetween)
-            .split(layout[1])[1];
-
-        let fuzzy = app.fuzzy.lock().unwrap();
-        let packets = app.packets.lock().unwrap();
-
-        let packet = if fuzzy.is_enabled() {
-            fuzzy.packets[app.packet_index.unwrap()]
-        } else {
-            packets[app.packet_index.unwrap()]
-        };
-
-        frame.render_widget(Clear, block);
-        frame.render_widget(
-            Block::new()
-                .title(" Packet Infos 󰋼  ")
-                .title_style(Style::new().bold().green())
-                .title_alignment(Alignment::Center)
-                .borders(Borders::all())
-                .border_style(Style::new().green())
-                .border_type(BorderType::Thick),
-            block,
-        );
-        match packet {
-            AppPacket::Ip(ip_packet) => ip_packet.render(block, frame),
-            AppPacket::Arp(arp_packet) => arp_packet.render(block, frame),
-        };
     }
 }
