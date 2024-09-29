@@ -8,11 +8,14 @@ use ratatui::{
 };
 use tui_big_text::{BigText, PixelSize};
 
-use crate::app::{App, FocusedBlock};
-use crate::ScrollableMenuComponent;
+use crate::app::App;
+use crate::filters::direction::TrafficDirection;
+use crate::phase::{Phase, PhaseEnum};
+use crate::sections::section::Section;
+use crate::traits::ScrollableMenuComponent;
 
 #[derive(Debug, Copy, Clone, PartialEq)]
-pub enum UpdateFilterMenuBlock {
+pub enum UpdateBlockEnum {
     TransportFilter,
     NetworkFilter,
     LinkFilter,
@@ -20,41 +23,39 @@ pub enum UpdateFilterMenuBlock {
     Start,
 }
 
-impl UpdateFilterMenuBlock {
+impl UpdateBlockEnum {
     pub fn next(self, app: &mut App) {
-        self.set_state(app, Some(0));
-        let x = match self {
-            UpdateFilterMenuBlock::TransportFilter => UpdateFilterMenuBlock::NetworkFilter,
-            UpdateFilterMenuBlock::NetworkFilter => UpdateFilterMenuBlock::LinkFilter,
-            UpdateFilterMenuBlock::LinkFilter => UpdateFilterMenuBlock::TrafficDirection,
-            UpdateFilterMenuBlock::TrafficDirection => UpdateFilterMenuBlock::Start,
-            UpdateFilterMenuBlock::Start => UpdateFilterMenuBlock::TransportFilter,
-        };
-        app.focused_block = FocusedBlock::UpdateFilterMenuBlock(x);
         self.set_state(app, None);
+        let x = match self {
+            UpdateBlockEnum::TransportFilter => UpdateBlockEnum::NetworkFilter,
+            UpdateBlockEnum::NetworkFilter => UpdateBlockEnum::LinkFilter,
+            UpdateBlockEnum::LinkFilter => UpdateBlockEnum::TrafficDirection,
+            UpdateBlockEnum::TrafficDirection => UpdateBlockEnum::Start,
+            UpdateBlockEnum::Start => UpdateBlockEnum::TransportFilter,
+        };
+        app.filter_update = x;
+        x.set_state(app, Some(0));
     }
     pub fn previous(self, app: &mut App) {
-        self.set_state(app, Some(0));
-        let x = match self {
-            UpdateFilterMenuBlock::TransportFilter => UpdateFilterMenuBlock::Start,
-            UpdateFilterMenuBlock::NetworkFilter => UpdateFilterMenuBlock::TransportFilter,
-            UpdateFilterMenuBlock::LinkFilter => UpdateFilterMenuBlock::NetworkFilter,
-            UpdateFilterMenuBlock::TrafficDirection => UpdateFilterMenuBlock::LinkFilter,
-            UpdateFilterMenuBlock::Start => UpdateFilterMenuBlock::TrafficDirection,
-        };
-        app.focused_block = FocusedBlock::UpdateFilterMenuBlock(x);
         self.set_state(app, None);
+        let x = match self {
+            UpdateBlockEnum::TransportFilter => UpdateBlockEnum::Start,
+            UpdateBlockEnum::NetworkFilter => UpdateBlockEnum::TransportFilter,
+            UpdateBlockEnum::LinkFilter => UpdateBlockEnum::NetworkFilter,
+            UpdateBlockEnum::TrafficDirection => UpdateBlockEnum::LinkFilter,
+            UpdateBlockEnum::Start => UpdateBlockEnum::TrafficDirection,
+        };
+        app.filter_update = x;
+        x.set_state(app, Some(0));
     }
 
     fn app_component(self, app: &mut App) -> Option<Box<&mut dyn ScrollableMenuComponent>> {
         match self {
-            UpdateFilterMenuBlock::TransportFilter => Some(Box::new(&mut app.filter.transport)),
-            UpdateFilterMenuBlock::NetworkFilter => Some(Box::new(&mut app.filter.network)),
-            UpdateFilterMenuBlock::LinkFilter => Some(Box::new(&mut app.filter.link)),
-            UpdateFilterMenuBlock::TrafficDirection => {
-                Some(Box::new(&mut app.filter.traffic_direction))
-            }
-            UpdateFilterMenuBlock::Start => None,
+            UpdateBlockEnum::TransportFilter => Some(Box::new(&mut app.filter.transport)),
+            UpdateBlockEnum::NetworkFilter => Some(Box::new(&mut app.filter.network)),
+            UpdateBlockEnum::LinkFilter => Some(Box::new(&mut app.filter.link)),
+            UpdateBlockEnum::TrafficDirection => Some(Box::new(&mut app.filter.traffic_direction)),
+            UpdateBlockEnum::Start => None,
         }
     }
 
@@ -85,7 +86,30 @@ impl UpdateFilterMenuBlock {
             KeyCode::Char('k') | KeyCode::Up => self.scroll_up(app),
 
             KeyCode::Char('j') | KeyCode::Down => self.scroll_down(app),
+            KeyCode::Char(' ') => match self.app_component(app) {
+                Some(p) => p.select(),
+                _ => {}
+            },
+            KeyCode::Enter => {
+                app.filter.network.apply();
+                app.filter.transport.apply();
+                app.filter.link.apply();
+                app.filter.traffic_direction.apply();
 
+                let traffic_dir = &app.filter.traffic_direction.applied_direction;
+                if traffic_dir.contains(&TrafficDirection::Ingress) {
+                    app.load_ingress();
+                }
+                if traffic_dir.contains(&TrafficDirection::Egress) {
+                    app.load_egress();
+                }
+
+                app.phase = Phase {
+                    phase_enum: PhaseEnum::Sniffing(Section::Packet),
+                    popup: None,
+                }
+            }
+            KeyCode::Esc => app.phase.popup = None,
             _ => {}
         }
     }
@@ -141,25 +165,33 @@ impl UpdateFilterMenuBlock {
             block,
         );
 
-        app.filter
-            .transport
-            .render(frame, transport_filter_block, &app.focused_block);
+        app.filter.transport.render(
+            frame,
+            transport_filter_block,
+            *self == UpdateBlockEnum::TransportFilter,
+        );
 
-        app.filter
-            .network
-            .render(frame, network_filter_block, &app.focused_block);
+        app.filter.network.render(
+            frame,
+            network_filter_block,
+            *self == UpdateBlockEnum::NetworkFilter,
+        );
 
-        app.filter
-            .link
-            .render(frame, link_filter_block, &app.focused_block);
+        app.filter.link.render(
+            frame,
+            link_filter_block,
+            *self == UpdateBlockEnum::LinkFilter,
+        );
 
-        app.filter
-            .traffic_direction
-            .render(frame, traffic_direction_block, &app.focused_block);
+        app.filter.traffic_direction.render(
+            frame,
+            traffic_direction_block,
+            *self == UpdateBlockEnum::TrafficDirection,
+        );
 
         let apply = BigText::builder()
             .pixel_size(PixelSize::Sextant)
-            .style(if *self == UpdateFilterMenuBlock::Start {
+            .style(if *self == UpdateBlockEnum::Start {
                 Style::default().white().bold()
             } else {
                 Style::default().dark_gray()

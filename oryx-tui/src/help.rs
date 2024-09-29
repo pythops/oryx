@@ -1,3 +1,4 @@
+use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Margin},
     style::{Color, Style, Stylize},
@@ -8,7 +9,9 @@ use ratatui::{
     Frame,
 };
 
-#[derive(Debug, Clone, Default)]
+use crate::app::App;
+
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct Help {
     block_height: usize,
     state: TableState,
@@ -86,7 +89,12 @@ impl Help {
         *self.state.offset_mut() = i;
         self.state.select(Some(i));
     }
-
+    pub fn handle_key_events(&self, key_event: KeyEvent, app: &mut App) {
+        match key_event.code {
+            KeyCode::Esc => app.phase.popup = None,
+            _ => {}
+        }
+    }
     pub fn render(&mut self, frame: &mut Frame) {
         let layout = Layout::default()
             .direction(Direction::Vertical)

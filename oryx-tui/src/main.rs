@@ -23,21 +23,20 @@ fn main() -> AppResult<()> {
         std::process::exit(1);
     }
 
-    let mut app = App::new();
-
     let backend = CrosstermBackend::new(io::stdout());
     let terminal = Terminal::new(backend)?;
     let events = EventHandler::new(TICK_RATE);
     let mut tui = Tui::new(terminal, events);
     tui.init()?;
 
+    let mut app = App::new();
+    app.set_sender(tui.events.sender.clone());
+
     while app.running {
         tui.draw(&mut app)?;
         match tui.events.next()? {
             Event::Tick => app.tick(),
-            Event::Key(key_event) => {
-                handle_key_events(key_event, &mut app, tui.events.sender.clone())?
-            }
+            Event::Key(key_event) => handle_key_events(key_event, &mut app)?,
             Event::Notification(notification) => {
                 app.notifications.push(notification);
             }

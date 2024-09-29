@@ -1,9 +1,5 @@
 use oryx_common::RawPacket;
-use ratatui::{
-    layout::{Constraint, Direction, Layout, Rect},
-    widgets::TableState,
-    Frame,
-};
+use ratatui::widgets::TableState;
 use std::{
     error,
     sync::{Arc, Mutex},
@@ -14,10 +10,10 @@ use std::{
 use crate::{
     ebpf::Ebpf,
     event::Event,
-    filters::{
-        direction::TrafficDirection, filter::Filter, fuzzy::Fuzzy, start_menu::StartMenuBlock,
-        update_menu::UpdateFilterMenuBlock,
-    },
+    filters::{direction::TrafficDirection, filter::Filter, fuzzy::Fuzzy},
+    phase::Phase,
+    startup::Startup,
+    update::UpdateBlockEnum,
 };
 
 use crate::help::Help;
@@ -25,20 +21,21 @@ use crate::interface::Interface;
 use crate::notification::Notification;
 use crate::packets::packet::AppPacket;
 
-use crate::stats::Stats;
-use crate::{alerts::alert::Alert, firewall::Firewall};
-use crate::{bandwidth::Bandwidth, mode::Mode};
+use crate::alerts::alert::Alert;
+use crate::bandwidth::Bandwidth;
+
+use crate::sections::{firewall::Firewall, section::Section, stats::Stats};
 pub type AppResult<T> = std::result::Result<T, Box<dyn error::Error>>;
 
 pub const TICK_RATE: u64 = 40;
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum FocusedBlock {
-    StartMenuBlock(StartMenuBlock),
-    UpdateFilterMenuBlock(UpdateFilterMenuBlock),
-    Help,
-    Main(Mode),
-}
+// #[derive(Debug, Clone, PartialEq)]
+// pub enum FocusedBlock {
+//     StartMenuBlock(StartMenuBlock),
+//     UpdateFilterMenuBlock(UpdateFilterMenuBlock),
+//     Help,
+//     Main(Section),
+// }
 
 #[derive(Debug)]
 pub struct DataEventHandler {
@@ -46,22 +43,30 @@ pub struct DataEventHandler {
     pub handler: thread::JoinHandle<()>,
 }
 
+#[derive(Debug, PartialEq)]
+pub enum Mode {
+    Normal,
+    Insert,
+}
+
 #[derive(Debug)]
 pub struct App {
     pub running: bool,
     pub help: Help,
-    pub focused_block: FocusedBlock,
-    // used in setup to know which block to  fall into after discarding help
-    pub previous_focused_block: FocusedBlock,
+    // pub focused_block: FocusedBlock,
+    // // used in setup to know which block to  fall into after discarding help
+    // pub previous_focused_block: FocusedBlock,
+    pub startup: Startup,
+    pub filter_update: UpdateBlockEnum,
     pub interface: Interface,
     pub filter: Filter,
-    pub start_sniffing: bool,
+    pub phase: Phase,
     pub packets: Arc<Mutex<Vec<AppPacket>>>,
     pub packets_table_state: TableState,
     pub fuzzy: Arc<Mutex<Fuzzy>>,
     pub notifications: Vec<Notification>,
     pub manuall_scroll: bool,
-    pub mode: Mode,
+    pub section: Section,
     pub stats: Arc<Mutex<Stats>>,
     pub packet_end_index: usize,
     pub packet_window_size: usize,
@@ -72,7 +77,8 @@ pub struct App {
     pub packet_index: Option<usize>,
     pub alert: Alert,
     pub firewall: Firewall,
-    pub is_editing: bool,
+    pub mode: Mode,
+    pub notification_sender: Option<kanal::Sender<Event>>,
 }
 
 impl Default for App {
@@ -102,17 +108,19 @@ impl App {
         Self {
             running: true,
             help: Help::new(),
-            focused_block: FocusedBlock::StartMenuBlock(StartMenuBlock::Interface),
-            previous_focused_block: FocusedBlock::StartMenuBlock(StartMenuBlock::Interface),
+            startup: Startup::new(),
+            // focused_block: FocusedBlock::StartMenuBlock(StartMenuBlock::Interface),
+            // previous_focused_block: FocusedBlock::StartMenuBlock(StartMenuBlock::Interface),
             interface: Interface::default(),
             filter: Filter::new(),
-            start_sniffing: false,
+            phase: Phase::new(),
+            filter_update: UpdateBlockEnum::NetworkFilter,
             packets: packets.clone(),
             packets_table_state: TableState::default(),
             fuzzy: Fuzzy::new(packets.clone()),
             notifications: Vec::new(),
             manuall_scroll: false,
-            mode: Mode::Packet,
+            section: Section::Packet,
             stats,
             packet_end_index: 0,
             packet_window_size: 0,
@@ -123,78 +131,34 @@ impl App {
             packet_index: None,
             alert: Alert::new(packets.clone()),
             firewall: Firewall::new(),
-            is_editing: false,
+            mode: Mode::Normal,
+            notification_sender: None,
         }
     }
-
-    pub fn load_ingress(&self, sender: &kanal::Sender<Event>) {
+    pub fn set_sender(&mut self, sender: kanal::Sender<Event>) {
+        self.notification_sender = Some(sender);
+    }
+    pub fn load_ingress(&self) {
         {
             Ebpf::load_ingress(
                 self.interface.selected_interface.name.clone(),
-                sender.clone(),
+                self.notification_sender.clone().unwrap(),
                 self.data_channel_sender.clone(),
                 self.filter.ingress_channel.receiver.clone(),
                 self.filter.traffic_direction.terminate_ingress.clone(),
             );
         }
     }
-    pub fn load_egress(&self, sender: &kanal::Sender<Event>) {
+    pub fn load_egress(&self) {
         {
             Ebpf::load_egress(
                 self.interface.selected_interface.name.clone(),
-                sender.clone(),
+                self.notification_sender.clone().unwrap(),
                 self.data_channel_sender.clone(),
                 self.filter.egress_channel.receiver.clone(),
                 self.filter.traffic_direction.terminate_egress.clone(),
             );
         }
-    }
-    pub fn render(&mut self, frame: &mut Frame) {
-        // Setup
-        match self.focused_block.clone() {
-            FocusedBlock::StartMenuBlock(b) => b.render(frame, self),
-            FocusedBlock::Main(mode) => self.render_main_section(frame, &mode),
-            _ => {
-                match self.previous_focused_block.clone() {
-                    FocusedBlock::StartMenuBlock(b) => b.render(frame, self),
-                    FocusedBlock::Main(mode) => self.render_main_section(frame, &mode),
-                    _ => {}
-                }
-                match self.focused_block {
-                    FocusedBlock::UpdateFilterMenuBlock(b) => b.render(frame, self),
-                    FocusedBlock::Help => self.help.render(frame),
-                    _ => {}
-                }
-            }
-        }
-    }
-
-    fn render_main_section(&mut self, frame: &mut Frame, mode: &Mode) {
-        // Build layout
-        let (settings_block, mode_block) = {
-            let chunks: std::rc::Rc<[Rect]> = Layout::default()
-                .direction(Direction::Vertical)
-                .constraints([Constraint::Length(8), Constraint::Fill(1)])
-                .split(frame.area());
-            (chunks[0], chunks[1])
-        };
-        let (filter_block, interface_block) = {
-            let chunks = Layout::default()
-                .direction(Direction::Horizontal)
-                .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
-                .margin(1)
-                .split(settings_block);
-            (chunks[0], chunks[1])
-        };
-
-        // Render settings
-        // Interface
-        self.interface.render_on_sniffing(frame, interface_block);
-        // Filters
-        self.filter.render_on_sniffing(frame, filter_block);
-
-        // Render  mode section
-        mode.render(frame, mode_block, self);
     }
 
     pub fn detach_ebpf(&mut self) {

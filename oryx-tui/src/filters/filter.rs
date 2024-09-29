@@ -1,15 +1,11 @@
-use oryx_common::protocols::{
-    Protocol, NB_LINK_PROTOCOL, NB_NETWORK_PROTOCOL, NB_TRANSPORT_PROTOCOL,
-};
+use oryx_common::protocols::Protocol;
 use ratatui::{
-    layout::{Alignment, Constraint, Direction, Flex, Layout, Rect},
+    layout::{Alignment, Constraint, Rect},
     style::{Style, Stylize},
     text::{Line, Span},
     widgets::{Block, BorderType, Borders, Padding, Row, Table},
     Frame,
 };
-
-use crate::app::FocusedBlock;
 
 use super::{
     direction::TrafficDirectionFilter, link::LinkFilter, network::NetworkFilter,
@@ -61,44 +57,6 @@ impl Filter {
             ingress_channel: FilterChannel::new(),
             egress_channel: FilterChannel::new(),
         }
-    }
-
-    pub fn render_on_setup(
-        &mut self,
-        frame: &mut Frame,
-        block: Rect,
-        focused_block: &FocusedBlock,
-    ) {
-        let (
-            transport_filter_block,
-            network_filter_block,
-            link_filter_block,
-            traffic_direction_block,
-        ) = {
-            let chunks = Layout::default()
-                .direction(Direction::Vertical)
-                .constraints([
-                    Constraint::Length(NB_TRANSPORT_PROTOCOL + 4),
-                    Constraint::Length(NB_NETWORK_PROTOCOL + 4),
-                    Constraint::Length(NB_LINK_PROTOCOL + 4),
-                    Constraint::Length(6),
-                ])
-                .margin(1)
-                .flex(Flex::SpaceAround)
-                .split(block);
-            (chunks[0], chunks[1], chunks[2], chunks[3])
-        };
-
-        self.network
-            .render(frame, network_filter_block, focused_block);
-
-        self.transport
-            .render(frame, transport_filter_block, focused_block);
-
-        self.link.render(frame, link_filter_block, focused_block);
-
-        self.traffic_direction
-            .render(frame, traffic_direction_block, focused_block);
     }
 
     pub fn render_on_sniffing(&mut self, frame: &mut Frame, block: Rect) {

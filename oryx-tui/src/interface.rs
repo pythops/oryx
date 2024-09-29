@@ -14,7 +14,7 @@ use std::{
     path::PathBuf,
 };
 
-use crate::{app::FocusedBlock, filters::start_menu::StartMenuBlock, MenuComponent, Scrollable};
+use crate::traits::{MenuComponent, Scrollable};
 
 #[derive(Debug, Clone)]
 pub struct NetworkInterface {
@@ -168,12 +168,7 @@ impl Interface {
         self.state.select(value);
     }
 
-    pub fn render_on_setup(
-        &mut self,
-        frame: &mut Frame,
-        block: Rect,
-        focused_block: &FocusedBlock,
-    ) {
+    pub fn render(&mut self, frame: &mut Frame, block: Rect, is_focused: bool) {
         let layout = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([
@@ -243,13 +238,11 @@ impl Interface {
                 .title_style(Style::default().bold().fg(Color::Green))
                 .title_alignment(Alignment::Center)
                 .borders(Borders::LEFT)
-                .border_type(
-                    if *focused_block == FocusedBlock::StartMenuBlock(StartMenuBlock::Interface) {
-                        BorderType::Thick
-                    } else {
-                        BorderType::default()
-                    },
-                )
+                .border_type(if is_focused {
+                    BorderType::Thick
+                } else {
+                    BorderType::default()
+                })
                 .border_style(Style::default().fg(Color::Green)),
             area,
         );

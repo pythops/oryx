@@ -20,16 +20,13 @@ pub mod filters {
     pub mod fuzzy;
     pub mod link;
     pub mod network;
-    pub mod start_menu;
+
     pub mod transport;
-    pub mod update_menu;
 }
 
 pub mod notification;
 
 pub mod export;
-
-pub mod stats;
 
 pub mod bandwidth;
 
@@ -45,19 +42,15 @@ pub mod alerts {
     pub mod syn_flood;
 }
 
-pub mod firewall;
+pub mod sections {
+    pub mod firewall;
+    pub mod inspection;
+    pub mod section;
 
-pub mod mode;
-
-pub trait MenuComponent {
-    fn set_state(&mut self, value: Option<usize>);
-    fn select(&mut self);
+    pub mod stats;
 }
-pub trait Scrollable {
-    fn scroll_up(&mut self);
-    fn scroll_down(&mut self);
-}
-
-pub trait ScrollableMenuComponent: MenuComponent + Scrollable {}
-
-impl<T: MenuComponent + Scrollable> ScrollableMenuComponent for T {}
+pub mod phase;
+pub mod popup;
+pub mod startup;
+pub mod traits;
+pub mod update;

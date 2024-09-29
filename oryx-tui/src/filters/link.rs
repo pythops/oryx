@@ -6,9 +6,7 @@ use ratatui::{
     Frame,
 };
 
-use crate::{app::FocusedBlock, MenuComponent, Scrollable};
-
-use super::{start_menu::StartMenuBlock, update_menu::UpdateFilterMenuBlock};
+use crate::{traits::MenuComponent, traits::Scrollable};
 
 #[derive(Debug)]
 pub struct LinkFilter {
@@ -84,7 +82,7 @@ impl LinkFilter {
         self.selected_protocols.clear();
     }
 
-    pub fn render(&mut self, frame: &mut Frame, block: Rect, focused_block: &FocusedBlock) {
+    pub fn render(&mut self, frame: &mut Frame, block: Rect, is_focused: bool) {
         let layout = Layout::default()
             .direction(Direction::Horizontal)
             .constraints(
@@ -121,12 +119,10 @@ impl LinkFilter {
                 .title_style(Style::default().bold().fg(Color::Green))
                 .title_alignment(Alignment::Center)
                 .borders(Borders::LEFT)
-                .border_type(match *focused_block {
-                    FocusedBlock::StartMenuBlock(StartMenuBlock::LinkFilter)
-                    | FocusedBlock::UpdateFilterMenuBlock(UpdateFilterMenuBlock::LinkFilter) => {
-                        BorderType::Thick
-                    }
-                    _ => BorderType::default(),
+                .border_type(if is_focused {
+                    BorderType::Thick
+                } else {
+                    BorderType::default()
                 })
                 .border_style(Style::default().fg(Color::Green)),
             area,

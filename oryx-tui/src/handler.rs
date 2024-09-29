@@ -1,27 +1,17 @@
 use crate::{
-    app::{App, AppResult, FocusedBlock},
+    app::{App, AppResult, Mode},
     event::Event,
+    phase::Phase,
+    popup::PopupEnum,
 };
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
-fn handle_key_events_help(key_event: KeyEvent, app: &mut App) {
-    match key_event.code {
-        KeyCode::Esc => app.focused_block = app.previous_focused_block.clone(),
-        _ => {}
-    }
-}
-
-pub fn handle_key_events(
-    key_event: KeyEvent,
-    app: &mut App,
-    sender: kanal::Sender<Event>,
-) -> AppResult<()> {
+pub fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<()> {
     // handle global key events
-    if !app.is_editing {
+    if app.mode == Mode::Normal {
         match key_event.code {
             KeyCode::Char('?') => {
-                app.previous_focused_block = app.focused_block.clone();
-                app.focused_block = FocusedBlock::Help;
+                app.phase.popup = Some(PopupEnum::Help);
                 return Ok(());
             }
             KeyCode::Char('q') => {
@@ -38,7 +28,11 @@ pub fn handle_key_events(
             KeyCode::Char('r') => {
                 if key_event.modifiers == KeyModifiers::CONTROL {
                     app.detach_ebpf();
-                    sender.send(Event::Reset)?;
+                    app.notification_sender
+                        .clone()
+                        .unwrap()
+                        .send(Event::Reset)?;
+                    app.phase = Phase::new();
                     return Ok(());
                 }
             }
@@ -46,15 +40,6 @@ pub fn handle_key_events(
             _ => {}
         }
     }
-    match app.focused_block.clone() {
-        FocusedBlock::Help => handle_key_events_help(key_event, app),
-        FocusedBlock::StartMenuBlock(mut start_block) => {
-            start_block.handle_key_events(key_event, app, sender)
-        }
-        FocusedBlock::UpdateFilterMenuBlock(mut update_block) => {
-            update_block.handle_key_events(key_event, app)
-        }
-        FocusedBlock::Main(mut mode_block) => mode_block.handle_key_events(key_event, app),
-    }
+    app.phase.clone().handle_key_events(key_event, app);
     return Ok(());
 }

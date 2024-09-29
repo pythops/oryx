@@ -1,6 +1,6 @@
-# Description
+# Components Description
 
-## phases :
+## phases
 - Startup
 - Sniffing
 
@@ -17,7 +17,8 @@
 - alert
 - firewall
 
-
+## notification
+---
 # Rendering
 ## startup (phase)
 - help (popup)

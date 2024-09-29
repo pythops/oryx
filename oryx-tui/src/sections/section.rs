@@ -1,11 +1,13 @@
 use crate::{
-    app::{App, FocusedBlock},
-    filters::{fuzzy, update_menu::UpdateFilterMenuBlock},
+    app::{App, Mode},
+    filters::fuzzy,
     packets::{
         network::{IpPacket, IpProto},
         packet::AppPacket,
     },
-    MenuComponent,
+    phase::PhaseEnum,
+    popup::PopupEnum,
+    traits::MenuComponent,
 };
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
@@ -20,32 +22,33 @@ use ratatui::{
 };
 use tui_input::backend::crossterm::EventHandler;
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum Mode {
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum Section {
     Packet,
     Stats,
     Alerts,
     Firewall,
 }
 
-impl Mode {
+impl Section {
     pub fn next(&self, app: &mut App) {
         let x = match self {
-            Mode::Packet => Mode::Stats,
-            Mode::Stats => Mode::Alerts,
-            Mode::Alerts => Mode::Firewall,
-            Mode::Firewall => Mode::Packet,
+            Section::Packet => Section::Stats,
+            Section::Stats => Section::Alerts,
+            Section::Alerts => Section::Firewall,
+            Section::Firewall => Section::Packet,
         };
-        app.focused_block = FocusedBlock::Main(x);
+
+        app.phase.phase_enum = PhaseEnum::Sniffing(x);
     }
     pub fn previous(&self, app: &mut App) {
         let x = match self {
-            Mode::Packet => Mode::Firewall,
-            Mode::Stats => Mode::Packet,
-            Mode::Alerts => Mode::Stats,
-            Mode::Firewall => Mode::Alerts,
+            Section::Packet => Section::Firewall,
+            Section::Stats => Section::Packet,
+            Section::Alerts => Section::Stats,
+            Section::Firewall => Section::Alerts,
         };
-        app.focused_block = FocusedBlock::Main(x);
+        app.phase.phase_enum = PhaseEnum::Sniffing(x);
     }
 
     pub fn handle_key_events(&mut self, key_event: KeyEvent, app: &mut App) {
@@ -55,7 +58,7 @@ impl Mode {
 
             _ => {
                 match self {
-                    Mode::Packet => {
+                    Section::Packet => {
                         let fuzzy = app.fuzzy.clone();
                         let mut fuzzy = fuzzy.lock().unwrap();
                         let app_packets = app.packets.lock().unwrap();
@@ -92,7 +95,7 @@ impl Mode {
                                     } else {
                                         fuzzy.enable();
                                         fuzzy.unpause();
-                                        app.is_editing = true;
+                                        app.mode = Mode::Insert;
                                     }
                                 }
                                 KeyCode::Char('j') | KeyCode::Down => {
@@ -146,10 +149,8 @@ impl Mode {
                                     app.packets_table_state.select(Some(i));
                                 }
                                 KeyCode::Char('f') => {
-                                    app.update_filters = true;
-                                    app.focused_block = FocusedBlock::UpdateFilterMenuBlock(
-                                        UpdateFilterMenuBlock::TransportFilter,
-                                    );
+                                    app.phase.popup = Some(PopupEnum::FilterUpdate);
+
                                     app.filter.transport.set_state(Some(0));
 
                                     app.filter.network.selected_protocols =
@@ -169,7 +170,7 @@ impl Mode {
                                         app.show_packet_infos_popup = false;
                                     } else if !fuzzy.is_paused() {
                                         fuzzy.pause();
-                                        app.is_editing = false;
+                                        app.mode = Mode::Normal;
                                     } else if app.manuall_scroll {
                                         app.manuall_scroll = false;
                                     }
@@ -179,8 +180,8 @@ impl Mode {
                         }
                     }
 
-                    Mode::Firewall => match key_event.code {
-                        KeyCode::Char('n') => app.is_editing = true,
+                    Section::Firewall => match key_event.code {
+                        KeyCode::Char('n') => app.mode = Mode::Insert,
                         _ => {}
                     },
                     _ => {}
@@ -189,19 +190,44 @@ impl Mode {
         }
     }
 
-    pub fn render(&self, frame: &mut Frame, area: Rect, app: &mut App) {
-        self.render_header(frame, area, app.alert.title_span(*self == Mode::Alerts));
+    pub fn render(&self, frame: &mut Frame, app: &mut App) {
+        let (settings_block, section_block) = {
+            let chunks: std::rc::Rc<[Rect]> = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([Constraint::Length(8), Constraint::Fill(1)])
+                .split(frame.area());
+            (chunks[0], chunks[1])
+        };
+        let (filter_block, interface_block) = {
+            let chunks = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+                .margin(1)
+                .split(settings_block);
+            (chunks[0], chunks[1])
+        };
+
+        // Render settings
+        // Interface
+        app.interface.render_on_sniffing(frame, interface_block);
+        // Filters
+        app.filter.render_on_sniffing(frame, filter_block);
+        self.render_header(
+            frame,
+            section_block,
+            app.alert.title_span(*self == Section::Alerts),
+        );
         match self {
-            Mode::Packet => {
-                self.render_packets_mode(frame, area, app);
+            Section::Packet => {
+                self.render_packets_section(frame, section_block, app);
                 // show packet info popup if needed
                 if app.show_packet_infos_popup {
                     self.render_packet_infos_popup(frame, app);
                 }
             }
-            Mode::Stats => self.render_stats_mode(frame, area, app),
-            Mode::Alerts => app.alert.render(frame, area),
-            Mode::Firewall => app.firewall.render(frame, area),
+            Section::Stats => self.render_stats_section(frame, section_block, app),
+            Section::Alerts => app.alert.render(frame, section_block),
+            Section::Firewall => app.firewall.render(frame, section_block),
         }
     }
 
@@ -265,7 +291,7 @@ impl Mode {
             area,
         );
     }
-    fn render_stats_mode(&self, frame: &mut Frame, block: Rect, app: &App) {
+    fn render_stats_section(&self, frame: &mut Frame, block: Rect, app: &App) {
         let stats = app.stats.lock().unwrap();
 
         let (bandwidth_block, stats_block) = {
@@ -286,7 +312,7 @@ impl Mode {
         );
     }
 
-    fn render_packets_mode(&self, frame: &mut Frame, area: Rect, app: &mut App) {
+    fn render_packets_section(&self, frame: &mut Frame, area: Rect, app: &mut App) {
         let app_packets = app.packets.lock().unwrap();
         let mut fuzzy = app.fuzzy.lock().unwrap();
         let fuzzy_packets = fuzzy.clone().packets.clone();
