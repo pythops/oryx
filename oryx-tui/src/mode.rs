@@ -29,7 +29,7 @@ pub enum Mode {
 
 impl Mode {
     pub fn next(&mut self) {
-        *self = match self {
+        *self = match *self {
             Mode::Packet => Mode::Stats,
             Mode::Stats => Mode::Alerts,
             Mode::Alerts => Mode::Firewall,
@@ -37,7 +37,7 @@ impl Mode {
         }
     }
     pub fn previous(&mut self) {
-        *self = match self {
+        *self = match *self {
             Mode::Packet => Mode::Firewall,
             Mode::Stats => Mode::Packet,
             Mode::Alerts => Mode::Stats,
@@ -150,7 +150,7 @@ impl Mode {
                                     app.focused_block = FocusedBlock::UpdateFilterMenuBlock(
                                         UpdateFilterMenuBlock::TransportFilter,
                                     );
-                                    UpdateFilterMenuBlock::TransportFilter.select(app);
+                                    UpdateFilterMenuBlock::TransportFilter.on_select(app);
 
                                     app.filter.network.selected_protocols =
                                         app.filter.network.applied_protocols.clone();

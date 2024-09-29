@@ -1,4 +1,4 @@
-use crate::app::App;
+use crate::app::{App, FocusedBlock};
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::prelude::Stylize;
 use ratatui::{
@@ -20,9 +20,9 @@ pub enum StartMenuBlock {
 }
 
 impl StartMenuBlock {
-    pub fn next(&mut self, app: &mut App) {
-        self.unselect(app);
-        *self = match self {
+    pub fn next(self, app: &mut App) {
+        self.on_unselect(app);
+        let x = match self {
             StartMenuBlock::Interface => StartMenuBlock::TransportFilter,
             StartMenuBlock::TransportFilter => StartMenuBlock::NetworkFilter,
             StartMenuBlock::NetworkFilter => StartMenuBlock::LinkFilter,
@@ -30,8 +30,23 @@ impl StartMenuBlock {
             StartMenuBlock::TrafficDirection => StartMenuBlock::Start,
             StartMenuBlock::Start => StartMenuBlock::Interface,
         };
-        self.select(app);
+        app.focused_block = FocusedBlock::StartMenuBlock(x);
+        x.on_select(app)
     }
+    pub fn previous(self, app: &mut App) {
+        self.on_unselect(app);
+        let x = match self {
+            StartMenuBlock::Interface => StartMenuBlock::Start,
+            StartMenuBlock::TransportFilter => StartMenuBlock::Interface,
+            StartMenuBlock::NetworkFilter => StartMenuBlock::TransportFilter,
+            StartMenuBlock::LinkFilter => StartMenuBlock::NetworkFilter,
+            StartMenuBlock::TrafficDirection => StartMenuBlock::LinkFilter,
+            StartMenuBlock::Start => StartMenuBlock::TrafficDirection,
+        };
+        app.focused_block = FocusedBlock::StartMenuBlock(x);
+        x.on_select(app)
+    }
+
     pub fn app_component(self, app: &mut App) -> Option<&mut TableState> {
         match self {
             StartMenuBlock::Interface => Some(&mut app.interface.state),
@@ -42,20 +57,8 @@ impl StartMenuBlock {
             StartMenuBlock::Start => None,
         }
     }
-    pub fn previous(&mut self, app: &mut App) {
-        self.unselect(app);
-        *self = match self {
-            StartMenuBlock::Interface => StartMenuBlock::Start,
-            StartMenuBlock::TransportFilter => StartMenuBlock::Interface,
-            StartMenuBlock::NetworkFilter => StartMenuBlock::TransportFilter,
-            StartMenuBlock::LinkFilter => StartMenuBlock::NetworkFilter,
-            StartMenuBlock::TrafficDirection => StartMenuBlock::LinkFilter,
-            StartMenuBlock::Start => StartMenuBlock::TrafficDirection,
-        };
-        self.select(app);
-    }
 
-    fn select(self, app: &mut App) {
+    fn on_select(self, app: &mut App) {
         match self.app_component(app) {
             Some(p) => {
                 p.select(Some(0));
@@ -63,7 +66,7 @@ impl StartMenuBlock {
             None => {}
         }
     }
-    fn unselect(self, app: &mut App) {
+    fn on_unselect(self, app: &mut App) {
         match self.app_component(app) {
             Some(p) => {
                 p.select(None);
@@ -98,18 +101,13 @@ impl StartMenuBlock {
     }
     pub fn handle_key_events(&mut self, key_event: KeyEvent, app: &mut App) {
         match key_event.code {
-            KeyCode::Tab => {
-                self.next(app);
-            }
-            KeyCode::BackTab => {
-                self.previous(app);
-            }
-            KeyCode::Char('k') | KeyCode::Up => {
-                self.scroll_up(app);
-            }
-            KeyCode::Char('j') | KeyCode::Down => {
-                self.scroll_down(app);
-            }
+            KeyCode::Tab => self.next(app),
+            KeyCode::BackTab => self.previous(app),
+
+            KeyCode::Char('k') | KeyCode::Up => self.scroll_up(app),
+
+            KeyCode::Char('j') | KeyCode::Down => self.scroll_down(app),
+
             _ => {}
         }
     }

@@ -8,7 +8,7 @@ use ratatui::{
 };
 use tui_big_text::{BigText, PixelSize};
 
-use crate::app::App;
+use crate::app::{App, FocusedBlock};
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum UpdateFilterMenuBlock {
@@ -20,16 +20,17 @@ pub enum UpdateFilterMenuBlock {
 }
 
 impl UpdateFilterMenuBlock {
-    pub fn next(&mut self, app: &mut App) {
-        self.unselect(app);
-        *self = match self {
+    pub fn next(self, app: &mut App) {
+        self.on_unselect(app);
+        let x = match self {
             UpdateFilterMenuBlock::TransportFilter => UpdateFilterMenuBlock::NetworkFilter,
             UpdateFilterMenuBlock::NetworkFilter => UpdateFilterMenuBlock::LinkFilter,
             UpdateFilterMenuBlock::LinkFilter => UpdateFilterMenuBlock::TrafficDirection,
             UpdateFilterMenuBlock::TrafficDirection => UpdateFilterMenuBlock::Start,
             UpdateFilterMenuBlock::Start => UpdateFilterMenuBlock::TransportFilter,
         };
-        self.select(app);
+        app.focused_block = FocusedBlock::UpdateFilterMenuBlock(x);
+        x.on_select(app)
     }
     pub fn app_component(self, app: &mut App) -> Option<&mut TableState> {
         match self {
@@ -42,19 +43,20 @@ impl UpdateFilterMenuBlock {
             UpdateFilterMenuBlock::Start => None,
         }
     }
-    pub fn previous(&mut self, app: &mut App) {
-        self.unselect(app);
-        *self = match self {
+    pub fn previous(self, app: &mut App) {
+        self.on_unselect(app);
+        let x = match self {
             UpdateFilterMenuBlock::TransportFilter => UpdateFilterMenuBlock::Start,
             UpdateFilterMenuBlock::NetworkFilter => UpdateFilterMenuBlock::TransportFilter,
             UpdateFilterMenuBlock::LinkFilter => UpdateFilterMenuBlock::NetworkFilter,
             UpdateFilterMenuBlock::TrafficDirection => UpdateFilterMenuBlock::LinkFilter,
             UpdateFilterMenuBlock::Start => UpdateFilterMenuBlock::TrafficDirection,
         };
-        self.select(app);
+        app.focused_block = FocusedBlock::UpdateFilterMenuBlock(x);
+        x.on_select(app)
     }
 
-    pub fn select(self, app: &mut App) {
+    pub fn on_select(self, app: &mut App) {
         match self.app_component(app) {
             Some(p) => {
                 p.select(Some(0));
@@ -62,7 +64,7 @@ impl UpdateFilterMenuBlock {
             None => {}
         }
     }
-    fn unselect(self, app: &mut App) {
+    fn on_unselect(self, app: &mut App) {
         match self.app_component(app) {
             Some(p) => {
                 p.select(None);
@@ -95,23 +97,13 @@ impl UpdateFilterMenuBlock {
     }
     pub fn handle_key_events(&mut self, key_event: KeyEvent, app: &mut App) {
         match key_event.code {
-            KeyCode::Tab => {
-                self.next(app);
-            }
-            KeyCode::BackTab => {
-                self.previous(app);
-            }
-            KeyCode::Char('k') | KeyCode::Up => {
-                self.scroll_up(app);
-            }
-            KeyCode::Char('j') | KeyCode::Down => {
-                self.scroll_down(app);
-            }
+            KeyCode::Tab => self.next(app),
+            KeyCode::BackTab => self.previous(app),
 
-            KeyCode::Esc => {
-                app.focused_block = app.previous_focused_block.clone();
-                app.update_filters = false;
-            }
+            KeyCode::Char('k') | KeyCode::Up => self.scroll_up(app),
+
+            KeyCode::Char('j') | KeyCode::Down => self.scroll_down(app),
+
             _ => {}
         }
     }

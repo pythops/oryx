@@ -24,7 +24,6 @@ kanal = "0.1.0-pre8"
 mimalloc = "0.1"
 clap = { version = "4", features = ["derive", "cargo"] }
 network-types = "0.0.7"
-
 [[bin]]
 name = "oryx"
 path = "src/main.rs"
