@@ -13,7 +13,7 @@ use ratatui::{
     Frame,
 };
 
-use crate::app::FocusedBlock;
+use crate::{app::FocusedBlock, MenuComponent, Scrollable};
 
 use super::{start_menu::StartMenuBlock, update_menu::UpdateFilterMenuBlock};
 
@@ -47,6 +47,36 @@ impl Default for TrafficDirectionFilter {
     }
 }
 
+impl MenuComponent for TrafficDirectionFilter {
+    fn set_state(&mut self, value: Option<usize>) {
+        self.state.select(value);
+    }
+    fn select(&mut self) {
+        if let Some(i) = self.state.selected() {
+            let traffic_direction = match i {
+                0 => TrafficDirection::Ingress,
+                _ => TrafficDirection::Egress,
+            };
+
+            if self.selected_direction.contains(&traffic_direction) {
+                self.selected_direction
+                    .retain(|&direction| direction != traffic_direction);
+            } else {
+                self.selected_direction.push(traffic_direction);
+            }
+        }
+    }
+}
+impl Scrollable for TrafficDirectionFilter {
+    fn scroll_down(&mut self) {
+        self.state.select(Some(1));
+    }
+
+    fn scroll_up(&mut self) {
+        self.state.select(Some(0));
+    }
+}
+
 impl TrafficDirectionFilter {
     pub fn new() -> Self {
         TrafficDirectionFilter {
@@ -62,22 +92,6 @@ impl TrafficDirectionFilter {
         match direction {
             TrafficDirection::Ingress => self.terminate_ingress.store(true, Ordering::Relaxed),
             TrafficDirection::Egress => self.terminate_egress.store(true, Ordering::Relaxed),
-        }
-    }
-
-    pub fn select(&mut self) {
-        if let Some(i) = self.state.selected() {
-            let traffic_direction = match i {
-                0 => TrafficDirection::Ingress,
-                _ => TrafficDirection::Egress,
-            };
-
-            if self.selected_direction.contains(&traffic_direction) {
-                self.selected_direction
-                    .retain(|&direction| direction != traffic_direction);
-            } else {
-                self.selected_direction.push(traffic_direction);
-            }
         }
     }
 

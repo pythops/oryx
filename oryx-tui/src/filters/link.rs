@@ -6,7 +6,7 @@ use ratatui::{
     Frame,
 };
 
-use crate::app::FocusedBlock;
+use crate::{app::FocusedBlock, MenuComponent, Scrollable};
 
 use super::{start_menu::StartMenuBlock, update_menu::UpdateFilterMenuBlock};
 
@@ -22,17 +22,12 @@ impl Default for LinkFilter {
         Self::new()
     }
 }
-
-impl LinkFilter {
-    pub fn new() -> Self {
-        Self {
-            state: TableState::default(),
-            selected_protocols: vec![LinkProtocol::Arp],
-            applied_protocols: Vec::new(),
-        }
+impl MenuComponent for LinkFilter {
+    fn set_state(&mut self, value: Option<usize>) {
+        self.state.select(value);
     }
 
-    pub fn select(&mut self) {
+    fn select(&mut self) {
         if self.state.selected().is_some() {
             let protocol = LinkProtocol::Arp;
             if self.selected_protocols.contains(&protocol) {
@@ -42,8 +37,9 @@ impl LinkFilter {
             }
         }
     }
-
-    pub fn scroll_down(&mut self) {
+}
+impl Scrollable for LinkFilter {
+    fn scroll_down(&mut self) {
         let i = match self.state.selected() {
             Some(i) => {
                 if i < (NB_LINK_PROTOCOL - 1).into() {
@@ -58,7 +54,7 @@ impl LinkFilter {
         self.state.select(Some(i));
     }
 
-    pub fn scroll_up(&mut self) {
+    fn scroll_up(&mut self) {
         let i = match self.state.selected() {
             Some(i) => {
                 if i > 1 {
@@ -72,6 +68,17 @@ impl LinkFilter {
 
         self.state.select(Some(i));
     }
+}
+
+impl LinkFilter {
+    pub fn new() -> Self {
+        Self {
+            state: TableState::default(),
+            selected_protocols: vec![LinkProtocol::Arp],
+            applied_protocols: Vec::new(),
+        }
+    }
+
     pub fn apply(&mut self) {
         self.applied_protocols = self.selected_protocols.clone();
         self.selected_protocols.clear();

@@ -5,6 +5,7 @@ use crate::{
         network::{IpPacket, IpProto},
         packet::AppPacket,
     },
+    MenuComponent,
 };
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
@@ -150,7 +151,7 @@ impl Mode {
                                     app.focused_block = FocusedBlock::UpdateFilterMenuBlock(
                                         UpdateFilterMenuBlock::TransportFilter,
                                     );
-                                    UpdateFilterMenuBlock::TransportFilter.on_select(app);
+                                    app.filter.transport.set_state(Some(0));
 
                                     app.filter.network.selected_protocols =
                                         app.filter.network.applied_protocols.clone();

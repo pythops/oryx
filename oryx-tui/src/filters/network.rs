@@ -6,7 +6,7 @@ use ratatui::{
     Frame,
 };
 
-use crate::app::FocusedBlock;
+use crate::{app::FocusedBlock, MenuComponent, Scrollable};
 
 use super::{start_menu::StartMenuBlock, update_menu::UpdateFilterMenuBlock};
 
@@ -22,21 +22,12 @@ impl Default for NetworkFilter {
         Self::new()
     }
 }
-
-impl NetworkFilter {
-    pub fn new() -> Self {
-        NetworkFilter {
-            state: TableState::default(),
-            selected_protocols: vec![
-                NetworkProtocol::Ipv4,
-                NetworkProtocol::Ipv6,
-                NetworkProtocol::Icmp,
-            ],
-            applied_protocols: Vec::new(),
-        }
+impl MenuComponent for NetworkFilter {
+    fn set_state(&mut self, value: Option<usize>) {
+        self.state.select(value);
     }
 
-    pub fn select(&mut self) {
+    fn select(&mut self) {
         if let Some(i) = self.state.selected() {
             let protocol = match i {
                 0 => NetworkProtocol::Ipv4,
@@ -51,8 +42,9 @@ impl NetworkFilter {
             }
         }
     }
-
-    pub fn scroll_down(&mut self) {
+}
+impl Scrollable for NetworkFilter {
+    fn scroll_down(&mut self) {
         let i = match self.state.selected() {
             Some(i) => {
                 if i < (NB_NETWORK_PROTOCOL - 1).into() {
@@ -67,7 +59,7 @@ impl NetworkFilter {
         self.state.select(Some(i));
     }
 
-    pub fn scroll_up(&mut self) {
+    fn scroll_up(&mut self) {
         let i = match self.state.selected() {
             Some(i) => {
                 if i > 1 {
@@ -80,6 +72,19 @@ impl NetworkFilter {
         };
 
         self.state.select(Some(i));
+    }
+}
+impl NetworkFilter {
+    pub fn new() -> Self {
+        NetworkFilter {
+            state: TableState::default(),
+            selected_protocols: vec![
+                NetworkProtocol::Ipv4,
+                NetworkProtocol::Ipv6,
+                NetworkProtocol::Icmp,
+            ],
+            applied_protocols: Vec::new(),
+        }
     }
 
     pub fn apply(&mut self) {

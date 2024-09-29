@@ -1,10 +1,12 @@
 use crate::app::{App, FocusedBlock};
+
+use crate::ScrollableMenuComponent;
 use crossterm::event::{KeyCode, KeyEvent};
+
 use ratatui::prelude::Stylize;
 use ratatui::{
     layout::{Constraint, Direction, Flex, Layout},
     style::Style,
-    widgets::TableState,
     Frame,
 };
 use tui_big_text::{BigText, PixelSize};
@@ -21,7 +23,7 @@ pub enum StartMenuBlock {
 
 impl StartMenuBlock {
     pub fn next(self, app: &mut App) {
-        self.on_unselect(app);
+        self.set_state(app, None);
         let x = match self {
             StartMenuBlock::Interface => StartMenuBlock::TransportFilter,
             StartMenuBlock::TransportFilter => StartMenuBlock::NetworkFilter,
@@ -31,10 +33,10 @@ impl StartMenuBlock {
             StartMenuBlock::Start => StartMenuBlock::Interface,
         };
         app.focused_block = FocusedBlock::StartMenuBlock(x);
-        x.on_select(app)
+        x.set_state(app, Some(0));
     }
     pub fn previous(self, app: &mut App) {
-        self.on_unselect(app);
+        self.set_state(app, None);
         let x = match self {
             StartMenuBlock::Interface => StartMenuBlock::Start,
             StartMenuBlock::TransportFilter => StartMenuBlock::Interface,
@@ -44,69 +46,50 @@ impl StartMenuBlock {
             StartMenuBlock::Start => StartMenuBlock::TrafficDirection,
         };
         app.focused_block = FocusedBlock::StartMenuBlock(x);
-        x.on_select(app)
+        x.set_state(app, Some(0));
     }
 
-    pub fn app_component(self, app: &mut App) -> Option<&mut TableState> {
+    fn app_component(self, app: &mut App) -> Option<Box<&mut dyn ScrollableMenuComponent>> {
         match self {
-            StartMenuBlock::Interface => Some(&mut app.interface.state),
-            StartMenuBlock::TransportFilter => Some(&mut (*app).filter.transport.state),
-            StartMenuBlock::NetworkFilter => Some(&mut (*app).filter.network.state),
-            StartMenuBlock::LinkFilter => Some(&mut (*app).filter.link.state),
-            StartMenuBlock::TrafficDirection => Some(&mut (*app).filter.traffic_direction.state),
+            StartMenuBlock::Interface => Some(Box::new(&mut app.interface)),
+            StartMenuBlock::TransportFilter => Some(Box::new(&mut app.filter.transport)),
+            StartMenuBlock::NetworkFilter => Some(Box::new(&mut app.filter.network)),
+            StartMenuBlock::LinkFilter => Some(Box::new(&mut app.filter.link)),
+            StartMenuBlock::TrafficDirection => Some(Box::new(&mut app.filter.traffic_direction)),
             StartMenuBlock::Start => None,
         }
     }
 
-    fn on_select(self, app: &mut App) {
+    fn set_state(self, app: &mut App, value: Option<usize>) {
         match self.app_component(app) {
-            Some(p) => {
-                p.select(Some(0));
-            }
-            None => {}
-        }
-    }
-    fn on_unselect(self, app: &mut App) {
-        match self.app_component(app) {
-            Some(p) => {
-                p.select(None);
-            }
-            None => {}
-        }
-    }
-    pub fn scroll_up(self, app: &mut App) {
-        match self {
-            StartMenuBlock::Interface => app.interface.scroll_up(),
-            StartMenuBlock::TransportFilter => (*app).filter.transport.scroll_up(),
-            StartMenuBlock::NetworkFilter => (*app).filter.network.scroll_up(),
-            StartMenuBlock::LinkFilter => (*app).filter.link.scroll_up(),
-            StartMenuBlock::TrafficDirection => {
-                (*app).filter.traffic_direction.state.select(Some(0))
-            }
+            Some(p) => p.set_state(value),
             _ => {}
         }
     }
 
-    pub fn scroll_down(self, app: &mut App) {
-        match self {
-            StartMenuBlock::Interface => app.interface.scroll_down(),
-            StartMenuBlock::TransportFilter => (*app).filter.transport.scroll_down(),
-            StartMenuBlock::NetworkFilter => (*app).filter.network.scroll_down(),
-            StartMenuBlock::LinkFilter => (*app).filter.link.scroll_down(),
-            StartMenuBlock::TrafficDirection => {
-                (*app).filter.traffic_direction.state.select(Some(1))
-            }
+    pub fn scroll_up(self, app: &mut App) {
+        match self.app_component(app) {
+            Some(p) => p.scroll_up(),
             _ => {}
         }
     }
+    pub fn scroll_down(self, app: &mut App) {
+        match self.app_component(app) {
+            Some(p) => p.scroll_down(),
+            _ => {}
+        }
+    }
+
     pub fn handle_key_events(&mut self, key_event: KeyEvent, app: &mut App) {
         match key_event.code {
             KeyCode::Tab => self.next(app),
             KeyCode::BackTab => self.previous(app),
-
             KeyCode::Char('k') | KeyCode::Up => self.scroll_up(app),
-
             KeyCode::Char('j') | KeyCode::Down => self.scroll_down(app),
+            KeyCode::Char(' ') => match self.app_component(app) {
+                Some(p) => p.select(),
+                _ => {}
+            },
 
             _ => {}
         }

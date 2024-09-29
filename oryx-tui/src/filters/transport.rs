@@ -6,7 +6,7 @@ use ratatui::{
     Frame,
 };
 
-use crate::app::FocusedBlock;
+use crate::{app::FocusedBlock, MenuComponent, Scrollable};
 
 use super::{start_menu::StartMenuBlock, update_menu::UpdateFilterMenuBlock};
 
@@ -23,16 +23,12 @@ impl Default for TransportFilter {
     }
 }
 
-impl TransportFilter {
-    pub fn new() -> Self {
-        Self {
-            state: TableState::default(),
-            selected_protocols: vec![TransportProtocol::TCP, TransportProtocol::UDP],
-            applied_protocols: Vec::new(),
-        }
+impl MenuComponent for TransportFilter {
+    fn set_state(&mut self, value: Option<usize>) {
+        self.state.select(value);
     }
 
-    pub fn select(&mut self) {
+    fn select(&mut self) {
         if let Some(i) = self.state.selected() {
             let protocol = match i {
                 0 => TransportProtocol::TCP,
@@ -46,8 +42,9 @@ impl TransportFilter {
             }
         }
     }
-
-    pub fn scroll_down(&mut self) {
+}
+impl Scrollable for TransportFilter {
+    fn scroll_down(&mut self) {
         let i = match self.state.selected() {
             Some(i) => {
                 if i < (NB_TRANSPORT_PROTOCOL - 1).into() {
@@ -62,7 +59,7 @@ impl TransportFilter {
         self.state.select(Some(i));
     }
 
-    pub fn scroll_up(&mut self) {
+    fn scroll_up(&mut self) {
         let i = match self.state.selected() {
             Some(i) => {
                 if i > 1 {
@@ -75,6 +72,16 @@ impl TransportFilter {
         };
 
         self.state.select(Some(i));
+    }
+}
+
+impl TransportFilter {
+    pub fn new() -> Self {
+        Self {
+            state: TableState::default(),
+            selected_protocols: vec![TransportProtocol::TCP, TransportProtocol::UDP],
+            applied_protocols: Vec::new(),
+        }
     }
 
     pub fn apply(&mut self) {

@@ -3,12 +3,13 @@ use ratatui::prelude::Stylize;
 use ratatui::{
     layout::{Constraint, Direction, Flex, Layout},
     style::Style,
-    widgets::{Block, BorderType, Borders, Clear, TableState},
+    widgets::{Block, BorderType, Borders, Clear},
     Frame,
 };
 use tui_big_text::{BigText, PixelSize};
 
 use crate::app::{App, FocusedBlock};
+use crate::ScrollableMenuComponent;
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum UpdateFilterMenuBlock {
@@ -21,7 +22,7 @@ pub enum UpdateFilterMenuBlock {
 
 impl UpdateFilterMenuBlock {
     pub fn next(self, app: &mut App) {
-        self.on_unselect(app);
+        self.set_state(app, Some(0));
         let x = match self {
             UpdateFilterMenuBlock::TransportFilter => UpdateFilterMenuBlock::NetworkFilter,
             UpdateFilterMenuBlock::NetworkFilter => UpdateFilterMenuBlock::LinkFilter,
@@ -30,21 +31,10 @@ impl UpdateFilterMenuBlock {
             UpdateFilterMenuBlock::Start => UpdateFilterMenuBlock::TransportFilter,
         };
         app.focused_block = FocusedBlock::UpdateFilterMenuBlock(x);
-        x.on_select(app)
-    }
-    pub fn app_component(self, app: &mut App) -> Option<&mut TableState> {
-        match self {
-            UpdateFilterMenuBlock::TransportFilter => Some(&mut (*app).filter.transport.state),
-            UpdateFilterMenuBlock::NetworkFilter => Some(&mut (*app).filter.network.state),
-            UpdateFilterMenuBlock::LinkFilter => Some(&mut (*app).filter.link.state),
-            UpdateFilterMenuBlock::TrafficDirection => {
-                Some(&mut (*app).filter.traffic_direction.state)
-            }
-            UpdateFilterMenuBlock::Start => None,
-        }
+        self.set_state(app, None);
     }
     pub fn previous(self, app: &mut App) {
-        self.on_unselect(app);
+        self.set_state(app, Some(0));
         let x = match self {
             UpdateFilterMenuBlock::TransportFilter => UpdateFilterMenuBlock::Start,
             UpdateFilterMenuBlock::NetworkFilter => UpdateFilterMenuBlock::TransportFilter,
@@ -53,45 +43,37 @@ impl UpdateFilterMenuBlock {
             UpdateFilterMenuBlock::Start => UpdateFilterMenuBlock::TrafficDirection,
         };
         app.focused_block = FocusedBlock::UpdateFilterMenuBlock(x);
-        x.on_select(app)
+        self.set_state(app, None);
     }
 
-    pub fn on_select(self, app: &mut App) {
-        match self.app_component(app) {
-            Some(p) => {
-                p.select(Some(0));
-            }
-            None => {}
-        }
-    }
-    fn on_unselect(self, app: &mut App) {
-        match self.app_component(app) {
-            Some(p) => {
-                p.select(None);
-            }
-            None => {}
-        }
-    }
-    pub fn scroll_up(self, app: &mut App) {
+    fn app_component(self, app: &mut App) -> Option<Box<&mut dyn ScrollableMenuComponent>> {
         match self {
-            UpdateFilterMenuBlock::TransportFilter => (*app).filter.transport.scroll_up(),
-            UpdateFilterMenuBlock::NetworkFilter => (*app).filter.network.scroll_up(),
-            UpdateFilterMenuBlock::LinkFilter => (*app).filter.link.scroll_up(),
+            UpdateFilterMenuBlock::TransportFilter => Some(Box::new(&mut app.filter.transport)),
+            UpdateFilterMenuBlock::NetworkFilter => Some(Box::new(&mut app.filter.network)),
+            UpdateFilterMenuBlock::LinkFilter => Some(Box::new(&mut app.filter.link)),
             UpdateFilterMenuBlock::TrafficDirection => {
-                (*app).filter.traffic_direction.state.select(Some(0))
+                Some(Box::new(&mut app.filter.traffic_direction))
             }
+            UpdateFilterMenuBlock::Start => None,
+        }
+    }
+
+    fn set_state(self, app: &mut App, value: Option<usize>) {
+        match self.app_component(app) {
+            Some(p) => p.set_state(value),
             _ => {}
         }
     }
 
+    pub fn scroll_up(self, app: &mut App) {
+        match self.app_component(app) {
+            Some(p) => p.scroll_up(),
+            _ => {}
+        }
+    }
     pub fn scroll_down(self, app: &mut App) {
-        match self {
-            UpdateFilterMenuBlock::TransportFilter => (*app).filter.transport.scroll_down(),
-            UpdateFilterMenuBlock::NetworkFilter => (*app).filter.network.scroll_down(),
-            UpdateFilterMenuBlock::LinkFilter => (*app).filter.link.scroll_down(),
-            UpdateFilterMenuBlock::TrafficDirection => {
-                (*app).filter.traffic_direction.state.select(Some(1))
-            }
+        match self.app_component(app) {
+            Some(p) => p.scroll_down(),
             _ => {}
         }
     }

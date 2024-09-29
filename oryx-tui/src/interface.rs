@@ -14,7 +14,7 @@ use std::{
     path::PathBuf,
 };
 
-use crate::{app::FocusedBlock, filters::start_menu::StartMenuBlock};
+use crate::{app::FocusedBlock, filters::start_menu::StartMenuBlock, MenuComponent, Scrollable};
 
 #[derive(Debug, Clone)]
 pub struct NetworkInterface {
@@ -108,7 +108,50 @@ impl Default for Interface {
         Self::new()
     }
 }
+impl MenuComponent for Interface {
+    fn set_state(&mut self, value: Option<usize>) {
+        self.state.select(value);
+    }
 
+    fn select(&mut self) {
+        if let Some(index) = self.state.selected() {
+            let net_interface = self.interfaces[index].clone();
+            if net_interface.is_up {
+                self.selected_interface = net_interface;
+            }
+        }
+    }
+}
+
+impl Scrollable for Interface {
+    fn scroll_down(&mut self) {
+        let i = match self.state.selected() {
+            Some(i) => {
+                if i < self.interfaces.len() - 1 {
+                    i + 1
+                } else {
+                    i
+                }
+            }
+            None => 0,
+        };
+
+        self.set_state(Some(i));
+    }
+    fn scroll_up(&mut self) {
+        let i = match self.state.selected() {
+            Some(i) => {
+                if i > 1 {
+                    i - 1
+                } else {
+                    0
+                }
+            }
+            None => 0,
+        };
+        self.state.select(Some(i));
+    }
+}
 impl Interface {
     pub fn new() -> Self {
         let interfaces = NetworkInterface::list();
@@ -121,33 +164,8 @@ impl Interface {
         }
     }
 
-    pub fn scroll_down(&mut self) {
-        let i = match self.state.selected() {
-            Some(i) => {
-                if i < self.interfaces.len() - 1 {
-                    i + 1
-                } else {
-                    i
-                }
-            }
-            None => 0,
-        };
-
-        self.state.select(Some(i));
-    }
-    pub fn scroll_up(&mut self) {
-        let i = match self.state.selected() {
-            Some(i) => {
-                if i > 1 {
-                    i - 1
-                } else {
-                    0
-                }
-            }
-            None => 0,
-        };
-
-        self.state.select(Some(i));
+    pub fn set_state(&mut self, value: Option<usize>) {
+        self.state.select(value);
     }
 
     pub fn render_on_setup(

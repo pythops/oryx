@@ -49,4 +49,15 @@ pub mod firewall;
 
 pub mod mode;
 
-pub mod app_;
+pub trait MenuComponent {
+    fn set_state(&mut self, value: Option<usize>);
+    fn select(&mut self);
+}
+pub trait Scrollable {
+    fn scroll_up(&mut self);
+    fn scroll_down(&mut self);
+}
+
+pub trait ScrollableMenuComponent: MenuComponent + Scrollable {}
+
+impl<T: MenuComponent + Scrollable> ScrollableMenuComponent for T {}

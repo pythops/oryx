@@ -16,7 +16,7 @@ show interface:
 
 # Run oryx
 run:
-    cargo xtask run --release
+    cargo xtask run 
 
 # Build oryx
 build:
