@@ -1,5 +1,7 @@
 use crate::app::{App, FocusedBlock};
 
+use crate::event::Event;
+use crate::mode::Mode;
 use crate::ScrollableMenuComponent;
 use crossterm::event::{KeyCode, KeyEvent};
 
@@ -10,6 +12,8 @@ use ratatui::{
     Frame,
 };
 use tui_big_text::{BigText, PixelSize};
+
+use super::direction::TrafficDirection;
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum StartMenuBlock {
@@ -80,7 +84,12 @@ impl StartMenuBlock {
         }
     }
 
-    pub fn handle_key_events(&mut self, key_event: KeyEvent, app: &mut App) {
+    pub fn handle_key_events(
+        &mut self,
+        key_event: KeyEvent,
+        app: &mut App,
+        sender: kanal::Sender<Event>,
+    ) {
         match key_event.code {
             KeyCode::Tab => self.next(app),
             KeyCode::BackTab => self.previous(app),
@@ -90,7 +99,23 @@ impl StartMenuBlock {
                 Some(p) => p.select(),
                 _ => {}
             },
+            KeyCode::Enter => {
+                app.filter.network.apply();
+                app.filter.transport.apply();
+                app.filter.link.apply();
+                app.filter.traffic_direction.apply();
 
+                let traffic_dir = &app.filter.traffic_direction.applied_direction;
+                if traffic_dir.contains(&TrafficDirection::Ingress) {
+                    app.load_ingress(&sender);
+                }
+                if traffic_dir.contains(&TrafficDirection::Egress) {
+                    app.load_egress(&sender);
+                }
+
+                app.start_sniffing = true;
+                app.focused_block = FocusedBlock::Main(Mode::Packet);
+            }
             _ => {}
         }
     }

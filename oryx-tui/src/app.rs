@@ -11,9 +11,13 @@ use std::{
     time::Duration,
 };
 
-use crate::filters::{
-    direction::TrafficDirection, filter::Filter, fuzzy::Fuzzy, start_menu::StartMenuBlock,
-    update_menu::UpdateFilterMenuBlock,
+use crate::{
+    ebpf::Ebpf,
+    event::Event,
+    filters::{
+        direction::TrafficDirection, filter::Filter, fuzzy::Fuzzy, start_menu::StartMenuBlock,
+        update_menu::UpdateFilterMenuBlock,
+    },
 };
 
 use crate::help::Help;
@@ -123,6 +127,28 @@ impl App {
         }
     }
 
+    pub fn load_ingress(&self, sender: &kanal::Sender<Event>) {
+        {
+            Ebpf::load_ingress(
+                self.interface.selected_interface.name.clone(),
+                sender.clone(),
+                self.data_channel_sender.clone(),
+                self.filter.ingress_channel.receiver.clone(),
+                self.filter.traffic_direction.terminate_ingress.clone(),
+            );
+        }
+    }
+    pub fn load_egress(&self, sender: &kanal::Sender<Event>) {
+        {
+            Ebpf::load_egress(
+                self.interface.selected_interface.name.clone(),
+                sender.clone(),
+                self.data_channel_sender.clone(),
+                self.filter.egress_channel.receiver.clone(),
+                self.filter.traffic_direction.terminate_egress.clone(),
+            );
+        }
+    }
     pub fn render(&mut self, frame: &mut Frame) {
         // Setup
         match self.focused_block.clone() {

@@ -29,31 +29,29 @@ pub enum Mode {
 }
 
 impl Mode {
-    pub fn next(&mut self) {
-        *self = match *self {
+    pub fn next(&self, app: &mut App) {
+        let x = match self {
             Mode::Packet => Mode::Stats,
             Mode::Stats => Mode::Alerts,
             Mode::Alerts => Mode::Firewall,
             Mode::Firewall => Mode::Packet,
-        }
+        };
+        app.focused_block = FocusedBlock::Main(x);
     }
-    pub fn previous(&mut self) {
-        *self = match *self {
+    pub fn previous(&self, app: &mut App) {
+        let x = match self {
             Mode::Packet => Mode::Firewall,
             Mode::Stats => Mode::Packet,
             Mode::Alerts => Mode::Stats,
             Mode::Firewall => Mode::Alerts,
         };
+        app.focused_block = FocusedBlock::Main(x);
     }
 
     pub fn handle_key_events(&mut self, key_event: KeyEvent, app: &mut App) {
         match key_event.code {
-            KeyCode::Tab => {
-                self.next();
-            }
-            KeyCode::BackTab => {
-                self.previous();
-            }
+            KeyCode::Tab => self.next(app),
+            KeyCode::BackTab => self.previous(app),
 
             _ => {
                 match self {
