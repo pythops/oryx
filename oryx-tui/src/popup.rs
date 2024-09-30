@@ -1,25 +1,28 @@
-use ratatui::{layout::Rect, Frame};
+use ratatui::Frame;
 
 use crate::{app::App, packets::info::PacketInfo};
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum PopupEnum {
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum ActivePopup {
     Help,
     FilterUpdate,
     PacketInfo,
 }
-impl PopupEnum {
-    pub fn render(&self, frame: &mut Frame, _: Rect, app: &mut App) {
+impl ActivePopup {
+    pub fn render(&self, frame: &mut Frame, app: &mut App) {
         match self {
-            PopupEnum::Help => app.help.render(frame),
-            PopupEnum::FilterUpdate => app.filter_update.clone().render(frame, app),
-            PopupEnum::PacketInfo => PacketInfo::render(frame, app),
+            ActivePopup::Help => app.help.render(frame),
+            ActivePopup::FilterUpdate => app.filter_update.clone().render(frame, app),
+            ActivePopup::PacketInfo => PacketInfo::render(frame, app),
         }
     }
+
     pub fn handle_key_events(&mut self, key_event: crossterm::event::KeyEvent, app: &mut App) {
         match self {
-            PopupEnum::Help => app.help.clone().handle_key_events(key_event, app),
-            PopupEnum::FilterUpdate => app.filter_update.clone().handle_key_events(key_event, app),
+            ActivePopup::Help => app.help.clone().handle_key_events(key_event, app),
+            ActivePopup::FilterUpdate => {
+                app.filter_update.clone().handle_key_events(key_event, app)
+            }
             _ => {}
         }
     }

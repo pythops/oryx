@@ -1,27 +1,27 @@
-use crate::app::App;
+use crate::{app::App, popup::ActivePopup};
 
-use crate::popup::PopupEnum;
 use crate::sections::section::Section;
 use ratatui::{layout::Rect, Frame};
 #[derive(Debug, Clone, PartialEq)]
-pub enum PhaseEnum {
+pub enum Step {
     Startup,
     Sniffing(Section),
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Phase {
-    pub phase_enum: PhaseEnum,
-    pub popup: Option<PopupEnum>,
+    pub step: Step,
+    pub popup: Option<ActivePopup>,
 }
+
 impl Phase {
-    pub fn render(&self, frame: &mut Frame, area: Rect, app: &mut App) {
-        match &self.phase_enum {
-            PhaseEnum::Startup => app.startup.clone().render(frame, app),
-            PhaseEnum::Sniffing(section) => section.render(frame, app),
+    pub fn render(&mut self, frame: &mut Frame, app: &mut App) {
+        match self.step {
+            Step::Startup => app.startup.render(frame, app),
+            Step::Sniffing(section) => section.render(frame, app),
         }
-        match &self.popup {
-            Some(popup) => popup.render(frame, area, app),
+        match self.popup {
+            Some(popup) => popup.render(frame, app),
             _ => {}
         }
     }

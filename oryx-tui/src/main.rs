@@ -29,8 +29,7 @@ fn main() -> AppResult<()> {
     let mut tui = Tui::new(terminal, events);
     tui.init()?;
 
-    let mut app = App::new();
-    app.set_sender(tui.events.sender.clone());
+    let mut app = App::new(tui.events.sender.clone());
 
     while app.running {
         tui.draw(&mut app)?;
@@ -41,7 +40,7 @@ fn main() -> AppResult<()> {
                 app.notifications.push(notification);
             }
             Event::Reset => {
-                app = App::new();
+                app = App::new(tui.events.sender.clone());
             }
             _ => {}
         }

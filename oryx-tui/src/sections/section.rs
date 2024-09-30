@@ -32,14 +32,14 @@ pub enum Section {
 
 impl Section {
     pub fn next(&self, app: &mut App) {
-        let x = match self {
+        let section = match self {
             Section::Packet => Section::Stats,
             Section::Stats => Section::Alerts,
             Section::Alerts => Section::Firewall,
             Section::Firewall => Section::Packet,
         };
 
-        app.phase.phase_enum = PhaseEnum::Sniffing(x);
+        app.phase.phase_enum = PhaseEnum::Sniffing(section);
     }
     pub fn previous(&self, app: &mut App) {
         let x = match self {

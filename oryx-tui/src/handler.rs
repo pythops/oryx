@@ -28,10 +28,7 @@ pub fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<()> {
             KeyCode::Char('r') => {
                 if key_event.modifiers == KeyModifiers::CONTROL {
                     app.detach_ebpf();
-                    app.notification_sender
-                        .clone()
-                        .unwrap()
-                        .send(Event::Reset)?;
+                    app.notification_sender.send(Event::Reset)?;
                     app.phase = Phase::new();
                     return Ok(());
                 }
@@ -40,6 +37,8 @@ pub fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<()> {
             _ => {}
         }
     }
+
     app.phase.clone().handle_key_events(key_event, app);
-    return Ok(());
+
+    Ok(())
 }

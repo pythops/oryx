@@ -78,17 +78,11 @@ pub struct App {
     pub alert: Alert,
     pub firewall: Firewall,
     pub mode: Mode,
-    pub notification_sender: Option<kanal::Sender<Event>>,
-}
-
-impl Default for App {
-    fn default() -> Self {
-        Self::new()
-    }
+    pub notification_sender: kanal::Sender<Event>,
 }
 
 impl App {
-    pub fn new() -> Self {
+    pub fn new(notification_sender: kanal::Sender<Event>) -> Self {
         let packets = Arc::new(Mutex::new(Vec::with_capacity(AppPacket::LEN * 1024 * 1024)));
         let stats = Arc::new(Mutex::new(Stats::default()));
 
@@ -132,17 +126,15 @@ impl App {
             alert: Alert::new(packets.clone()),
             firewall: Firewall::new(),
             mode: Mode::Normal,
-            notification_sender: None,
+            notification_sender,
         }
     }
-    pub fn set_sender(&mut self, sender: kanal::Sender<Event>) {
-        self.notification_sender = Some(sender);
-    }
+
     pub fn load_ingress(&self) {
         {
             Ebpf::load_ingress(
                 self.interface.selected_interface.name.clone(),
-                self.notification_sender.clone().unwrap(),
+                self.notification_sender.clone(),
                 self.data_channel_sender.clone(),
                 self.filter.ingress_channel.receiver.clone(),
                 self.filter.traffic_direction.terminate_ingress.clone(),
@@ -153,7 +145,7 @@ impl App {
         {
             Ebpf::load_egress(
                 self.interface.selected_interface.name.clone(),
-                self.notification_sender.clone().unwrap(),
+                self.notification_sender.clone(),
                 self.data_channel_sender.clone(),
                 self.filter.egress_channel.receiver.clone(),
                 self.filter.traffic_direction.terminate_egress.clone(),
