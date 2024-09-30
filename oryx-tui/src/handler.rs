@@ -7,7 +7,7 @@ use crate::{
     ebpf::Ebpf,
     event::Event,
     export::export,
-    filters::direction::TrafficDirection,
+    filter::direction::TrafficDirection,
     notification::{Notification, NotificationLevel},
 };
 use ratatui::{
@@ -207,24 +207,7 @@ pub fn handle_key_events(
                                     // Record the last position. Usefull for selecting the packets to display
                                     fuzzy.packet_end_index = fuzzy.packets.len();
                                 }
-                                let i = match fuzzy.scroll_state.selected() {
-                                    Some(i) => {
-                                        if i < app.packet_window_size - 1 {
-                                            i + 1
-                                        } else if i == app.packet_window_size - 1
-                                            && fuzzy.packets.len() > fuzzy.packet_end_index
-                                        {
-                                            // shit the window by one
-                                            fuzzy.packet_end_index += 1;
-                                            i + 1
-                                        } else {
-                                            i
-                                        }
-                                    }
-                                    None => fuzzy.packets.len(),
-                                };
-
-                                fuzzy.scroll_state.select(Some(i));
+                                fuzzy.scroll_down(app.packet_window_size);
                             } else {
                                 match &app.focused_block {
                                     FocusedBlock::NetworkFilter => {
@@ -254,24 +237,7 @@ pub fn handle_key_events(
                                     // Record the last position. Usefull for selecting the packets to display
                                     fuzzy.packet_end_index = fuzzy.packets.len();
                                 }
-                                let i = match fuzzy.scroll_state.selected() {
-                                    Some(i) => {
-                                        if i > 1 {
-                                            i - 1
-                                        } else if i == 0
-                                            && fuzzy.packet_end_index > app.packet_window_size
-                                        {
-                                            // shit the window by one
-                                            fuzzy.packet_end_index -= 1;
-                                            0
-                                        } else {
-                                            0
-                                        }
-                                    }
-                                    None => fuzzy.packets.len(),
-                                };
-
-                                fuzzy.scroll_state.select(Some(i));
+                                fuzzy.scroll_up(app.packet_window_size);
                             } else {
                                 match &app.focused_block {
                                     FocusedBlock::NetworkFilter => {
