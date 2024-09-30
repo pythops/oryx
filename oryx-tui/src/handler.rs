@@ -3,7 +3,7 @@ use std::{thread, time::Duration};
 use tui_input::backend::crossterm::EventHandler;
 
 use crate::{
-    app::{App, AppResult, FocusedBlock, Mode},
+    app::{App, AppResult, FocusedBlock, Section},
     ebpf::Ebpf,
     event::Event,
     export::export,
@@ -97,10 +97,10 @@ pub fn handle_key_events(
                     return Ok(());
                 }
 
-                match app.mode {
-                    Mode::Packet => app.mode = Mode::Stats,
-                    Mode::Stats => app.mode = Mode::Alerts,
-                    Mode::Alerts => app.mode = Mode::Packet,
+                match app.section {
+                    Section::Packet => app.section = Section::Stats,
+                    Section::Stats => app.section = Section::Alerts,
+                    Section::Alerts => app.section = Section::Packet,
                 }
             }
 
@@ -668,10 +668,10 @@ pub fn handle_key_events(
                         return Ok(());
                     }
 
-                    match app.mode {
-                        Mode::Packet => app.mode = Mode::Stats,
-                        Mode::Stats => app.mode = Mode::Alerts,
-                        Mode::Alerts => app.mode = Mode::Packet,
+                    match app.section {
+                        Section::Packet => app.section = Section::Stats,
+                        Section::Stats => app.section = Section::Alerts,
+                        Section::Alerts => app.section = Section::Packet,
                     };
                 } else {
                     match &app.focused_block {
@@ -759,10 +759,10 @@ pub fn handle_key_events(
                         return Ok(());
                     };
 
-                    match app.mode {
-                        Mode::Packet => app.mode = Mode::Alerts,
-                        Mode::Stats => app.mode = Mode::Packet,
-                        Mode::Alerts => app.mode = Mode::Stats,
+                    match app.section {
+                        Section::Packet => app.section = Section::Alerts,
+                        Section::Stats => app.section = Section::Packet,
+                        Section::Alerts => app.section = Section::Stats,
                     };
                 } else {
                     match &app.focused_block {

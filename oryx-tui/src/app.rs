@@ -39,7 +39,7 @@ pub enum FocusedBlock {
 }
 
 #[derive(Debug, PartialEq)]
-pub enum Mode {
+pub enum Section {
     Packet,
     Stats,
     Alerts,
@@ -66,7 +66,7 @@ pub struct App {
     pub fuzzy: Arc<Mutex<Fuzzy>>,
     pub notifications: Vec<Notification>,
     pub manuall_scroll: bool,
-    pub mode: Mode,
+    pub section: Section,
     pub stats: Arc<Mutex<Stats>>,
     pub packet_end_index: usize,
     pub packet_window_size: usize,
@@ -115,7 +115,7 @@ impl App {
             fuzzy: Fuzzy::new(packets.clone()),
             notifications: Vec::new(),
             manuall_scroll: false,
-            mode: Mode::Packet,
+            section: Section::Packet,
             stats,
             packet_end_index: 0,
             packet_window_size: 0,
@@ -191,15 +191,15 @@ impl App {
             self.filter.render_on_sniffing(frame, filter_block);
 
             // Packets/Stats
-            match self.mode {
-                Mode::Packet => {
+            match self.section {
+                Section::Packet => {
                     self.render_packets_mode(frame, mode_block);
                     if self.show_packet_infos_popup {
                         self.render_packet_infos_popup(frame);
                     }
                 }
-                Mode::Stats => self.render_stats_mode(frame, mode_block),
-                Mode::Alerts => self.alert.render(frame, mode_block),
+                Section::Stats => self.render_stats_mode(frame, mode_block),
+                Section::Alerts => self.alert.render(frame, mode_block),
             }
 
             // Update filters
