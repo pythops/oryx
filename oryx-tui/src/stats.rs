@@ -12,9 +12,9 @@ use ratatui::{
     Frame,
 };
 
-use crate::packets::{
+use crate::packet::{
     network::{IpPacket, IpProto},
-    packet::AppPacket,
+    AppPacket,
 };
 
 #[derive(Debug)]

@@ -1,3 +1,5 @@
+mod syn_flood;
+
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Margin, Rect},
     style::{Color, Style, Stylize},
@@ -6,10 +8,9 @@ use ratatui::{
     Frame,
 };
 use std::sync::{atomic::Ordering, Arc, Mutex};
+use syn_flood::SynFlood;
 
-use crate::packets::packet::AppPacket;
-
-use super::syn_flood::SynFlood;
+use crate::packet::AppPacket;
 
 #[derive(Debug)]
 pub struct Alert {

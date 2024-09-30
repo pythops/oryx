@@ -11,7 +11,7 @@ use ratatui::{
 };
 use tui_input::Input;
 
-use crate::{app::TICK_RATE, packets::packet::AppPacket};
+use crate::{app::TICK_RATE, packet::AppPacket};
 
 #[derive(Debug, Clone, Default)]
 pub struct Fuzzy {
@@ -54,6 +54,44 @@ impl Fuzzy {
         });
 
         fuzzy
+    }
+
+    pub fn scroll_down(&mut self, win_size: usize) {
+        let i = match self.scroll_state.selected() {
+            Some(i) => {
+                if i < win_size - 1 {
+                    i + 1
+                } else if i == win_size - 1 && self.packets.len() > self.packet_end_index {
+                    // shit the window by one
+                    self.packet_end_index += 1;
+                    i + 1
+                } else {
+                    i
+                }
+            }
+            None => self.packets.len(),
+        };
+
+        self.scroll_state.select(Some(i));
+    }
+
+    pub fn scroll_up(&mut self, win_size: usize) {
+        let i = match self.scroll_state.selected() {
+            Some(i) => {
+                if i > 1 {
+                    i - 1
+                } else if i == 0 && self.packet_end_index > win_size {
+                    // shit the window by one
+                    self.packet_end_index -= 1;
+                    0
+                } else {
+                    0
+                }
+            }
+            None => self.packets.len(),
+        };
+
+        self.scroll_state.select(Some(i));
     }
 
     pub fn find(&mut self, packets: &[AppPacket]) {

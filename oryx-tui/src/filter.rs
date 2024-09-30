@@ -1,3 +1,12 @@
+pub mod direction;
+pub mod fuzzy;
+mod link;
+mod network;
+mod transport;
+
+use direction::TrafficDirectionFilter;
+use link::LinkFilter;
+use network::NetworkFilter;
 use oryx_common::protocols::{
     Protocol, NB_LINK_PROTOCOL, NB_NETWORK_PROTOCOL, NB_TRANSPORT_PROTOCOL,
 };
@@ -8,14 +17,10 @@ use ratatui::{
     widgets::{Block, BorderType, Borders, Clear, Padding, Row, Table},
     Frame,
 };
+use transport::TransportFilter;
 use tui_big_text::{BigText, PixelSize};
 
 use crate::app::FocusedBlock;
-
-use super::{
-    direction::TrafficDirectionFilter, link::LinkFilter, network::NetworkFilter,
-    transport::TransportFilter,
-};
 
 #[derive(Debug, Clone)]
 pub struct FilterChannel {

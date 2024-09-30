@@ -16,20 +16,11 @@ use std::{
 };
 use tui_big_text::{BigText, PixelSize};
 
-use crate::alerts::alert::Alert;
-use crate::bandwidth::Bandwidth;
-use crate::filters::{
-    filter::Filter,
-    fuzzy::{self, Fuzzy},
-};
-use crate::help::Help;
-use crate::interface::Interface;
-use crate::notification::Notification;
-use crate::packets::{
-    network::{IpPacket, IpProto},
-    packet::AppPacket,
-};
-use crate::stats::Stats;
+use crate::{alert::Alert, bandwidth::Bandwidth, filter::fuzzy, packet::network::IpProto};
+use crate::{filter::fuzzy::Fuzzy, notification::Notification};
+use crate::{filter::Filter, help::Help};
+use crate::{interface::Interface, packet::AppPacket};
+use crate::{packet::network::IpPacket, stats::Stats};
 
 pub type AppResult<T> = std::result::Result<T, Box<dyn error::Error>>;
 
