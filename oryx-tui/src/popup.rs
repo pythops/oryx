@@ -25,7 +25,6 @@ impl ActivePopup {
             }
 
             ActivePopup::PacketInfo => PacketInfo::handle_key_events(key_event, app),
-            _ => {}
         }
     }
 }
