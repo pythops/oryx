@@ -10,7 +10,7 @@ use tui_big_text::{BigText, PixelSize};
 
 use crate::app::App;
 use crate::filters::direction::TrafficDirection;
-use crate::phase::{Phase, PhaseEnum};
+use crate::phase::{Phase, Step};
 use crate::sections::section::Section;
 use crate::traits::ScrollableMenuComponent;
 
@@ -105,7 +105,7 @@ impl UpdateBlockEnum {
                 }
 
                 app.phase = Phase {
-                    phase_enum: PhaseEnum::Sniffing(Section::Packet),
+                    step: Step::Sniffing(Section::Packet),
                     popup: None,
                 }
             }

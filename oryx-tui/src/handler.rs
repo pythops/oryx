@@ -2,7 +2,7 @@ use crate::{
     app::{App, AppResult, Mode},
     event::Event,
     phase::Phase,
-    popup::PopupEnum,
+    popup::ActivePopup,
 };
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
@@ -11,7 +11,7 @@ pub fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<()> {
     if app.mode == Mode::Normal {
         match key_event.code {
             KeyCode::Char('?') => {
-                app.phase.popup = Some(PopupEnum::Help);
+                app.phase.popup = Some(ActivePopup::Help);
                 return Ok(());
             }
             KeyCode::Char('q') => {

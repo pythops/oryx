@@ -5,8 +5,8 @@ use crate::{
         network::{IpPacket, IpProto},
         packet::AppPacket,
     },
-    phase::PhaseEnum,
-    popup::PopupEnum,
+    phase::Step,
+    popup::ActivePopup,
     traits::MenuComponent,
 };
 use crossterm::event::{KeyCode, KeyEvent};
@@ -39,7 +39,7 @@ impl Section {
             Section::Firewall => Section::Packet,
         };
 
-        app.phase.phase_enum = PhaseEnum::Sniffing(section);
+        app.phase.step = Step::Sniffing(section);
     }
     pub fn previous(&self, app: &mut App) {
         let x = match self {
@@ -48,7 +48,7 @@ impl Section {
             Section::Alerts => Section::Stats,
             Section::Firewall => Section::Alerts,
         };
-        app.phase.phase_enum = PhaseEnum::Sniffing(x);
+        app.phase.step = Step::Sniffing(x);
     }
 
     pub fn handle_key_events(&mut self, key_event: KeyEvent, app: &mut App) {
@@ -87,7 +87,7 @@ impl Section {
                             match key_event.code {
                                 KeyCode::Char('i') => {
                                     if !app.packet_index.is_none() && !fuzzy.packets.is_empty() {
-                                        app.phase.popup = Some(PopupEnum::PacketInfo);
+                                        app.phase.popup = Some(ActivePopup::PacketInfo);
                                     }
                                 }
                                 KeyCode::Char('/') => {
@@ -149,7 +149,7 @@ impl Section {
                                     app.packets_table_state.select(Some(i));
                                 }
                                 KeyCode::Char('f') => {
-                                    app.phase.popup = Some(PopupEnum::FilterUpdate);
+                                    app.phase.popup = Some(ActivePopup::FilterUpdate);
 
                                     app.filter.transport.set_state(Some(0));
 

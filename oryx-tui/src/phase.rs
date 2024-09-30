@@ -1,7 +1,7 @@
 use crate::{app::App, popup::ActivePopup};
 
 use crate::sections::section::Section;
-use ratatui::{layout::Rect, Frame};
+use ratatui::Frame;
 #[derive(Debug, Clone, PartialEq)]
 pub enum Step {
     Startup,
@@ -17,7 +17,7 @@ pub struct Phase {
 impl Phase {
     pub fn render(&mut self, frame: &mut Frame, app: &mut App) {
         match self.step {
-            Step::Startup => app.startup.render(frame, app),
+            Step::Startup => app.startup.clone().render(frame, app),
             Step::Sniffing(section) => section.render(frame, app),
         }
         match self.popup {
@@ -27,7 +27,7 @@ impl Phase {
     }
     pub fn new() -> Self {
         Self {
-            phase_enum: PhaseEnum::Startup,
+            step: Step::Startup,
             popup: None,
         }
     }
@@ -39,9 +39,9 @@ impl Phase {
                     .unwrap()
                     .handle_key_events(key_event, app);
             }
-            None => match &self.phase_enum {
-                PhaseEnum::Startup => app.startup.clone().handle_key_events(key_event, app),
-                PhaseEnum::Sniffing(mut section) => section.handle_key_events(key_event, app),
+            None => match &self.step {
+                Step::Startup => app.startup.clone().handle_key_events(key_event, app),
+                Step::Sniffing(mut section) => section.handle_key_events(key_event, app),
             },
         }
     }

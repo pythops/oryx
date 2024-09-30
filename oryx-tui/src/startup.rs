@@ -1,8 +1,8 @@
 use crate::app::App;
 
 use crate::filters::direction::TrafficDirection;
-use crate::phase::{Phase, PhaseEnum};
-use crate::popup::PopupEnum;
+use crate::phase::{Phase, Step};
+use crate::popup::ActivePopup;
 use crate::sections::section::Section;
 use crate::traits::ScrollableMenuComponent;
 use crossterm::event::{KeyCode, KeyEvent};
@@ -30,7 +30,7 @@ pub enum StartupBlockEnum {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Startup {
     pub focus_block: StartupBlockEnum,
-    pub popup: Option<PopupEnum>,
+    pub popup: Option<ActivePopup>,
 }
 impl Startup {
     pub fn new() -> Self {
@@ -144,7 +144,7 @@ impl Startup {
                 }
 
                 app.phase = Phase {
-                    phase_enum: PhaseEnum::Sniffing(Section::Packet),
+                    step: Step::Sniffing(Section::Packet),
                     popup: None,
                 }
             }

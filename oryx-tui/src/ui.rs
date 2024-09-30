@@ -19,7 +19,7 @@ pub fn render(app: &mut App, frame: &mut Frame) {
     //         }
     //     }
     // }
-    app.phase.clone().render(frame, frame.area(), app);
+    app.phase.clone().render(frame, app);
 
     for (index, notification) in app.notifications.iter().enumerate() {
         notification.render(index, frame);
