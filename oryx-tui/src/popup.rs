@@ -23,6 +23,8 @@ impl ActivePopup {
             ActivePopup::FilterUpdate => {
                 app.filter_update.clone().handle_key_events(key_event, app)
             }
+
+            ActivePopup::PacketInfo => PacketInfo::handle_key_events(key_event, app),
             _ => {}
         }
     }

@@ -12,6 +12,17 @@ use super::packet::AppPacket;
 
 pub struct PacketInfo {}
 impl PacketInfo {
+    pub fn get_inspected_packet(app: &mut App) -> AppPacket {
+        let fuzzy = app.fuzzy.lock().unwrap();
+        let packets = app.packets.lock().unwrap();
+
+        let packet = if fuzzy.is_enabled() {
+            fuzzy.packets[app.packet_index.unwrap()]
+        } else {
+            packets[app.packet_index.unwrap()]
+        };
+        packet
+    }
     pub fn render(frame: &mut Frame, app: &mut App) {
         let layout = Layout::default()
             .direction(Direction::Vertical)
@@ -33,15 +44,6 @@ impl PacketInfo {
             .flex(ratatui::layout::Flex::SpaceBetween)
             .split(layout[1])[1];
 
-        let fuzzy = app.fuzzy.lock().unwrap();
-        let packets = app.packets.lock().unwrap();
-
-        let packet = if fuzzy.is_enabled() {
-            fuzzy.packets[app.packet_index.unwrap()]
-        } else {
-            packets[app.packet_index.unwrap()]
-        };
-
         frame.render_widget(Clear, block);
         frame.render_widget(
             Block::new()
@@ -53,12 +55,12 @@ impl PacketInfo {
                 .border_type(BorderType::Thick),
             block,
         );
-        match packet {
+        match Self::get_inspected_packet(app) {
             AppPacket::Ip(ip_packet) => ip_packet.render(block, frame),
             AppPacket::Arp(arp_packet) => arp_packet.render(block, frame),
         };
     }
-    pub fn handle_key_events(&mut self, key_event: KeyEvent, app: &mut App) {
+    pub fn handle_key_events(key_event: KeyEvent, app: &mut App) {
         match key_event.code {
             KeyCode::Esc => app.phase.popup = None,
             _ => {}

@@ -86,9 +86,7 @@ impl Section {
                         } else {
                             match key_event.code {
                                 KeyCode::Char('i') => {
-                                    if !app.packet_index.is_none() && !fuzzy.packets.is_empty() {
-                                        app.phase.popup = Some(ActivePopup::PacketInfo);
-                                    }
+                                    app.phase.popup = Some(ActivePopup::PacketInfo);
                                 }
                                 KeyCode::Char('/') => {
                                     if fuzzy.is_enabled() {
