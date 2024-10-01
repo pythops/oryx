@@ -76,12 +76,10 @@ pub fn handle_key_events(
     }
 
     if app.editing_block.is_some() {
-        match key_event.code {
-            KeyCode::Esc => {
-                app.editing_block = None;
-            }
-            _ => {}
+        if key_event.code == KeyCode::Esc {
+            app.editing_block = None
         }
+
         app.section.handle_keys(key_event);
         return Ok(());
     }

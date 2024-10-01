@@ -123,10 +123,11 @@ impl Section {
                 FocusedSection::Alerts => self.focused_section = FocusedSection::Stats,
             },
 
-            _ => match self.focused_section {
-                FocusedSection::Inspection => self.inspection.handle_keys(key_event),
-                _ => {}
-            },
+            _ => {
+                if self.focused_section == FocusedSection::Inspection {
+                    self.inspection.handle_keys(key_event);
+                }
+            }
         }
     }
 }

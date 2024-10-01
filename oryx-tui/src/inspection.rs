@@ -50,9 +50,9 @@ impl Inspection {
         let fuzzy = self.fuzzy.lock().unwrap();
 
         if fuzzy.is_enabled() {
-            return !fuzzy.packets.is_empty();
+            !fuzzy.packets.is_empty()
         } else {
-            return !packets.is_empty();
+            !packets.is_empty()
         }
     }
 
