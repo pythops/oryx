@@ -2,6 +2,9 @@ use dns_lookup::lookup_addr;
 use std::{
     collections::HashMap,
     net::{IpAddr, Ipv4Addr},
+    sync::{Arc, Mutex},
+    thread,
+    time::Duration,
 };
 
 use ratatui::{
@@ -12,13 +15,16 @@ use ratatui::{
     Frame,
 };
 
-use crate::packet::{
-    network::{IpPacket, IpProto},
-    AppPacket,
+use crate::{
+    bandwidth::Bandwidth,
+    packet::{
+        network::{IpPacket, IpProto},
+        AppPacket,
+    },
 };
 
-#[derive(Debug)]
-pub struct Stats {
+#[derive(Debug, Default)]
+pub struct PacketStats {
     pub total: usize,
     pub filtered: usize,
     pub network: NetworkStats,
@@ -27,81 +33,118 @@ pub struct Stats {
     pub addresses: HashMap<Ipv4Addr, (Option<String>, usize)>,
 }
 
-impl Default for Stats {
-    fn default() -> Self {
-        Self::new()
-    }
+#[derive(Debug)]
+pub struct Stats {
+    pub packet_stats: Arc<Mutex<PacketStats>>,
+    pub bandwidth: Bandwidth,
 }
 
 impl Stats {
-    pub fn new() -> Self {
+    pub fn new(packets: Arc<Mutex<Vec<AppPacket>>>) -> Self {
+        let packet_stats: Arc<Mutex<PacketStats>> = Arc::new(Mutex::new(PacketStats::default()));
+
+        thread::spawn({
+            let packet_stats = packet_stats.clone();
+            move || {
+                let mut last_index = 0;
+                loop {
+                    thread::sleep(Duration::from_millis(160));
+                    let packets = packets.lock().unwrap();
+
+                    if packets.is_empty() {
+                        continue;
+                    }
+                    let mut packet_stats = packet_stats.lock().unwrap();
+                    for packet in packets[last_index..].iter() {
+                        match packet {
+                            AppPacket::Arp(_) => {
+                                packet_stats.link.arp += 1;
+                            }
+                            AppPacket::Ip(packet) => match packet {
+                                IpPacket::V4(ipv4_packet) => {
+                                    packet_stats.network.ipv4 += 1;
+
+                                    if !ipv4_packet.dst_ip.is_private()
+                                        && !ipv4_packet.dst_ip.is_loopback()
+                                    {
+                                        if let Some((_, counts)) =
+                                            packet_stats.addresses.get_mut(&ipv4_packet.dst_ip)
+                                        {
+                                            *counts += 1;
+                                        } else if let Ok(host) =
+                                            lookup_addr(&IpAddr::V4(ipv4_packet.dst_ip))
+                                        {
+                                            packet_stats
+                                                .addresses
+                                                .insert(ipv4_packet.dst_ip, (Some(host), 1));
+                                        } else {
+                                            packet_stats
+                                                .addresses
+                                                .insert(ipv4_packet.dst_ip, (None, 1));
+                                        }
+                                    }
+
+                                    match ipv4_packet.proto {
+                                        IpProto::Tcp(_) => {
+                                            packet_stats.transport.tcp += 1;
+                                        }
+                                        IpProto::Udp(_) => {
+                                            packet_stats.transport.udp += 1;
+                                        }
+                                        IpProto::Icmp(_) => {
+                                            packet_stats.network.icmp += 1;
+                                        }
+                                    }
+                                }
+                                IpPacket::V6(ipv6_packet) => {
+                                    packet_stats.network.ipv6 += 1;
+                                    match ipv6_packet.proto {
+                                        IpProto::Tcp(_) => {
+                                            packet_stats.transport.tcp += 1;
+                                        }
+                                        IpProto::Udp(_) => {
+                                            packet_stats.transport.udp += 1;
+                                        }
+                                        IpProto::Icmp(_) => {
+                                            packet_stats.network.icmp += 1;
+                                        }
+                                    }
+                                }
+                            },
+                        }
+
+                        packet_stats.total += 1;
+                    }
+
+                    last_index = packets.len() - 1;
+                }
+            }
+        });
+
         Self {
-            total: 0,
-            filtered: 0,
-            network: NetworkStats::default(),
-            transport: TransportStats::default(),
-            link: LinkStats::default(),
-            addresses: HashMap::with_capacity(1024),
+            packet_stats,
+            bandwidth: Bandwidth::new(),
         }
     }
-    pub fn get_top_10(&self) -> Vec<(&Ipv4Addr, &(Option<String>, usize))> {
-        let mut items: Vec<(&Ipv4Addr, &(Option<String>, usize))> = self.addresses.iter().collect();
+    pub fn get_top_10(
+        &self,
+        addresses: HashMap<Ipv4Addr, (Option<String>, usize)>,
+    ) -> Vec<(Ipv4Addr, (Option<String>, usize))> {
+        let mut items: Vec<(Ipv4Addr, (Option<String>, usize))> = addresses.into_iter().collect();
         items.sort_by(|a, b| b.1 .1.cmp(&a.1 .1));
         items.into_iter().take(10).collect()
     }
 
-    pub fn refresh(&mut self, packet: &AppPacket) {
-        match packet {
-            AppPacket::Arp(_) => {
-                self.link.arp += 1;
-            }
-            AppPacket::Ip(packet) => match packet {
-                IpPacket::V4(ipv4_packet) => {
-                    self.network.ipv4 += 1;
+    pub fn render(&self, frame: &mut Frame, block: Rect, network_interface: &str) {
+        let (bandwidth_block, stats_block) = {
+            let chunks = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
+                .margin(1)
+                .split(block);
+            (chunks[0], chunks[1])
+        };
 
-                    if !ipv4_packet.dst_ip.is_private() && !ipv4_packet.dst_ip.is_loopback() {
-                        if let Some((_, counts)) = self.addresses.get_mut(&ipv4_packet.dst_ip) {
-                            *counts += 1;
-                        } else if let Ok(host) = lookup_addr(&IpAddr::V4(ipv4_packet.dst_ip)) {
-                            self.addresses.insert(ipv4_packet.dst_ip, (Some(host), 1));
-                        } else {
-                            self.addresses.insert(ipv4_packet.dst_ip, (None, 1));
-                        }
-                    }
-
-                    match ipv4_packet.proto {
-                        IpProto::Tcp(_) => {
-                            self.transport.tcp += 1;
-                        }
-                        IpProto::Udp(_) => {
-                            self.transport.udp += 1;
-                        }
-                        IpProto::Icmp(_) => {
-                            self.network.icmp += 1;
-                        }
-                    }
-                }
-                IpPacket::V6(ipv6_packet) => {
-                    self.network.ipv6 += 1;
-                    match ipv6_packet.proto {
-                        IpProto::Tcp(_) => {
-                            self.transport.tcp += 1;
-                        }
-                        IpProto::Udp(_) => {
-                            self.transport.udp += 1;
-                        }
-                        IpProto::Icmp(_) => {
-                            self.network.icmp += 1;
-                        }
-                    }
-                }
-            },
-        }
-
-        self.total += 1;
-    }
-
-    pub fn render(&self, frame: &mut Frame, stats_block: Rect) {
         let (address_block, network_block, transport_block, link_block) = {
             let chunks = Layout::default()
                 .direction(Direction::Horizontal)
@@ -120,6 +163,8 @@ impl Stats {
             (chunks[0], chunks[1], chunks[2], chunks[3])
         };
 
+        let packet_stats = self.packet_stats.lock().unwrap();
+
         let link_chart = BarChart::default()
             .bar_width(3)
             .bar_gap(1)
@@ -128,13 +173,13 @@ impl Stats {
                     .label("ARP".into())
                     .style(Style::new().fg(Color::LightYellow))
                     .value_style(Style::new().fg(Color::Black).bg(Color::LightYellow))
-                    .text_value(if self.total != 0 {
-                        format!("{}%", self.link.arp * 100 / self.total)
+                    .text_value(if packet_stats.total != 0 {
+                        format!("{}%", packet_stats.link.arp * 100 / packet_stats.total)
                     } else {
                         "0%".to_string()
                     })
-                    .value(if self.total != 0 {
-                        (self.link.arp * 100 / self.total) as u64
+                    .value(if packet_stats.total != 0 {
+                        (packet_stats.link.arp * 100 / packet_stats.total) as u64
                     } else {
                         0
                     })]),
@@ -151,13 +196,13 @@ impl Stats {
                         .label("TCP".into())
                         .style(Style::new().fg(Color::LightBlue))
                         .value_style(Style::new().fg(Color::Black).bg(Color::LightBlue))
-                        .text_value(if self.total != 0 {
-                            format!("{}%", self.transport.tcp * 100 / self.total)
+                        .text_value(if packet_stats.total != 0 {
+                            format!("{}%", packet_stats.transport.tcp * 100 / packet_stats.total)
                         } else {
                             "0%".to_string()
                         })
-                        .value(if self.total != 0 {
-                            (self.transport.tcp * 100 / self.total) as u64
+                        .value(if packet_stats.total != 0 {
+                            (packet_stats.transport.tcp * 100 / packet_stats.total) as u64
                         } else {
                             0
                         }),
@@ -165,13 +210,13 @@ impl Stats {
                         .label("UDP".into())
                         .style(Style::new().fg(Color::LightGreen))
                         .value_style(Style::new().fg(Color::Black).bg(Color::LightGreen))
-                        .text_value(if self.total != 0 {
-                            format!("{}%", self.transport.udp * 100 / self.total)
+                        .text_value(if packet_stats.total != 0 {
+                            format!("{}%", packet_stats.transport.udp * 100 / packet_stats.total)
                         } else {
                             "0%".to_string()
                         })
-                        .value(if self.total != 0 {
-                            (self.transport.udp * 100 / self.total) as u64
+                        .value(if packet_stats.total != 0 {
+                            (packet_stats.transport.udp * 100 / packet_stats.total) as u64
                         } else {
                             0
                         }),
@@ -179,13 +224,13 @@ impl Stats {
                         .label("ICMP".into())
                         .style(Style::new().fg(Color::LightGreen))
                         .value_style(Style::new().fg(Color::Black).bg(Color::LightGreen))
-                        .text_value(if self.total != 0 {
-                            format!("{}%", self.network.icmp * 100 / self.total)
+                        .text_value(if packet_stats.total != 0 {
+                            format!("{}%", packet_stats.network.icmp * 100 / packet_stats.total)
                         } else {
                             "0%".to_string()
                         })
-                        .value(if self.total != 0 {
-                            (self.network.icmp * 100 / self.total) as u64
+                        .value(if packet_stats.total != 0 {
+                            (packet_stats.network.icmp * 100 / packet_stats.total) as u64
                         } else {
                             0
                         }),
@@ -203,13 +248,13 @@ impl Stats {
                         .label("IPv4".into())
                         .style(Style::new().fg(Color::LightRed))
                         .value_style(Style::new().fg(Color::Black).bg(Color::LightRed))
-                        .text_value(if self.total != 0 {
-                            format!("{}%", self.network.ipv4 * 100 / self.total)
+                        .text_value(if packet_stats.total != 0 {
+                            format!("{}%", packet_stats.network.ipv4 * 100 / packet_stats.total)
                         } else {
                             "0%".to_string()
                         })
-                        .value(if self.total != 0 {
-                            (self.network.ipv4 * 100 / self.total) as u64
+                        .value(if packet_stats.total != 0 {
+                            (packet_stats.network.ipv4 * 100 / packet_stats.total) as u64
                         } else {
                             0
                         }),
@@ -217,13 +262,13 @@ impl Stats {
                         .label("IPv6".into())
                         .style(Style::new().fg(Color::LightCyan))
                         .value_style(Style::new().fg(Color::Black).bg(Color::LightCyan))
-                        .text_value(if self.total != 0 {
-                            format!("{}%", self.network.ipv6 * 100 / self.total)
+                        .text_value(if packet_stats.total != 0 {
+                            format!("{}%", packet_stats.network.ipv6 * 100 / packet_stats.total)
                         } else {
                             "0%".to_string()
                         })
-                        .value(if self.total != 0 {
-                            (self.network.ipv6 * 100 / self.total) as u64
+                        .value(if packet_stats.total != 0 {
+                            (packet_stats.network.ipv6 * 100 / packet_stats.total) as u64
                         } else {
                             0
                         }),
@@ -239,7 +284,7 @@ impl Stats {
             .data(
                 BarGroup::default().bars(
                     &self
-                        .get_top_10()
+                        .get_top_10(packet_stats.addresses.clone())
                         .into_iter()
                         .map(|(ip, (host, count))| {
                             Bar::default()
@@ -247,7 +292,7 @@ impl Stats {
                                 .style(Style::new().fg(Color::LightYellow))
                                 .value_style(Style::new().fg(Color::Black).bg(Color::LightYellow))
                                 .text_value(host.clone().unwrap_or(ip.to_string()))
-                                .value(*count as u64)
+                                .value(count as u64)
                         })
                         .collect::<Vec<Bar>>(),
                 ),
@@ -264,6 +309,9 @@ impl Stats {
         frame.render_widget(transport_chart, transport_block);
         frame.render_widget(network_chart, network_block);
         frame.render_widget(link_chart, link_block);
+
+        self.bandwidth
+            .render(frame, bandwidth_block, network_interface);
     }
 }
 

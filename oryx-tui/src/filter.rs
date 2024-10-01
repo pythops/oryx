@@ -291,7 +291,6 @@ impl Filter {
 
         self.apply();
 
-        //TODO: why ?
         thread::sleep(Duration::from_millis(150));
 
         self.traffic_direction
@@ -650,10 +649,6 @@ impl Filter {
         );
 
         frame.render_widget(table, filter_summury_block);
-
-        if self.show_popup {
-            self.render_update_popup(frame);
-        }
     }
 
     pub fn render_update_popup(&mut self, frame: &mut Frame) {

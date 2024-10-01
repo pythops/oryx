@@ -1,10 +1,9 @@
 mod syn_flood;
 
 use ratatui::{
-    layout::{Alignment, Constraint, Direction, Layout, Margin, Rect},
+    layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Style, Stylize},
-    text::{Line, Span, Text},
-    widgets::{Block, BorderType, Borders, Padding},
+    text::{Span, Text},
     Frame,
 };
 use std::sync::{atomic::Ordering, Arc, Mutex};
@@ -39,40 +38,6 @@ impl Alert {
     }
 
     pub fn render(&self, frame: &mut Frame, block: Rect) {
-        frame.render_widget(
-            Block::default()
-                .title({
-                    Line::from(vec![
-                        Span::from(" Packet ").fg(Color::DarkGray),
-                        Span::from(" Stats ").fg(Color::DarkGray),
-                        {
-                            if self.detected {
-                                if self.flash_count % 12 == 0 {
-                                    Span::from(" Alert 󰐼 ").fg(Color::White).bg(Color::Red)
-                                } else {
-                                    Span::from(" Alert 󰐼 ").bg(Color::Red)
-                                }
-                            } else {
-                                Span::styled(
-                                    " Alert ",
-                                    Style::default().bg(Color::Green).fg(Color::White).bold(),
-                                )
-                            }
-                        },
-                    ])
-                })
-                .title_alignment(Alignment::Left)
-                .padding(Padding::top(1))
-                .borders(Borders::ALL)
-                .style(Style::default())
-                .border_type(BorderType::default())
-                .border_style(Style::default().green()),
-            block.inner(Margin {
-                horizontal: 1,
-                vertical: 0,
-            }),
-        );
-
         if !self.detected {
             let text_block = Layout::default()
                 .direction(Direction::Vertical)
@@ -111,8 +76,21 @@ impl Alert {
         self.syn_flood.render(frame, syn_flood_block);
     }
 
-    pub fn title_span(&self) -> Span<'_> {
-        if self.detected {
+    pub fn title_span(&self, is_focused: bool) -> Span<'_> {
+        if is_focused {
+            if self.detected {
+                if self.flash_count % 12 == 0 {
+                    Span::from(" Alert 󰐼 ").fg(Color::White).bg(Color::Red)
+                } else {
+                    Span::from(" Alert 󰐼 ").bg(Color::Red)
+                }
+            } else {
+                Span::styled(
+                    " Alert ",
+                    Style::default().bg(Color::Green).fg(Color::White).bold(),
+                )
+            }
+        } else if self.detected {
             if self.flash_count % 12 == 0 {
                 Span::from(" Alert 󰐼 ").fg(Color::White).bg(Color::Red)
             } else {
