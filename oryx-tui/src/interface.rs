@@ -14,8 +14,6 @@ use std::{
     path::PathBuf,
 };
 
-use crate::app::FocusedBlock;
-
 #[derive(Debug, Clone)]
 pub struct NetworkInterface {
     pub name: String,
@@ -150,12 +148,7 @@ impl Interface {
         self.state.select(Some(i));
     }
 
-    pub fn render_on_setup(
-        &mut self,
-        frame: &mut Frame,
-        block: Rect,
-        focused_block: &FocusedBlock,
-    ) {
+    pub fn render_on_setup(&mut self, frame: &mut Frame, block: Rect, is_focused: bool) {
         let layout = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([
@@ -225,7 +218,7 @@ impl Interface {
                 .title_style(Style::default().bold().fg(Color::Green))
                 .title_alignment(Alignment::Center)
                 .borders(Borders::LEFT)
-                .border_type(if *focused_block == FocusedBlock::Interface {
+                .border_type(if is_focused {
                     BorderType::Thick
                 } else {
                     BorderType::default()

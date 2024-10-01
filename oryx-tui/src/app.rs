@@ -14,35 +14,29 @@ use std::{
     sync::{Arc, Mutex},
     thread,
 };
-use tui_big_text::{BigText, PixelSize};
 
+use crate::packet::AppPacket;
 use crate::{alert::Alert, bandwidth::Bandwidth, filter::fuzzy, packet::network::IpProto};
 use crate::{filter::fuzzy::Fuzzy, notification::Notification};
 use crate::{filter::Filter, help::Help};
-use crate::{interface::Interface, packet::AppPacket};
 use crate::{packet::network::IpPacket, stats::Stats};
 
 pub type AppResult<T> = std::result::Result<T, Box<dyn error::Error>>;
 
 pub const TICK_RATE: u64 = 40;
 
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub enum FocusedBlock {
-    Interface,
-    TransportFilter,
-    NetworkFilter,
-    LinkFilter,
-    TrafficDirection,
-    Start,
-    Help,
-    Main,
-}
-
 #[derive(Debug, PartialEq)]
 pub enum Section {
     Packet,
     Stats,
     Alerts,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum ActivePopup {
+    Help,
+    UpdateFilters,
+    PacketInfos,
 }
 
 #[derive(Debug)]
@@ -55,10 +49,6 @@ pub struct DataEventHandler {
 pub struct App {
     pub running: bool,
     pub help: Help,
-    pub focused_block: FocusedBlock,
-    // used in setup to know which block to  fall into after discarding help
-    pub previous_focused_block: FocusedBlock,
-    pub interface: Interface,
     pub filter: Filter,
     pub start_sniffing: bool,
     pub packets: Arc<Mutex<Vec<AppPacket>>>,
@@ -70,12 +60,12 @@ pub struct App {
     pub stats: Arc<Mutex<Stats>>,
     pub packet_end_index: usize,
     pub packet_window_size: usize,
-    pub update_filters: bool,
     pub data_channel_sender: kanal::Sender<[u8; RawPacket::LEN]>,
     pub bandwidth: Bandwidth,
-    pub show_packet_infos_popup: bool,
     pub packet_index: Option<usize>,
     pub alert: Alert,
+    pub is_editing: bool,
+    pub active_popup: Option<ActivePopup>,
 }
 
 impl Default for App {
@@ -105,9 +95,6 @@ impl App {
         Self {
             running: true,
             help: Help::new(),
-            focused_block: FocusedBlock::Interface,
-            previous_focused_block: FocusedBlock::Interface,
-            interface: Interface::default(),
             filter: Filter::new(),
             start_sniffing: false,
             packets: packets.clone(),
@@ -119,94 +106,36 @@ impl App {
             stats,
             packet_end_index: 0,
             packet_window_size: 0,
-            update_filters: false,
             data_channel_sender: sender,
             bandwidth: Bandwidth::new(),
-            show_packet_infos_popup: false,
             packet_index: None,
             alert: Alert::new(packets.clone()),
+            is_editing: false,
+            active_popup: None,
         }
     }
 
     pub fn render(&mut self, frame: &mut Frame) {
         // Setup
         if !self.start_sniffing {
-            let (interface_block, filter_block, start_block) = {
-                let chunks = Layout::default()
-                    .direction(Direction::Vertical)
-                    .constraints([
-                        Constraint::Length(self.interface.interfaces.len() as u16 + 6),
-                        Constraint::Fill(1),
-                        Constraint::Length(4),
-                    ])
-                    .margin(1)
-                    .flex(Flex::SpaceAround)
-                    .split(frame.area());
-                (chunks[0], chunks[1], chunks[2])
-            };
-
-            // interfaces
-            self.interface
-                .render_on_setup(frame, interface_block, &self.focused_block);
-
-            // Filters
-            self.filter
-                .render_on_setup(frame, filter_block, &self.focused_block);
-
-            // Start Button
-            let start = BigText::builder()
-                .pixel_size(PixelSize::Sextant)
-                .style(if self.focused_block == FocusedBlock::Start {
-                    Style::default().white().bold()
-                } else {
-                    Style::default().dark_gray()
-                })
-                .lines(vec!["START".into()])
-                .centered()
-                .build();
-            frame.render_widget(start, start_block);
+            self.filter.render_on_setup(frame);
         } else {
             // Sniffing
-            let (settings_block, mode_block) = {
+            let (settings_block, section_block) = {
                 let chunks = Layout::default()
                     .direction(Direction::Vertical)
                     .constraints([Constraint::Length(8), Constraint::Fill(1)])
                     .split(frame.area());
                 (chunks[0], chunks[1])
             };
-            // Settings
-            let (filter_block, interface_block) = {
-                let chunks = Layout::default()
-                    .direction(Direction::Horizontal)
-                    .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
-                    .margin(1)
-                    .split(settings_block);
-                (chunks[0], chunks[1])
-            };
-
-            // Interface
-            self.interface.render_on_sniffing(frame, interface_block);
-
-            // Filters
-            self.filter.render_on_sniffing(frame, filter_block);
 
             // Packets/Stats
             match self.section {
-                Section::Packet => {
-                    self.render_packets_mode(frame, mode_block);
-                    if self.show_packet_infos_popup {
-                        self.render_packet_infos_popup(frame);
-                    }
-                }
-                Section::Stats => self.render_stats_mode(frame, mode_block),
-                Section::Alerts => self.alert.render(frame, mode_block),
+                Section::Packet => self.render_packets_mode(frame, section_block),
+                Section::Stats => self.render_stats_mode(frame, section_block),
+                Section::Alerts => self.alert.render(frame, section_block),
             }
-
-            // Update filters
-
-            if self.update_filters {
-                self.filter.update(frame, mode_block, &self.focused_block);
-            }
+            self.filter.render_on_sniffing(frame, settings_block);
         }
     }
 
@@ -652,11 +581,11 @@ impl App {
         self.bandwidth.render(
             frame,
             bandwidth_block,
-            &self.interface.selected_interface.name.clone(),
+            &self.filter.interface.selected_interface.name.clone(),
         );
     }
 
-    fn render_packet_infos_popup(&self, frame: &mut Frame) {
+    pub fn render_packet_infos_popup(&self, frame: &mut Frame) {
         let layout = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
