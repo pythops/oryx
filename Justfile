@@ -21,3 +21,7 @@ run:
 # Build oryx
 build:
     cargo xtask build
+
+# Profile
+profile:
+    CARGO_PROFILE_RELEASE_DEBUG=true cargo flamegraph  --root --bin oryx
