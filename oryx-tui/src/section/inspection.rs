@@ -195,17 +195,25 @@ impl Inspection {
             if fuzzy.is_enabled() {
                 let chunks = Layout::default()
                     .direction(Direction::Vertical)
-                    .constraints([Constraint::Fill(1), Constraint::Length(3)])
+                    .constraints([
+                        Constraint::Length(1),
+                        Constraint::Fill(1),
+                        Constraint::Length(3),
+                    ])
                     .horizontal_margin(1)
                     .split(block);
-                (chunks[0], chunks[1])
+                (chunks[1], chunks[2])
             } else {
                 let chunks = Layout::default()
                     .direction(Direction::Vertical)
-                    .constraints([Constraint::Fill(1), Constraint::Length(1)])
+                    .constraints([
+                        Constraint::Length(1),
+                        Constraint::Fill(1),
+                        Constraint::Length(1),
+                    ])
                     .horizontal_margin(1)
                     .split(block);
-                (chunks[0], chunks[1])
+                (chunks[1], chunks[2])
             }
         };
 
@@ -485,7 +493,7 @@ impl Inspection {
             .flex(Flex::SpaceBetween)
             .highlight_style(Style::new().bg(ratatui::style::Color::DarkGray))
             .highlight_spacing(HighlightSpacing::Always)
-            .block(Block::default().padding(Padding::top(2)));
+            .block(Block::default().padding(Padding::uniform(1)));
 
         if fuzzy.is_enabled() {
             frame.render_stateful_widget(table, packet_block, &mut fuzzy.scroll_state);
@@ -544,6 +552,7 @@ impl Inspection {
                     Block::new()
                         .borders(Borders::TOP)
                         .title(" Search  ")
+                        .padding(Padding::horizontal(1))
                         .title_style({
                             if fuzzy.is_paused() {
                                 Style::default().bold().yellow()
