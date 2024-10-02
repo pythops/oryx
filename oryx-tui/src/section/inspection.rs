@@ -546,16 +546,23 @@ impl Inspection {
                         .title(" Search  ")
                         .title_style({
                             if fuzzy.is_paused() {
-                                Style::default().bold().green()
-                            } else {
                                 Style::default().bold().yellow()
+                            } else {
+                                Style::default().bold().green()
+                            }
+                        })
+                        .border_type({
+                            if fuzzy.is_paused() {
+                                BorderType::default()
+                            } else {
+                                BorderType::Thick
                             }
                         })
                         .border_style({
                             if fuzzy.is_paused() {
-                                Style::default().green()
-                            } else {
                                 Style::default().yellow()
+                            } else {
+                                Style::default().green()
                             }
                         }),
                 );
