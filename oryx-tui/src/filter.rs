@@ -30,19 +30,40 @@ use tui_big_text::{BigText, PixelSize};
 use crate::{app::AppResult, ebpf::Ebpf, event::Event, interface::Interface};
 
 #[derive(Debug, Clone)]
-pub struct FilterChannel {
+pub struct Channels {
     pub sender: kanal::Sender<(Protocol, bool)>,
     pub receiver: kanal::Receiver<(Protocol, bool)>,
 }
 
-impl FilterChannel {
+#[derive(Debug, Clone)]
+pub struct IoChans {
+    pub ingress: Channels,
+    pub egress: Channels,
+}
+
+impl Channels {
     pub fn new() -> Self {
         let (sender, receiver) = kanal::unbounded();
         Self { sender, receiver }
     }
 }
 
-impl Default for FilterChannel {
+impl IoChans {
+    pub fn new() -> Self {
+        Self {
+            ingress: Channels::new(),
+            egress: Channels::new(),
+        }
+    }
+}
+
+impl Default for Channels {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Default for IoChans {
     fn default() -> Self {
         Self::new()
     }
@@ -65,8 +86,8 @@ pub struct Filter {
     pub transport: TransportFilter,
     pub link: LinkFilter,
     pub traffic_direction: TrafficDirectionFilter,
-    pub ingress_channel: FilterChannel,
-    pub egress_channel: FilterChannel,
+    pub filter_chans: IoChans,
+    pub firewall_chans: IoChans,
     pub focused_block: FocusedBlock,
 }
 
@@ -84,8 +105,8 @@ impl Filter {
             transport: TransportFilter::new(),
             link: LinkFilter::new(),
             traffic_direction: TrafficDirectionFilter::new(),
-            ingress_channel: FilterChannel::new(),
-            egress_channel: FilterChannel::new(),
+            filter_chans: IoChans::new(),
+            firewall_chans: IoChans::new(),
             focused_block: FocusedBlock::Interface,
         }
     }
@@ -113,7 +134,8 @@ impl Filter {
                 iface.clone(),
                 notification_sender.clone(),
                 data_sender.clone(),
-                self.ingress_channel.receiver.clone(),
+                self.filter_chans.ingress.receiver.clone(),
+                self.firewall_chans.ingress.receiver.clone(),
                 self.traffic_direction.terminate_ingress.clone(),
             );
         }
@@ -127,7 +149,8 @@ impl Filter {
                 iface,
                 notification_sender,
                 data_sender,
-                self.egress_channel.receiver.clone(),
+                self.filter_chans.egress.receiver.clone(),
+                self.firewall_chans.egress.receiver.clone(),
                 self.traffic_direction.terminate_egress.clone(),
             );
         }
@@ -151,17 +174,21 @@ impl Filter {
     pub fn sync(&mut self) -> AppResult<()> {
         for protocol in TransportProtocol::all().iter() {
             if self.transport.applied_protocols.contains(protocol) {
-                self.ingress_channel
+                self.filter_chans
+                    .ingress
                     .sender
                     .send((Protocol::Transport(*protocol), false))?;
-                self.egress_channel
+                self.filter_chans
+                    .egress
                     .sender
                     .send((Protocol::Transport(*protocol), false))?;
             } else {
-                self.ingress_channel
+                self.filter_chans
+                    .ingress
                     .sender
                     .send((Protocol::Transport(*protocol), true))?;
-                self.egress_channel
+                self.filter_chans
+                    .egress
                     .sender
                     .send((Protocol::Transport(*protocol), true))?;
             }
@@ -169,17 +196,21 @@ impl Filter {
 
         for protocol in NetworkProtocol::all().iter() {
             if self.network.applied_protocols.contains(protocol) {
-                self.ingress_channel
+                self.filter_chans
+                    .ingress
                     .sender
                     .send((Protocol::Network(*protocol), false))?;
-                self.egress_channel
+                self.filter_chans
+                    .egress
                     .sender
                     .send((Protocol::Network(*protocol), false))?;
             } else {
-                self.ingress_channel
+                self.filter_chans
+                    .ingress
                     .sender
                     .send((Protocol::Network(*protocol), true))?;
-                self.egress_channel
+                self.filter_chans
+                    .egress
                     .sender
                     .send((Protocol::Network(*protocol), true))?;
             }
@@ -187,17 +218,21 @@ impl Filter {
 
         for protocol in LinkProtocol::all().iter() {
             if self.link.applied_protocols.contains(protocol) {
-                self.ingress_channel
+                self.filter_chans
+                    .ingress
                     .sender
                     .send((Protocol::Link(*protocol), false))?;
-                self.egress_channel
+                self.filter_chans
+                    .egress
                     .sender
                     .send((Protocol::Link(*protocol), false))?;
             } else {
-                self.ingress_channel
+                self.filter_chans
+                    .ingress
                     .sender
                     .send((Protocol::Link(*protocol), true))?;
-                self.egress_channel
+                self.filter_chans
+                    .egress
                     .sender
                     .send((Protocol::Link(*protocol), true))?;
             }
@@ -244,7 +279,8 @@ impl Filter {
                 iface,
                 notification_sender.clone(),
                 data_sender.clone(),
-                self.egress_channel.receiver.clone(),
+                self.filter_chans.egress.receiver.clone(),
+                self.firewall_chans.egress.receiver.clone(),
                 self.traffic_direction.terminate_egress.clone(),
             );
         }
@@ -280,7 +316,8 @@ impl Filter {
                 iface,
                 notification_sender.clone(),
                 data_sender.clone(),
-                self.ingress_channel.receiver.clone(),
+                self.filter_chans.ingress.receiver.clone(),
+                self.firewall_chans.ingress.receiver.clone(),
                 self.traffic_direction.terminate_ingress.clone(),
             );
         }

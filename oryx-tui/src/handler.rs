@@ -81,8 +81,9 @@ pub fn handle_key_events(
     }
 
     if app.is_editing {
-        if key_event.code == KeyCode::Esc {
-            app.is_editing = false
+        match key_event.code {
+            KeyCode::Esc | KeyCode::Enter => app.is_editing = false,
+            _ => {}
         }
 
         app.section.handle_keys(key_event);
@@ -121,7 +122,7 @@ pub fn handle_key_events(
             }
         }
 
-        KeyCode::Char('/') => {
+        KeyCode::Char('/') | KeyCode::Char('n') => {
             app.is_editing = true;
             app.section.handle_keys(key_event);
         }
