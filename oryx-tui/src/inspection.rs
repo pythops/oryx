@@ -57,113 +57,130 @@ impl Inspection {
     }
 
     pub fn handle_keys(&mut self, key_event: KeyEvent) {
-        match key_event.code {
-            KeyCode::Esc => {
-                let mut fuzzy = self.fuzzy.lock().unwrap();
-                if fuzzy.is_paused() {
-                    if self.manuall_scroll {
+        let fuzzy_is_enabled = { self.fuzzy.lock().unwrap().is_enabled() };
+
+        if fuzzy_is_enabled {
+            let mut fuzzy = self.fuzzy.lock().unwrap();
+            match key_event.code {
+                KeyCode::Esc => {
+                    if !fuzzy.is_paused() {
+                        fuzzy.pause();
+                    } else if self.manuall_scroll {
                         self.manuall_scroll = false;
                     } else {
                         fuzzy.disable();
                     }
-                } else {
-                    fuzzy.pause();
+                }
+                _ => {
+                    if !fuzzy.is_paused() {
+                        fuzzy
+                            .filter
+                            .handle_event(&crossterm::event::Event::Key(key_event));
+                    } else {
+                        match key_event.code {
+                            KeyCode::Char('j') => {
+                                if !self.manuall_scroll {
+                                    self.manuall_scroll = true;
+                                    fuzzy.packet_end_index = fuzzy.packets.len();
+                                }
+                                fuzzy.scroll_down(self.packet_window_size);
+                            }
+
+                            KeyCode::Char('/') => {
+                                fuzzy.enable();
+                                fuzzy.unpause();
+                            }
+
+                            KeyCode::Char('k') => {
+                                if !self.manuall_scroll {
+                                    self.manuall_scroll = true;
+                                    fuzzy.packet_end_index = fuzzy.packets.len();
+                                }
+                                fuzzy.scroll_up(self.packet_window_size);
+                            }
+
+                            _ => {}
+                        }
+                    }
                 }
             }
-
-            KeyCode::Char('/') => {
-                let mut fuzzy = self.fuzzy.lock().unwrap();
-                fuzzy.enable();
-                fuzzy.unpause();
-            }
-
-            KeyCode::Char('j') => {
-                self.scroll_down();
-            }
-
-            KeyCode::Char('k') => {
-                self.scroll_up();
-            }
-
-            _ => {
-                let mut fuzzy = self.fuzzy.lock().unwrap();
-                if !fuzzy.is_paused() {
-                    fuzzy
-                        .filter
-                        .handle_event(&crossterm::event::Event::Key(key_event));
+        } else {
+            match key_event.code {
+                KeyCode::Esc => {
+                    if self.manuall_scroll {
+                        self.manuall_scroll = false;
+                    }
                 }
+
+                KeyCode::Char('j') => {
+                    self.scroll_down();
+                }
+
+                KeyCode::Char('/') => {
+                    let mut fuzzy = self.fuzzy.lock().unwrap();
+                    fuzzy.enable();
+                    fuzzy.unpause();
+                }
+
+                KeyCode::Char('k') => {
+                    self.scroll_up();
+                }
+
+                _ => {}
             }
         }
     }
 
     pub fn scroll_up(&mut self) {
         let app_packets = self.packets.lock().unwrap();
-        let mut fuzzy = self.fuzzy.lock().unwrap();
         if !self.manuall_scroll {
             self.manuall_scroll = true;
             // Record the last position. Usefull for selecting the packets to display
-            if fuzzy.is_enabled() {
-                fuzzy.packet_end_index = fuzzy.packets.len();
-            } else {
-                self.packet_end_index = app_packets.len();
-            }
+            self.packet_end_index = app_packets.len();
         }
-        if fuzzy.is_enabled() {
-            fuzzy.scroll_up(self.packet_window_size);
-        } else {
-            let i = match self.state.selected() {
-                Some(i) => {
-                    if i > 1 {
-                        i - 1
-                    } else if i == 0 && self.packet_end_index > self.packet_window_size {
-                        // shit the window by one
-                        self.packet_end_index -= 1;
-                        0
-                    } else {
-                        0
-                    }
+        let i = match self.state.selected() {
+            Some(i) => {
+                if i > 1 {
+                    i - 1
+                } else if i == 0 && self.packet_end_index > self.packet_window_size {
+                    // shit the window by one
+                    self.packet_end_index -= 1;
+                    0
+                } else {
+                    0
                 }
-                None => self.packet_window_size,
-            };
+            }
+            None => self.packet_window_size,
+        };
 
-            self.state.select(Some(i));
-        }
+        self.state.select(Some(i));
     }
 
     pub fn scroll_down(&mut self) {
         let app_packets = self.packets.lock().unwrap();
-        let mut fuzzy = self.fuzzy.lock().unwrap();
 
         if !self.manuall_scroll {
             self.manuall_scroll = true;
-            if fuzzy.is_enabled() {
-                fuzzy.packet_end_index = fuzzy.packets.len();
-            } else {
-                self.packet_end_index = app_packets.len();
-            }
+            self.packet_end_index = app_packets.len();
         }
-        if fuzzy.is_enabled() {
-            fuzzy.scroll_down(self.packet_window_size);
-        } else {
-            let i = match self.state.selected() {
-                Some(i) => {
-                    if i < self.packet_window_size - 1 {
-                        i + 1
-                    } else if i == self.packet_window_size - 1
-                        && app_packets.len() > self.packet_end_index
-                    {
-                        // shit the window by one
-                        self.packet_end_index += 1;
-                        i + 1
-                    } else {
-                        i
-                    }
+        let i = match self.state.selected() {
+            Some(i) => {
+                if i < self.packet_window_size - 1 {
+                    i + 1
+                } else if i == self.packet_window_size - 1
+                    && app_packets.len() > self.packet_end_index
+                {
+                    // shit the window by one
+                    self.packet_end_index += 1;
+                    i + 1
+                } else {
+                    i
                 }
-                None => app_packets.len(),
-            };
+            }
+            None => app_packets.len(),
+        };
 
-            self.state.select(Some(i));
-        }
+        self.state.select(Some(i));
     }
 
     pub fn render(&mut self, frame: &mut Frame, block: Rect) {
@@ -525,7 +542,7 @@ impl Inspection {
                 .style(Style::default().white())
                 .block(
                     Block::new()
-                        .borders(Borders::all())
+                        .borders(Borders::TOP)
                         .title(" Search  ")
                         .title_style({
                             if fuzzy.is_paused() {
