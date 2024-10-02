@@ -1,7 +1,7 @@
 use std::{thread, time::Duration};
 
 use crate::{
-    app::{ActivePopup, App, AppResult, EditingBlock},
+    app::{ActivePopup, App, AppResult},
     event::Event,
     export::export,
     filter::direction::TrafficDirection,
@@ -75,9 +75,9 @@ pub fn handle_key_events(
         return Ok(());
     }
 
-    if app.editing_block.is_some() {
+    if app.is_editing {
         if key_event.code == KeyCode::Esc {
-            app.editing_block = None
+            app.is_editing = false
         }
 
         app.section.handle_keys(key_event);
@@ -124,7 +124,7 @@ pub fn handle_key_events(
         }
 
         KeyCode::Char('/') => {
-            app.editing_block = Some(EditingBlock::Fuzzy);
+            app.is_editing = true;
             app.section.handle_keys(key_event);
         }
 

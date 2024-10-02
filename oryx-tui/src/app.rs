@@ -24,12 +24,6 @@ pub enum ActivePopup {
     PacketInfos,
 }
 
-#[non_exhaustive]
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub enum EditingBlock {
-    Fuzzy,
-}
-
 #[derive(Debug)]
 pub struct DataEventHandler {
     pub sender: kanal::Sender<[u8; RawPacket::LEN]>,
@@ -46,7 +40,7 @@ pub struct App {
     pub notifications: Vec<Notification>,
     pub section: Section,
     pub data_channel_sender: kanal::Sender<[u8; RawPacket::LEN]>,
-    pub editing_block: Option<EditingBlock>,
+    pub is_editing: bool,
     pub active_popup: Option<ActivePopup>,
 }
 
@@ -84,7 +78,7 @@ impl App {
             notifications: Vec::new(),
             section: Section::new(packets.clone()),
             data_channel_sender: sender,
-            editing_block: None,
+            is_editing: false,
             active_popup: None,
         }
     }
