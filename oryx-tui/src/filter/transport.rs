@@ -6,8 +6,6 @@ use ratatui::{
     Frame,
 };
 
-use crate::app::FocusedBlock;
-
 #[derive(Debug)]
 pub struct TransportFilter {
     pub state: TableState,
@@ -80,7 +78,7 @@ impl TransportFilter {
         self.selected_protocols.clear();
     }
 
-    pub fn render(&mut self, frame: &mut Frame, block: Rect, focused_block: &FocusedBlock) {
+    pub fn render(&mut self, frame: &mut Frame, block: Rect, is_focused: bool) {
         let layout = Layout::default()
             .direction(Direction::Horizontal)
             .constraints(
@@ -129,7 +127,7 @@ impl TransportFilter {
                 .title_style(Style::default().bold().fg(Color::Green))
                 .title_alignment(Alignment::Center)
                 .borders(Borders::LEFT)
-                .border_type(if *focused_block == FocusedBlock::TransportFilter {
+                .border_type(if is_focused {
                     BorderType::Thick
                 } else {
                     BorderType::default()

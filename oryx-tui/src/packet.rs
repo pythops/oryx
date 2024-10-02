@@ -1,13 +1,14 @@
+pub mod link;
+pub mod network;
+pub mod transport;
+
 use std::{fmt::Display, mem, net::Ipv4Addr};
 
+use link::{ArpPacket, ArpType, MacAddr};
+use network::{IcmpPacket, IcmpType, IpPacket, IpProto, Ipv4Packet, Ipv6Packet};
 use network_types::ip::IpHdr;
 use oryx_common::{ProtoHdr, RawPacket};
-
-use super::{
-    link::{ArpPacket, ArpType, MacAddr},
-    network::{IcmpPacket, IcmpType, IpPacket, IpProto, Ipv4Packet, Ipv6Packet},
-    transport::{TcpPacket, UdpPacket},
-};
+use transport::{TcpPacket, UdpPacket};
 
 #[derive(Debug, Copy, Clone)]
 pub enum AppPacket {

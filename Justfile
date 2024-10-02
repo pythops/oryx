@@ -14,10 +14,18 @@ show interface:
     sudo tc filter show dev $interface ingress
     sudo tc filter show dev $interface egress
 
-# Run oryx
+# Run oryx debug
 run:
+    cargo xtask run
+
+# Run oryx debug
+release:
     cargo xtask run --release
 
 # Build oryx
 build:
     cargo xtask build
+
+# Profile
+profile:
+    CARGO_PROFILE_RELEASE_DEBUG=true cargo flamegraph  --root --bin oryx

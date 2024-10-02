@@ -6,9 +6,9 @@ use std::{
 
 use crate::{
     app::AppResult,
-    packets::{
+    packet::{
         network::{IpPacket, IpProto},
-        packet::AppPacket,
+        AppPacket,
     },
 };
 
