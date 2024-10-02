@@ -480,7 +480,7 @@ impl Inspection {
                     Line::from("Protocol").centered(),
                     {
                         if self.manuall_scroll {
-                            Line::from(" ").centered().yellow()
+                            Line::from("󰹆").centered().yellow()
                         } else {
                             Line::from("").centered()
                         }
