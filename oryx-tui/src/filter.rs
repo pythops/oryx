@@ -67,7 +67,8 @@ pub struct Filter {
     pub traffic_direction: TrafficDirectionFilter,
     pub ingress_channel: FilterChannel,
     pub egress_channel: FilterChannel,
-    focused_block: FocusedBlock,
+    pub focused_block: FocusedBlock,
+    //TODO: maybe remove
     show_popup: bool,
 }
 

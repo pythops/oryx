@@ -78,7 +78,7 @@ impl Inspection {
                             .handle_event(&crossterm::event::Event::Key(key_event));
                     } else {
                         match key_event.code {
-                            KeyCode::Char('j') => {
+                            KeyCode::Char('j') | KeyCode::Down => {
                                 if !self.manuall_scroll {
                                     self.manuall_scroll = true;
                                     fuzzy.packet_end_index = fuzzy.packets.len();
@@ -91,7 +91,7 @@ impl Inspection {
                                 fuzzy.unpause();
                             }
 
-                            KeyCode::Char('k') => {
+                            KeyCode::Char('k') | KeyCode::Up => {
                                 if !self.manuall_scroll {
                                     self.manuall_scroll = true;
                                     fuzzy.packet_end_index = fuzzy.packets.len();
@@ -112,7 +112,7 @@ impl Inspection {
                     }
                 }
 
-                KeyCode::Char('j') => {
+                KeyCode::Char('j') | KeyCode::Down => {
                     self.scroll_down();
                 }
 
@@ -122,7 +122,7 @@ impl Inspection {
                     fuzzy.unpause();
                 }
 
-                KeyCode::Char('k') => {
+                KeyCode::Char('k') | KeyCode::Up => {
                     self.scroll_up();
                 }
 

@@ -4,7 +4,7 @@ use crate::{
     app::{ActivePopup, App, AppResult},
     event::Event,
     export::export,
-    filter::direction::TrafficDirection,
+    filter::FocusedBlock,
     notification::{Notification, NotificationLevel},
 };
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
@@ -18,10 +18,12 @@ pub fn handle_key_events(
     if !app.start_sniffing {
         match key_event.code {
             KeyCode::Enter => {
-                app.filter
-                    .start(sender.clone(), app.data_channel_sender.clone());
+                if app.filter.focused_block == FocusedBlock::Apply {
+                    app.filter
+                        .start(sender.clone(), app.data_channel_sender.clone());
 
-                app.start_sniffing = true;
+                    app.start_sniffing = true;
+                }
             }
 
             KeyCode::Esc => {
@@ -59,9 +61,12 @@ pub fn handle_key_events(
                 }
             }
             KeyCode::Enter => {
-                if popup == ActivePopup::UpdateFilters {
+                if popup == ActivePopup::UpdateFilters
+                    && app.filter.focused_block == FocusedBlock::Apply
+                {
                     app.filter
                         .update(sender.clone(), app.data_channel_sender.clone())?;
+
                     app.active_popup = None;
                 }
             }
@@ -90,20 +95,13 @@ pub fn handle_key_events(
         }
 
         KeyCode::Char('f') => {
-            if app.active_popup.is_none() {
-                app.active_popup = Some(ActivePopup::UpdateFilters);
-                app.filter.trigger();
-            }
+            app.active_popup = Some(ActivePopup::UpdateFilters);
+            app.filter.trigger();
         }
 
         KeyCode::Char('r') => {
             if key_event.modifiers == KeyModifiers::CONTROL {
-                app.filter
-                    .traffic_direction
-                    .terminate(TrafficDirection::Ingress);
-                app.filter
-                    .traffic_direction
-                    .terminate(TrafficDirection::Egress);
+                app.filter.terminate();
                 thread::sleep(Duration::from_millis(150));
                 sender.send(Event::Reset)?;
             }
