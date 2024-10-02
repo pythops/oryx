@@ -68,8 +68,6 @@ pub struct Filter {
     pub ingress_channel: FilterChannel,
     pub egress_channel: FilterChannel,
     pub focused_block: FocusedBlock,
-    //TODO: maybe remove
-    show_popup: bool,
 }
 
 impl Default for Filter {
@@ -89,7 +87,6 @@ impl Filter {
             ingress_channel: FilterChannel::new(),
             egress_channel: FilterChannel::new(),
             focused_block: FocusedBlock::Interface,
-            show_popup: false,
         }
     }
 
@@ -137,8 +134,6 @@ impl Filter {
     }
 
     pub fn trigger(&mut self) {
-        self.show_popup = true;
-
         self.network.selected_protocols = self.network.applied_protocols.clone();
 
         self.transport.selected_protocols = self.transport.applied_protocols.clone();
@@ -302,19 +297,12 @@ impl Filter {
             .store(false, std::sync::atomic::Ordering::Relaxed);
 
         self.sync()?;
-        self.show_popup = false;
 
         Ok(())
     }
 
-    pub fn handle_key_events(&mut self, key_event: KeyEvent) {
+    pub fn handle_key_events(&mut self, key_event: KeyEvent, is_update_popup_displayed: bool) {
         match key_event.code {
-            KeyCode::Esc => {
-                if self.show_popup {
-                    self.show_popup = false
-                }
-            }
-
             KeyCode::Tab => match self.focused_block {
                 FocusedBlock::Interface => {
                     self.focused_block = FocusedBlock::TransportFilter;
@@ -345,7 +333,7 @@ impl Filter {
                 }
 
                 FocusedBlock::Apply => {
-                    if self.show_popup {
+                    if is_update_popup_displayed {
                         self.focused_block = FocusedBlock::TransportFilter;
                     } else {
                         self.focused_block = FocusedBlock::Interface;
@@ -360,7 +348,7 @@ impl Filter {
                 }
 
                 FocusedBlock::TransportFilter => {
-                    if self.show_popup {
+                    if is_update_popup_displayed {
                         self.focused_block = FocusedBlock::Apply;
                         self.transport.state.select(None);
                     } else {

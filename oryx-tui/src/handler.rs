@@ -44,7 +44,7 @@ pub fn handle_key_events(
                 }
             }
             _ => {
-                app.filter.handle_key_events(key_event);
+                app.filter.handle_key_events(key_event, false);
             }
         }
         return Ok(());
@@ -57,7 +57,7 @@ pub fn handle_key_events(
             KeyCode::Esc => {
                 app.active_popup = None;
                 if popup == ActivePopup::UpdateFilters {
-                    app.filter.handle_key_events(key_event);
+                    app.filter.handle_key_events(key_event, true);
                 }
             }
             KeyCode::Enter => {
@@ -72,7 +72,7 @@ pub fn handle_key_events(
             }
             _ => {
                 if popup == ActivePopup::UpdateFilters {
-                    app.filter.handle_key_events(key_event);
+                    app.filter.handle_key_events(key_event, true);
                 }
             }
         }
