@@ -1,7 +1,13 @@
+pub mod alert;
+pub mod inspection;
+pub mod stats;
+
 use std::sync::{Arc, Mutex};
 
+use alert::Alert;
 use crossterm::event::{KeyCode, KeyEvent};
 
+use inspection::Inspection;
 use ratatui::{
     layout::{Alignment, Rect},
     style::{Color, Style, Stylize},
@@ -9,8 +15,9 @@ use ratatui::{
     widgets::{Block, BorderType, Borders, Padding},
     Frame,
 };
+use stats::Stats;
 
-use crate::{alert::Alert, inspection::Inspection, packet::AppPacket, stats::Stats};
+use crate::packet::AppPacket;
 
 #[derive(Debug, PartialEq)]
 pub enum FocusedSection {
