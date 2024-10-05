@@ -131,16 +131,11 @@ impl Section {
                 FocusedSection::Firewall => self.focused_section = FocusedSection::Alerts,
             },
 
-            _ => {
-                if self.focused_section == FocusedSection::Inspection {
-                    self.inspection.handle_keys(key_event);
-                }
-                match self.focused_section {
-                    FocusedSection::Inspection => self.inspection.handle_keys(key_event),
-                    FocusedSection::Firewall => self.firewall.handle_keys(key_event)?,
-                    _ => {}
-                }
-            }
+            _ => match self.focused_section {
+                FocusedSection::Inspection => self.inspection.handle_keys(key_event),
+                FocusedSection::Firewall => self.firewall.handle_keys(key_event)?,
+                _ => {}
+            },
         }
         Ok(())
     }
