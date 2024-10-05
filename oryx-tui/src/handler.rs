@@ -6,7 +6,7 @@ use crate::{
     export::export,
     filter::FocusedBlock,
     notification::{Notification, NotificationLevel},
-    section::{FocusedSection, Section},
+    section::FocusedSection,
 };
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
@@ -62,7 +62,7 @@ pub fn handle_key_events(
                         app.filter.handle_key_events(key_event, true);
                     }
                     ActivePopup::NewFirewallRule => {
-                        app.section.firewall.handle_keys(key_event);
+                        app.section.firewall.handle_keys(key_event)?;
                         app.is_editing = false;
                     }
                     _ => {}
@@ -78,7 +78,9 @@ pub fn handle_key_events(
                     }
                 }
                 ActivePopup::NewFirewallRule => {
-                    app.section.firewall.handle_keys(key_event);
+                    if app.section.firewall.handle_keys(key_event).is_ok() {
+                        app.active_popup = None;
+                    }
                 }
                 _ => {}
             },
@@ -88,7 +90,7 @@ pub fn handle_key_events(
                     app.filter.handle_key_events(key_event, true);
                 }
                 ActivePopup::NewFirewallRule => {
-                    app.section.firewall.handle_keys(key_event);
+                    app.section.firewall.handle_keys(key_event)?;
                 }
                 _ => {}
             },
@@ -103,7 +105,7 @@ pub fn handle_key_events(
             _ => {}
         }
 
-        app.section.handle_keys(key_event);
+        app.section.handle_keys(key_event)?;
         return Ok(());
     }
 
@@ -142,14 +144,14 @@ pub fn handle_key_events(
         KeyCode::Char('/') => {
             if app.section.focused_section == FocusedSection::Inspection {
                 app.is_editing = true;
-                app.section.handle_keys(key_event);
+                app.section.handle_keys(key_event)?;
             }
         }
 
         KeyCode::Char('n') => {
             if app.section.focused_section == FocusedSection::Firewall {
                 app.is_editing = true;
-                app.section.handle_keys(key_event);
+                app.section.handle_keys(key_event)?;
                 app.active_popup = Some(ActivePopup::NewFirewallRule);
             }
         }
@@ -184,7 +186,7 @@ pub fn handle_key_events(
             }
         }
         _ => {
-            app.section.handle_keys(key_event);
+            app.section.handle_keys(key_event)?;
         }
     }
 

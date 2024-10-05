@@ -9,6 +9,8 @@ use ratatui::{
 use std::{net::IpAddr, str::FromStr};
 use tui_input::{backend::crossterm::EventHandler, Input};
 
+use crate::app::AppResult;
+
 #[derive(Debug, Clone)]
 pub struct FirewallRule {
     name: String,
@@ -35,7 +37,7 @@ struct UserInput {
 #[derive(Debug, Clone, Default)]
 struct UserInputField {
     field: Input,
-    error: String,
+    error: Option<String>,
 }
 
 impl UserInput {
@@ -49,34 +51,39 @@ impl UserInput {
     }
 
     fn validate_name(&mut self) {
-        self.name.error.clear();
+        self.name.error = None;
         if self.name.field.value().is_empty() {
-            self.name.error = "Required field.".to_string();
+            self.name.error = Some("Required field.".to_string());
         }
     }
 
     fn validate_ip(&mut self) {
-        self.ip.error.clear();
+        self.ip.error = None;
         if self.ip.field.value().is_empty() {
-            self.ip.error = "Required field.".to_string();
+            self.ip.error = Some("Required field.".to_string());
         } else if IpAddr::from_str(self.ip.field.value()).is_err() {
-            self.ip.error = "Invalid IP Address.".to_string();
+            self.ip.error = Some("Invalid IP Address.".to_string());
         }
     }
 
     fn validate_port(&mut self) {
-        self.port.error.clear();
+        self.port.error = None;
         if self.port.field.value().is_empty() {
-            self.port.error = "Required field.".to_string();
+            self.port.error = Some("Required field.".to_string());
         } else if u16::from_str(self.port.field.value()).is_err() {
-            self.port.error = "Invalid Port number.".to_string();
+            self.port.error = Some("Invalid Port number.".to_string());
         }
     }
 
-    fn validate(&mut self) {
+    fn validate(&mut self) -> AppResult<()> {
         self.validate_name();
         self.validate_ip();
         self.validate_port();
+
+        if self.name.error.is_some() || self.ip.error.is_some() || self.port.error.is_some() {
+            return Err("Valdidation Error".into());
+        }
+        Ok(())
     }
 
     pub fn render(&mut self, frame: &mut Frame) {
@@ -132,9 +139,30 @@ impl UserInput {
             ]),
             Row::new(vec![Cell::new(""), Cell::new(""), Cell::new("")]),
             Row::new(vec![
-                Cell::from(self.name.clone().error).red(),
-                Cell::from(self.ip.clone().error).red(),
-                Cell::from(self.port.clone().error).red(),
+                Cell::from({
+                    if let Some(error) = &self.name.error {
+                        error.to_string()
+                    } else {
+                        String::new()
+                    }
+                })
+                .red(),
+                Cell::from({
+                    if let Some(error) = &self.ip.error {
+                        error.to_string()
+                    } else {
+                        String::new()
+                    }
+                })
+                .red(),
+                Cell::from({
+                    if let Some(error) = &self.port.error {
+                        error.to_string()
+                    } else {
+                        String::new()
+                    }
+                })
+                .red(),
             ]),
         ];
 
@@ -196,7 +224,7 @@ impl Firewall {
         self.rules.retain(|r| r.name != rule.name);
     }
 
-    pub fn handle_keys(&mut self, key_event: KeyEvent) {
+    pub fn handle_keys(&mut self, key_event: KeyEvent) -> AppResult<()> {
         if let Some(user_input) = &mut self.user_input {
             match key_event.code {
                 KeyCode::Esc => {
@@ -205,7 +233,15 @@ impl Firewall {
 
                 KeyCode::Enter => {
                     if let Some(user_input) = &mut self.user_input {
-                        user_input.validate();
+                        user_input.validate()?;
+
+                        let rule = FirewallRule {
+                            name: user_input.name.field.value().to_lowercase(),
+                            ip: IpAddr::from_str(user_input.ip.field.value()).unwrap(),
+                            port: u16::from_str(user_input.port.field.value()).unwrap(),
+                            enabled: false,
+                        };
+                        self.rules.push(rule);
                     }
                 }
 
@@ -269,6 +305,8 @@ impl Firewall {
                 _ => {}
             }
         }
+
+        Ok(())
     }
 
     pub fn render(&self, frame: &mut Frame, block: Rect) {

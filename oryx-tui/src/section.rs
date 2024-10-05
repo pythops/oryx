@@ -19,7 +19,7 @@ use ratatui::{
 };
 use stats::Stats;
 
-use crate::packet::AppPacket;
+use crate::{app::AppResult, packet::AppPacket};
 
 #[derive(Debug, PartialEq)]
 pub enum FocusedSection {
@@ -115,7 +115,7 @@ impl Section {
         }
     }
 
-    pub fn handle_keys(&mut self, key_event: KeyEvent) {
+    pub fn handle_keys(&mut self, key_event: KeyEvent) -> AppResult<()> {
         match key_event.code {
             KeyCode::Tab => match self.focused_section {
                 FocusedSection::Inspection => self.focused_section = FocusedSection::Stats,
@@ -137,10 +137,11 @@ impl Section {
                 }
                 match self.focused_section {
                     FocusedSection::Inspection => self.inspection.handle_keys(key_event),
-                    FocusedSection::Firewall => self.firewall.handle_keys(key_event),
+                    FocusedSection::Firewall => self.firewall.handle_keys(key_event)?,
                     _ => {}
                 }
             }
         }
+        Ok(())
     }
 }
