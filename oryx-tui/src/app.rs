@@ -57,7 +57,7 @@ impl App {
 
         let (sender, receiver) = kanal::unbounded();
 
-        let (firewall_ingress_sender, firewall_egress_receiver) = kanal::unbounded();
+        let (firewall_ingress_sender, firewall_ingress_receiver) = kanal::unbounded();
 
         thread::spawn({
             let packets = packets.clone();
@@ -76,7 +76,7 @@ impl App {
         Self {
             running: true,
             help: Help::new(),
-            filter: Filter::new(firewall_egress_receiver),
+            filter: Filter::new(firewall_ingress_receiver),
             start_sniffing: false,
             packets: packets.clone(),
             notifications: Vec::new(),

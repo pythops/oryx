@@ -204,6 +204,27 @@ impl UserInput {
     }
 }
 
+impl From<FirewallRule> for UserInput {
+    fn from(rule: FirewallRule) -> Self {
+        Self {
+            id: Some(rule.id),
+            name: UserInputField {
+                field: Input::from(rule.name),
+                error: None,
+            },
+            ip: UserInputField {
+                field: Input::from(rule.ip.to_string()),
+                error: None,
+            },
+            port: UserInputField {
+                field: Input::from(rule.port.to_string()),
+                error: None,
+            },
+            focus_input: FocusedInput::Name,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Firewall {
     rules: Vec<FirewallRule>,
@@ -249,14 +270,14 @@ impl Firewall {
                         } else {
                             let rule = FirewallRule {
                                 id: uuid::Uuid::new_v4(),
-                                name: user_input.name.field.value().to_lowercase(),
+                                name: user_input.name.field.to_string(),
                                 ip: IpAddr::from_str(user_input.ip.field.value()).unwrap(),
                                 port: u16::from_str(user_input.port.field.value()).unwrap(),
                                 enabled: false,
                             };
                             self.rules.push(rule);
-                            self.user_input = None;
                         }
+                        self.user_input = None;
                     }
                 }
 
@@ -298,25 +319,7 @@ impl Firewall {
                 KeyCode::Char('e') => {
                     if let Some(index) = self.state.selected() {
                         let rule = self.rules[index].clone();
-
-                        let user_input = UserInput {
-                            id: Some(rule.id),
-                            name: UserInputField {
-                                field: Input::from(rule.name),
-                                error: None,
-                            },
-                            ip: UserInputField {
-                                field: Input::from(rule.ip.to_string()),
-                                error: None,
-                            },
-                            port: UserInputField {
-                                field: Input::from(rule.port.to_string()),
-                                error: None,
-                            },
-                            focus_input: FocusedInput::Name,
-                        };
-
-                        self.user_input = Some(user_input);
+                        self.user_input = Some(rule.into());
                     }
                 }
 
