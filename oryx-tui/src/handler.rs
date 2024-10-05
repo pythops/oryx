@@ -80,6 +80,7 @@ pub fn handle_key_events(
                 ActivePopup::NewFirewallRule => {
                     if app.section.firewall.handle_keys(key_event).is_ok() {
                         app.active_popup = None;
+                        app.is_editing = false;
                     }
                 }
                 _ => {}

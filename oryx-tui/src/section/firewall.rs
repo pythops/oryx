@@ -242,6 +242,7 @@ impl Firewall {
                             enabled: false,
                         };
                         self.rules.push(rule);
+                        self.user_input = None;
                     }
                 }
 
@@ -271,6 +272,18 @@ impl Firewall {
             match key_event.code {
                 KeyCode::Char('n') => {
                     self.add_rule();
+                }
+
+                KeyCode::Char(' ') => {
+                    if let Some(index) = self.state.selected() {
+                        self.rules[index].enabled = !self.rules[index].enabled;
+                    }
+                }
+
+                KeyCode::Char('d') => {
+                    if let Some(index) = self.state.selected() {
+                        self.rules.remove(index);
+                    }
                 }
 
                 KeyCode::Char('j') | KeyCode::Down => {
@@ -309,7 +322,7 @@ impl Firewall {
         Ok(())
     }
 
-    pub fn render(&self, frame: &mut Frame, block: Rect) {
+    pub fn render(&mut self, frame: &mut Frame, block: Rect) {
         if self.rules.is_empty() {
             let text_block = Layout::default()
                 .direction(Direction::Vertical)
@@ -355,9 +368,13 @@ impl Firewall {
             ])
         });
 
+        if self.state.selected().is_none() && !self.rules.is_empty() {
+            self.state.select(Some(0));
+        }
+
         let table = Table::new(rows, widths)
             .column_spacing(2)
-            .flex(Flex::SpaceAround)
+            .flex(Flex::SpaceBetween)
             .highlight_style(Style::default().bg(Color::DarkGray))
             .header(
                 Row::new(vec![
@@ -370,12 +387,13 @@ impl Firewall {
                 .bottom_margin(1),
             );
 
-        frame.render_widget(
+        frame.render_stateful_widget(
             table,
             block.inner(Margin {
                 horizontal: 2,
                 vertical: 2,
             }),
+            &mut self.state,
         );
     }
 
