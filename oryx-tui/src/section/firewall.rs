@@ -117,7 +117,7 @@ impl UserInput {
                             Color::DarkGray
                         }
                     })
-                    .fg(Color::White),
+                    .fg(Color::Black),
                 Cell::from(self.ip.field.to_string())
                     .bg({
                         if self.focus_input == FocusedInput::Ip {
@@ -126,7 +126,7 @@ impl UserInput {
                             Color::DarkGray
                         }
                     })
-                    .fg(Color::White),
+                    .fg(Color::Black),
                 Cell::from(self.port.field.to_string())
                     .bg({
                         if self.focus_input == FocusedInput::Port {
@@ -135,7 +135,7 @@ impl UserInput {
                             Color::DarkGray
                         }
                     })
-                    .fg(Color::White),
+                    .fg(Color::Black),
             ]),
             Row::new(vec![Cell::new(""), Cell::new(""), Cell::new("")]),
             Row::new(vec![
