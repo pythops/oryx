@@ -344,7 +344,7 @@ impl Firewall {
             Constraint::Max(30),
             Constraint::Max(20),
             Constraint::Length(10),
-            Constraint::Length(10),
+            Constraint::Length(14),
         ];
 
         let rows = self.rules.iter().map(|rule| {
