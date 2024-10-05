@@ -578,10 +578,14 @@ impl Filter {
         let (filter_summury_block, interface_block) = {
             let chunks = Layout::default()
                 .direction(Direction::Horizontal)
-                .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
-                .margin(1)
+                .constraints([
+                    Constraint::Percentage(50),
+                    Constraint::Length(1),
+                    Constraint::Percentage(50),
+                ])
                 .split(block);
-            (chunks[0], chunks[1])
+
+            (chunks[0], chunks[2])
         };
 
         self.interface.render_on_sniffing(frame, interface_block);

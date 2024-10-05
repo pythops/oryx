@@ -93,7 +93,7 @@ impl App {
             let (settings_block, section_block) = {
                 let chunks = Layout::default()
                     .direction(Direction::Vertical)
-                    .constraints([Constraint::Length(8), Constraint::Fill(1)])
+                    .constraints([Constraint::Length(6), Constraint::Fill(1)])
                     .split(frame.area());
                 (chunks[0], chunks[1])
             };
