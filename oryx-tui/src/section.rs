@@ -54,32 +54,32 @@ impl Section {
             FocusedSection::Inspection => {
                 if is_focused {
                     Span::styled(
-                        " Inspection ",
+                        "  Inspection 󰏖   ",
                         Style::default().bg(Color::Green).fg(Color::White).bold(),
                     )
                 } else {
-                    Span::from(" Inspection ").fg(Color::DarkGray)
+                    Span::from("  Inspection 󰏖   ").fg(Color::DarkGray)
                 }
             }
             FocusedSection::Stats => {
                 if is_focused {
                     Span::styled(
-                        " Stats ",
+                        "  Stats 󱕍   ",
                         Style::default().bg(Color::Green).fg(Color::White).bold(),
                     )
                 } else {
-                    Span::from(" Stats ").fg(Color::DarkGray)
+                    Span::from("  Stats 󱕍   ").fg(Color::DarkGray)
                 }
             }
             FocusedSection::Alerts => self.alert.title_span(is_focused),
             FocusedSection::Firewall => {
                 if is_focused {
                     Span::styled(
-                        " Firewall ",
+                        "  Firewall 󰞀   ",
                         Style::default().bg(Color::Green).fg(Color::White).bold(),
                     )
                 } else {
-                    Span::from(" Firewall ").fg(Color::DarkGray)
+                    Span::from("  Firewall 󰞀   ").fg(Color::DarkGray)
                 }
             }
         }

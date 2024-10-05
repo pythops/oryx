@@ -80,24 +80,24 @@ impl Alert {
         if is_focused {
             if self.detected {
                 if self.flash_count % 12 == 0 {
-                    Span::from(" Alert 󰐼 ").fg(Color::White).bg(Color::Red)
+                    Span::from("  Alert 󰐼   ").fg(Color::White).bg(Color::Red)
                 } else {
-                    Span::from(" Alert 󰐼 ").bg(Color::Red)
+                    Span::from("  Alert 󰐼   ").bg(Color::Red)
                 }
             } else {
                 Span::styled(
-                    " Alert ",
+                    "  Alert 󰀦   ",
                     Style::default().bg(Color::Green).fg(Color::White).bold(),
                 )
             }
         } else if self.detected {
             if self.flash_count % 12 == 0 {
-                Span::from(" Alert 󰐼 ").fg(Color::White).bg(Color::Red)
+                Span::from("  Alert 󰐼   ").fg(Color::White).bg(Color::Red)
             } else {
-                Span::from(" Alert 󰐼 ").fg(Color::Red)
+                Span::from("  Alert 󰐼   ").fg(Color::Red)
             }
         } else {
-            Span::from(" Alert ").fg(Color::DarkGray)
+            Span::from("  Alert 󰀦   ").fg(Color::DarkGray)
         }
     }
 }

@@ -378,10 +378,10 @@ impl Firewall {
             .highlight_style(Style::default().bg(Color::DarkGray))
             .header(
                 Row::new(vec![
-                    Line::from("Name").centered(),
-                    Line::from("IP").centered(),
-                    Line::from("Port").centered(),
-                    Line::from("Status").centered(),
+                    Line::from("Name").centered().blue(),
+                    Line::from("IP").centered().blue(),
+                    Line::from("Port").centered().blue(),
+                    Line::from("Status").centered().blue(),
                 ])
                 .style(Style::new().bold())
                 .bottom_margin(1),
