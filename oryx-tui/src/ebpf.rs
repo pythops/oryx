@@ -17,6 +17,7 @@ use oryx_common::{protocols::Protocol, RawPacket};
 use crate::{
     event::Event,
     notification::{Notification, NotificationLevel},
+    section::firewall::FirewallRule,
 };
 use mio::{event::Source, unix::SourceFd, Events, Interest, Poll, Registry, Token};
 
@@ -67,7 +68,7 @@ impl Ebpf {
         notification_sender: kanal::Sender<Event>,
         data_sender: kanal::Sender<[u8; RawPacket::LEN]>,
         filter_channel_receiver: kanal::Receiver<(Protocol, bool)>,
-        _firewall_channel_receiver: kanal::Receiver<(Protocol, bool)>,
+        _firewall_ingress_receiver: kanal::Receiver<FirewallRule>,
         terminate: Arc<AtomicBool>,
     ) {
         thread::spawn({

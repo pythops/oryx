@@ -149,7 +149,7 @@ pub fn handle_key_events(
             }
         }
 
-        KeyCode::Char('n') => {
+        KeyCode::Char('n') | KeyCode::Char('e') => {
             if app.section.focused_section == FocusedSection::Firewall {
                 app.is_editing = true;
                 app.section.handle_keys(key_event)?;

@@ -56,6 +56,9 @@ impl App {
         let packets = Arc::new(Mutex::new(Vec::with_capacity(AppPacket::LEN * 1024 * 1024)));
 
         let (sender, receiver) = kanal::unbounded();
+
+        let (firewall_ingress_sender, firewall_egress_receiver) = kanal::unbounded();
+
         thread::spawn({
             let packets = packets.clone();
             move || loop {
@@ -73,11 +76,11 @@ impl App {
         Self {
             running: true,
             help: Help::new(),
-            filter: Filter::new(),
+            filter: Filter::new(firewall_egress_receiver),
             start_sniffing: false,
             packets: packets.clone(),
             notifications: Vec::new(),
-            section: Section::new(packets.clone()),
+            section: Section::new(packets.clone(), firewall_ingress_sender),
             data_channel_sender: sender,
             is_editing: false,
             active_popup: None,

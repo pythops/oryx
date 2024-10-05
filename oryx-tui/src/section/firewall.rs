@@ -8,11 +8,13 @@ use ratatui::{
 };
 use std::{net::IpAddr, str::FromStr};
 use tui_input::{backend::crossterm::EventHandler, Input};
+use uuid;
 
 use crate::app::AppResult;
 
 #[derive(Debug, Clone)]
 pub struct FirewallRule {
+    id: uuid::Uuid,
     name: String,
     enabled: bool,
     ip: IpAddr,
@@ -28,6 +30,7 @@ pub enum FocusedInput {
 
 #[derive(Debug, Clone)]
 struct UserInput {
+    id: Option<uuid::Uuid>,
     pub name: UserInputField,
     pub ip: UserInputField,
     pub port: UserInputField,
@@ -43,6 +46,7 @@ struct UserInputField {
 impl UserInput {
     pub fn new() -> Self {
         Self {
+            id: None,
             name: UserInputField::default(),
             ip: UserInputField::default(),
             port: UserInputField::default(),
@@ -187,7 +191,7 @@ impl UserInput {
             .highlight_spacing(HighlightSpacing::Always)
             .block(
                 Block::default()
-                    .title(" New Firewall Rule ")
+                    .title(" Firewall Rule ")
                     .title_alignment(ratatui::layout::Alignment::Center)
                     .borders(Borders::all())
                     .border_type(ratatui::widgets::BorderType::Thick)
@@ -200,19 +204,21 @@ impl UserInput {
     }
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct Firewall {
     rules: Vec<FirewallRule>,
     state: TableState,
     user_input: Option<UserInput>,
+    ingress_sender: kanal::Sender<FirewallRule>,
 }
 
 impl Firewall {
-    pub fn new() -> Self {
+    pub fn new(ingress_sender: kanal::Sender<FirewallRule>) -> Self {
         Self {
             rules: Vec::new(),
             state: TableState::default(),
             user_input: None,
+            ingress_sender,
         }
     }
 
@@ -235,14 +241,22 @@ impl Firewall {
                     if let Some(user_input) = &mut self.user_input {
                         user_input.validate()?;
 
-                        let rule = FirewallRule {
-                            name: user_input.name.field.value().to_lowercase(),
-                            ip: IpAddr::from_str(user_input.ip.field.value()).unwrap(),
-                            port: u16::from_str(user_input.port.field.value()).unwrap(),
-                            enabled: false,
-                        };
-                        self.rules.push(rule);
-                        self.user_input = None;
+                        if let Some(id) = user_input.id {
+                            let rule = self.rules.iter_mut().find(|rule| rule.id == id).unwrap();
+                            rule.name = user_input.name.field.to_string();
+                            rule.ip = IpAddr::from_str(user_input.ip.field.value()).unwrap();
+                            rule.port = u16::from_str(user_input.port.field.value()).unwrap();
+                        } else {
+                            let rule = FirewallRule {
+                                id: uuid::Uuid::new_v4(),
+                                name: user_input.name.field.value().to_lowercase(),
+                                ip: IpAddr::from_str(user_input.ip.field.value()).unwrap(),
+                                port: u16::from_str(user_input.port.field.value()).unwrap(),
+                                enabled: false,
+                            };
+                            self.rules.push(rule);
+                            self.user_input = None;
+                        }
                     }
                 }
 
@@ -277,6 +291,32 @@ impl Firewall {
                 KeyCode::Char(' ') => {
                     if let Some(index) = self.state.selected() {
                         self.rules[index].enabled = !self.rules[index].enabled;
+                        self.ingress_sender.send(self.rules[index].clone())?
+                    }
+                }
+
+                KeyCode::Char('e') => {
+                    if let Some(index) = self.state.selected() {
+                        let rule = self.rules[index].clone();
+
+                        let user_input = UserInput {
+                            id: Some(rule.id),
+                            name: UserInputField {
+                                field: Input::from(rule.name),
+                                error: None,
+                            },
+                            ip: UserInputField {
+                                field: Input::from(rule.ip.to_string()),
+                                error: None,
+                            },
+                            port: UserInputField {
+                                field: Input::from(rule.port.to_string()),
+                                error: None,
+                            },
+                            focus_input: FocusedInput::Name,
+                        };
+
+                        self.user_input = Some(user_input);
                     }
                 }
 

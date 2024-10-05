@@ -27,7 +27,9 @@ use ratatui::{
 use transport::TransportFilter;
 use tui_big_text::{BigText, PixelSize};
 
-use crate::{app::AppResult, ebpf::Ebpf, event::Event, interface::Interface};
+use crate::{
+    app::AppResult, ebpf::Ebpf, event::Event, interface::Interface, section::firewall::FirewallRule,
+};
 
 #[derive(Debug, Clone)]
 pub struct Channels {
@@ -89,16 +91,11 @@ pub struct Filter {
     pub filter_chans: IoChans,
     pub firewall_chans: IoChans,
     pub focused_block: FocusedBlock,
-}
-
-impl Default for Filter {
-    fn default() -> Self {
-        Self::new()
-    }
+    pub firewall_ingress_receiver: kanal::Receiver<FirewallRule>,
 }
 
 impl Filter {
-    pub fn new() -> Self {
+    pub fn new(firewall_ingress_receiver: kanal::Receiver<FirewallRule>) -> Self {
         Self {
             interface: Interface::new(),
             network: NetworkFilter::new(),
@@ -108,6 +105,7 @@ impl Filter {
             filter_chans: IoChans::new(),
             firewall_chans: IoChans::new(),
             focused_block: FocusedBlock::Interface,
+            firewall_ingress_receiver,
         }
     }
 
@@ -135,7 +133,7 @@ impl Filter {
                 notification_sender.clone(),
                 data_sender.clone(),
                 self.filter_chans.ingress.receiver.clone(),
-                self.firewall_chans.ingress.receiver.clone(),
+                self.firewall_ingress_receiver.clone(),
                 self.traffic_direction.terminate_ingress.clone(),
             );
         }
@@ -317,7 +315,7 @@ impl Filter {
                 notification_sender.clone(),
                 data_sender.clone(),
                 self.filter_chans.ingress.receiver.clone(),
-                self.firewall_chans.ingress.receiver.clone(),
+                self.firewall_ingress_receiver.clone(),
                 self.traffic_direction.terminate_ingress.clone(),
             );
         }
