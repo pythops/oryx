@@ -67,7 +67,7 @@ impl Ebpf {
         notification_sender: kanal::Sender<Event>,
         data_sender: kanal::Sender<[u8; RawPacket::LEN]>,
         filter_channel_receiver: kanal::Receiver<(Protocol, bool)>,
-        firewall_channel_receiver: kanal::Receiver<(Protocol, bool)>,
+        _firewall_channel_receiver: kanal::Receiver<(Protocol, bool)>,
         terminate: Arc<AtomicBool>,
     ) {
         thread::spawn({
@@ -221,7 +221,7 @@ impl Ebpf {
         notification_sender: kanal::Sender<Event>,
         data_sender: kanal::Sender<[u8; RawPacket::LEN]>,
         filter_channel_receiver: kanal::Receiver<(Protocol, bool)>,
-        firewall_channel_receiver: kanal::Receiver<(Protocol, bool)>,
+        _firewall_channel_receiver: kanal::Receiver<(Protocol, bool)>,
         terminate: Arc<AtomicBool>,
     ) {
         thread::spawn({
