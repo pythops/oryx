@@ -31,7 +31,7 @@ pub enum FocusedSection {
 
 #[derive(Debug)]
 pub struct Section {
-    focused_section: FocusedSection,
+    pub focused_section: FocusedSection,
     pub inspection: Inspection,
     pub stats: Stats,
     pub alert: Alert,
@@ -111,7 +111,7 @@ impl Section {
             FocusedSection::Inspection => self.inspection.render(frame, block),
             FocusedSection::Stats => self.stats.render(frame, block, network_interace),
             FocusedSection::Alerts => self.alert.render(frame, block),
-            FocusedSection::Firewall => self.alert.render(frame, block),
+            FocusedSection::Firewall => self.firewall.render(frame, block),
         }
     }
 
@@ -134,6 +134,11 @@ impl Section {
             _ => {
                 if self.focused_section == FocusedSection::Inspection {
                     self.inspection.handle_keys(key_event);
+                }
+                match self.focused_section {
+                    FocusedSection::Inspection => self.inspection.handle_keys(key_event),
+                    FocusedSection::Firewall => self.firewall.handle_keys(key_event),
+                    _ => {}
                 }
             }
         }

@@ -6,6 +6,7 @@ use crate::{
     export::export,
     filter::FocusedBlock,
     notification::{Notification, NotificationLevel},
+    section::{FocusedSection, Section},
 };
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
@@ -56,25 +57,41 @@ pub fn handle_key_events(
         match key_event.code {
             KeyCode::Esc => {
                 app.active_popup = None;
-                if popup == ActivePopup::UpdateFilters {
-                    app.filter.handle_key_events(key_event, true);
+                match popup {
+                    ActivePopup::UpdateFilters => {
+                        app.filter.handle_key_events(key_event, true);
+                    }
+                    ActivePopup::NewFirewallRule => {
+                        app.section.firewall.handle_keys(key_event);
+                        app.is_editing = false;
+                    }
+                    _ => {}
                 }
             }
-            KeyCode::Enter => {
-                if popup == ActivePopup::UpdateFilters
-                    && app.filter.focused_block == FocusedBlock::Apply
-                {
-                    app.filter
-                        .update(sender.clone(), app.data_channel_sender.clone())?;
+            KeyCode::Enter => match popup {
+                ActivePopup::UpdateFilters => {
+                    if app.filter.focused_block == FocusedBlock::Apply {
+                        app.filter
+                            .update(sender.clone(), app.data_channel_sender.clone())?;
 
-                    app.active_popup = None;
+                        app.active_popup = None;
+                    }
                 }
-            }
-            _ => {
-                if popup == ActivePopup::UpdateFilters {
+                ActivePopup::NewFirewallRule => {
+                    app.section.firewall.handle_keys(key_event);
+                }
+                _ => {}
+            },
+
+            _ => match popup {
+                ActivePopup::UpdateFilters => {
                     app.filter.handle_key_events(key_event, true);
                 }
-            }
+                ActivePopup::NewFirewallRule => {
+                    app.section.firewall.handle_keys(key_event);
+                }
+                _ => {}
+            },
         }
 
         return Ok(());
@@ -122,9 +139,19 @@ pub fn handle_key_events(
             }
         }
 
-        KeyCode::Char('/') | KeyCode::Char('n') => {
-            app.is_editing = true;
-            app.section.handle_keys(key_event);
+        KeyCode::Char('/') => {
+            if app.section.focused_section == FocusedSection::Inspection {
+                app.is_editing = true;
+                app.section.handle_keys(key_event);
+            }
+        }
+
+        KeyCode::Char('n') => {
+            if app.section.focused_section == FocusedSection::Firewall {
+                app.is_editing = true;
+                app.section.handle_keys(key_event);
+                app.active_popup = Some(ActivePopup::NewFirewallRule);
+            }
         }
 
         KeyCode::Char('i') => {

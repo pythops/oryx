@@ -1,61 +1,23 @@
-use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::event::{Event, KeyCode, KeyEvent};
 use ratatui::{
-    layout::{Alignment, Constraint, Flex, Rect},
-    style::{Style, Stylize},
-    text::Line,
-    widgets::{Block, Borders, Padding, Row, Table},
+    layout::{Constraint, Direction, Flex, Layout, Margin, Rect},
+    style::{Color, Style, Stylize},
+    text::{Line, Text},
+    widgets::{Block, Borders, Cell, Clear, HighlightSpacing, Padding, Row, Table, TableState},
     Frame,
 };
-use std::net::IpAddr;
-use std::str::FromStr;
+use std::{net::IpAddr, str::FromStr};
 use tui_input::{backend::crossterm::EventHandler, Input};
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct FirewallRule {
     name: String,
     enabled: bool,
-    ip: Option<IpAddr>,
-    port: Option<u16>,
-}
-impl FirewallRule {
-    pub fn new() -> Self {
-        Self {
-            name: "".to_string(),
-            enabled: false,
-            ip: None,
-            port: None,
-        }
-    }
-
-    pub fn update(&mut self, inputs: Inputs) {
-        match inputs.focus {
-            FocusedInput::Name => self.name = inputs.name.value().into(),
-            FocusedInput::Ip => {
-                let ip = IpAddr::from_str(inputs.ip.value());
-                match ip {
-                    Ok(ipaddr) => self.ip = Some(ipaddr),
-                    _ => {} //TODO: error notif
-                }
-            }
-            FocusedInput::Port => {
-                let p = String::from(inputs.port).parse::<u16>();
-                match p {
-                    Ok(port) => self.port = Some(port),
-                    _ => {} //TODO: error notif
-                }
-            }
-        }
-    }
+    ip: IpAddr,
+    port: u16,
 }
 
-#[derive(Debug, Clone)]
-pub struct Firewall {
-    rules: Vec<FirewallRule>,
-    is_editing: bool,
-    focused_rule: Option<FirewallRule>,
-    inputs: Inputs,
-}
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum FocusedInput {
     Name,
     Ip,
@@ -63,232 +25,325 @@ pub enum FocusedInput {
 }
 
 #[derive(Debug, Clone)]
-struct Inputs {
-    pub name: Input,
-    pub ip: Input,
-    pub port: Input,
-    pub focus: FocusedInput,
+struct UserInput {
+    pub name: UserInputField,
+    pub ip: UserInputField,
+    pub port: UserInputField,
+    focus_input: FocusedInput,
 }
 
-impl Inputs {
+#[derive(Debug, Clone, Default)]
+struct UserInputField {
+    field: Input,
+    error: String,
+}
+
+impl UserInput {
     pub fn new() -> Self {
         Self {
-            name: Input::new("".to_string()),
-            ip: Input::new("".to_string()),
-            port: Input::new("".to_string()),
-            focus: FocusedInput::Name,
+            name: UserInputField::default(),
+            ip: UserInputField::default(),
+            port: UserInputField::default(),
+            focus_input: FocusedInput::Name,
         }
     }
-    pub fn reset(&mut self) {
-        self.name.reset();
-        self.ip.reset();
-        self.port.reset();
+
+    fn validate_name(&mut self) {
+        self.name.error.clear();
+        if self.name.field.value().is_empty() {
+            self.name.error = "Required field.".to_string();
+        }
     }
 
-    pub fn handle_event(&mut self, event: &crossterm::event::Event) {
-        let _ = match self.focus {
-            FocusedInput::Name => self.name.handle_event(event),
-            FocusedInput::Ip => self.ip.handle_event(event),
-            FocusedInput::Port => self.port.handle_event(event),
-        };
+    fn validate_ip(&mut self) {
+        self.ip.error.clear();
+        if self.ip.field.value().is_empty() {
+            self.ip.error = "Required field.".to_string();
+        } else if IpAddr::from_str(self.ip.field.value()).is_err() {
+            self.ip.error = "Invalid IP Address.".to_string();
+        }
     }
-    pub fn render(&mut self, frame: &mut Frame, block: Rect) {
-        let edited_value = match self.focus {
-            FocusedInput::Name => self.name.value(),
-            FocusedInput::Ip => self.ip.value(),
-            FocusedInput::Port => self.port.value(),
-        };
 
-        Paragraph::new(format!("> {}", edited_value))
-            .alignment(Alignment::Left)
-            .style(Style::default().white())
+    fn validate_port(&mut self) {
+        self.port.error.clear();
+        if self.port.field.value().is_empty() {
+            self.port.error = "Required field.".to_string();
+        } else if u16::from_str(self.port.field.value()).is_err() {
+            self.port.error = "Invalid Port number.".to_string();
+        }
+    }
+
+    fn validate(&mut self) {
+        self.validate_name();
+        self.validate_ip();
+        self.validate_port();
+    }
+
+    pub fn render(&mut self, frame: &mut Frame) {
+        let layout = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Fill(1),
+                Constraint::Length(9),
+                Constraint::Fill(1),
+            ])
+            .flex(ratatui::layout::Flex::SpaceBetween)
+            .split(frame.area());
+
+        let block = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Fill(1),
+                Constraint::Max(80),
+                Constraint::Fill(1),
+            ])
+            .flex(ratatui::layout::Flex::SpaceBetween)
+            .split(layout[1])[1];
+
+        let rows = [
+            Row::new(vec![
+                Cell::from(self.name.field.to_string())
+                    .bg({
+                        if self.focus_input == FocusedInput::Name {
+                            Color::Gray
+                        } else {
+                            Color::DarkGray
+                        }
+                    })
+                    .fg(Color::White),
+                Cell::from(self.ip.field.to_string())
+                    .bg({
+                        if self.focus_input == FocusedInput::Ip {
+                            Color::Gray
+                        } else {
+                            Color::DarkGray
+                        }
+                    })
+                    .fg(Color::White),
+                Cell::from(self.port.field.to_string())
+                    .bg({
+                        if self.focus_input == FocusedInput::Port {
+                            Color::Gray
+                        } else {
+                            Color::DarkGray
+                        }
+                    })
+                    .fg(Color::White),
+            ]),
+            Row::new(vec![Cell::new(""), Cell::new(""), Cell::new("")]),
+            Row::new(vec![
+                Cell::from(self.name.clone().error).red(),
+                Cell::from(self.ip.clone().error).red(),
+                Cell::from(self.port.clone().error).red(),
+            ]),
+        ];
+
+        let widths = [
+            Constraint::Percentage(33),
+            Constraint::Percentage(33),
+            Constraint::Percentage(33),
+        ];
+
+        let table = Table::new(rows, widths)
+            .header(
+                Row::new(vec![
+                    Line::from("Name").centered(),
+                    Line::from("IP").centered(),
+                    Line::from("Port").centered(),
+                ])
+                .style(Style::new().bold())
+                .bottom_margin(1),
+            )
+            .column_spacing(2)
+            .flex(Flex::SpaceBetween)
+            .highlight_spacing(HighlightSpacing::Always)
             .block(
-                Block::new()
-                    .borders(Borders::TOP)
-                    .title(" Search  ")
-                    .padding(Padding::horizontal(1))
-                    .title_style({ Style::default().bold().yellow() }),
+                Block::default()
+                    .title(" New Firewall Rule ")
+                    .title_alignment(ratatui::layout::Alignment::Center)
+                    .borders(Borders::all())
+                    .border_type(ratatui::widgets::BorderType::Thick)
+                    .border_style(Style::default().green())
+                    .padding(Padding::uniform(1)),
             );
 
-        frame.render_widget(fuzzy, fuzzy_block);
+        frame.render_widget(Clear, block);
+        frame.render_widget(table, block);
     }
 }
 
-impl From<FirewallRule> for Inputs {
-    fn from(rule: FirewallRule) -> Self {
-        Self {
-            name: Input::new(rule.name),
-            ip: Input::new(match rule.ip {
-                Some(ip) => ip.to_string(),
-                None => "".to_string(),
-            }),
-            port: Input::new(match rule.port {
-                Some(port) => port.to_string(),
-                None => "".to_string(),
-            }),
-            focus: FocusedInput::Name,
-        }
-    }
+#[derive(Debug, Clone, Default)]
+pub struct Firewall {
+    rules: Vec<FirewallRule>,
+    state: TableState,
+    user_input: Option<UserInput>,
 }
 
 impl Firewall {
     pub fn new() -> Self {
         Self {
             rules: Vec::new(),
-            is_editing: false,
-            focused_rule: None,
-            inputs: Inputs::new(),
+            state: TableState::default(),
+            user_input: None,
         }
     }
 
-    pub fn add_rule(&mut self, rule: FirewallRule) {
-        if self.rules.iter().any(|r| r.name == rule.name) {
-            return;
-        }
-        self.rules.push(rule);
+    pub fn add_rule(&mut self) {
+        self.user_input = Some(UserInput::new());
     }
+
     pub fn remove_rule(&mut self, rule: &FirewallRule) {
         self.rules.retain(|r| r.name != rule.name);
     }
+
     pub fn handle_keys(&mut self, key_event: KeyEvent) {
-        if self.is_editing {
+        if let Some(user_input) = &mut self.user_input {
             match key_event.code {
                 KeyCode::Esc => {
-                    self.is_editing = false;
-                    self.inputs.reset()
+                    self.user_input = None;
                 }
+
                 KeyCode::Enter => {
-                    self.is_editing = false;
-                    self.focused_rule
-                        .as_mut()
-                        .unwrap()
-                        .update(self.inputs.clone());
-                    self.inputs.reset();
+                    if let Some(user_input) = &mut self.user_input {
+                        user_input.validate();
+                    }
                 }
-                _ => {
-                    self.inputs
-                        .handle_event(&crossterm::event::Event::Key(key_event));
+
+                KeyCode::Tab => {
+                    if let Some(user_input) = &mut self.user_input {
+                        match user_input.focus_input {
+                            FocusedInput::Name => user_input.focus_input = FocusedInput::Ip,
+                            FocusedInput::Ip => user_input.focus_input = FocusedInput::Port,
+                            FocusedInput::Port => user_input.focus_input = FocusedInput::Name,
+                        }
+                    }
                 }
+
+                _ => match user_input.focus_input {
+                    FocusedInput::Name => {
+                        user_input.name.field.handle_event(&Event::Key(key_event));
+                    }
+                    FocusedInput::Ip => {
+                        user_input.ip.field.handle_event(&Event::Key(key_event));
+                    }
+                    FocusedInput::Port => {
+                        user_input.port.field.handle_event(&Event::Key(key_event));
+                    }
+                },
             }
         } else {
             match key_event.code {
-                KeyCode::Char('j') | KeyCode::Down => {}
-                KeyCode::Char('k') | KeyCode::Up => {}
                 KeyCode::Char('n') => {
-                    self.is_editing = true;
-                    self.add_rule(FirewallRule::new());
+                    self.add_rule();
+                }
+
+                KeyCode::Char('j') | KeyCode::Down => {
+                    let i = match self.state.selected() {
+                        Some(i) => {
+                            if i < self.rules.len() - 1 {
+                                i + 1
+                            } else {
+                                i
+                            }
+                        }
+                        None => 0,
+                    };
+
+                    self.state.select(Some(i));
+                }
+
+                KeyCode::Char('k') | KeyCode::Up => {
+                    let i = match self.state.selected() {
+                        Some(i) => {
+                            if i > 1 {
+                                i - 1
+                            } else {
+                                0
+                            }
+                        }
+                        None => 0,
+                    };
+
+                    self.state.select(Some(i));
                 }
                 _ => {}
             }
         }
     }
+
     pub fn render(&self, frame: &mut Frame, block: Rect) {
+        if self.rules.is_empty() {
+            let text_block = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([
+                    Constraint::Fill(1),
+                    Constraint::Length(3),
+                    Constraint::Fill(1),
+                ])
+                .flex(ratatui::layout::Flex::SpaceBetween)
+                .margin(2)
+                .split(block)[1];
+
+            let text = Text::from("No Rules").bold().centered();
+            frame.render_widget(text, text_block);
+            return;
+        }
+
         let widths = [
-            Constraint::Min(30),
-            Constraint::Min(20),
+            Constraint::Max(30),
+            Constraint::Max(20),
             Constraint::Length(10),
             Constraint::Length(10),
         ];
 
         let rows = self.rules.iter().map(|rule| {
-            if self.is_editing && self.focused_rule.as_ref().unwrap().name == rule.name {
-                Row::new(vec![
-                    Line::from(rule.name.clone()).centered().bold(),
-                    Line::from({
-                        if let Some(ip) = rule.ip {
-                            ip.to_string()
-                        } else {
-                            "-".to_string()
-                        }
-                    })
+            Row::new(vec![
+                Line::from(rule.name.clone()).centered().bold(),
+                Line::from(rule.ip.to_string()).centered().centered().bold(),
+                Line::from(rule.port.to_string())
+                    .centered()
                     .centered()
                     .bold(),
-                    Line::from({
-                        if let Some(port) = rule.port {
-                            port.to_string()
-                        } else {
-                            "-".to_string()
-                        }
-                    })
-                    .centered(),
-                    Line::from(rule.enabled.to_string()).centered(),
-                ])
-            } else {
-                Row::new(vec![
-                    Line::from(rule.name.clone()).centered().bold(),
-                    Line::from({
-                        if let Some(ip) = rule.ip {
-                            ip.to_string()
-                        } else {
-                            "-".to_string()
-                        }
-                    })
-                    .centered()
-                    .bold(),
-                    Line::from({
-                        if let Some(port) = rule.port {
-                            port.to_string()
-                        } else {
-                            "-".to_string()
-                        }
-                    })
-                    .centered(),
-                    Line::from(rule.enabled.to_string()).centered(),
-                ])
-            }
+                Line::from({
+                    if rule.enabled {
+                        "Enabled".to_string()
+                    } else {
+                        "Disabled".to_string()
+                    }
+                })
+                .centered()
+                .centered()
+                .bold(),
+            ])
         });
+
         let table = Table::new(rows, widths)
             .column_spacing(2)
-            .flex(Flex::SpaceBetween)
+            .flex(Flex::SpaceAround)
+            .highlight_style(Style::default().bg(Color::DarkGray))
             .header(
                 Row::new(vec![
                     Line::from("Name").centered(),
-                    Line::from("IP Address").centered(),
+                    Line::from("IP").centered(),
                     Line::from("Port").centered(),
-                    Line::from("Enabled?").centered(),
+                    Line::from("Status").centered(),
                 ])
                 .style(Style::new().bold())
                 .bottom_margin(1),
-            )
-            .block(
-                Block::new()
-                    .title(" Firewall Rules ")
-                    .borders(Borders::all())
-                    .border_style(Style::new().yellow())
-                    .title_alignment(Alignment::Center)
-                    .padding(Padding::uniform(2)),
             );
 
-        frame.render_widget(table, block);
+        frame.render_widget(
+            table,
+            block.inner(Margin {
+                horizontal: 2,
+                vertical: 2,
+            }),
+        );
+    }
+
+    pub fn render_new_rule_popup(&self, frame: &mut Frame) {
+        if let Some(user_input) = &mut self.user_input.clone() {
+            user_input.render(frame);
+        }
     }
 }
-
-// Paragraph::new(format!("> {}", fuzzy.filter.value()))
-// .alignment(Alignment::Left)
-// .style(Style::default().white())
-// .block(
-//     Block::new()
-//         .borders(Borders::TOP)
-//         .title(" Search  ")
-//         .padding(Padding::horizontal(1))
-//         .title_style({
-//             if fuzzy.is_paused() {
-//                 Style::default().bold().yellow()
-//             } else {
-//                 Style::default().bold().green()
-//             }
-//         })
-//         .border_type({
-//             if fuzzy.is_paused() {
-//                 BorderType::default()
-//             } else {
-//                 BorderType::Thick
-//             }
-//         })
-//         .border_style({
-//             if fuzzy.is_paused() {
-//                 Style::default().yellow()
-//             } else {
-//                 Style::default().green()
-//             }
-//         }),
