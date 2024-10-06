@@ -118,7 +118,7 @@ impl Filter {
         &mut self,
         notification_sender: kanal::Sender<Event>,
         data_sender: kanal::Sender<[u8; RawPacket::LEN]>,
-    ) {
+    ) -> AppResult<()> {
         let iface = self.interface.selected_interface.name.clone();
 
         self.apply();
@@ -152,6 +152,10 @@ impl Filter {
                 self.traffic_direction.terminate_egress.clone(),
             );
         }
+
+        self.sync()?;
+
+        Ok(())
     }
 
     pub fn trigger(&mut self) {
