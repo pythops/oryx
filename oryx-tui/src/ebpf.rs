@@ -1,5 +1,6 @@
 use std::{
     io,
+    net::IpAddr,
     os::fd::AsRawFd,
     sync::{atomic::AtomicBool, Arc},
     thread::{self, spawn},
@@ -8,7 +9,7 @@ use std::{
 
 use aya::{
     include_bytes_aligned,
-    maps::{ring_buf::RingBufItem, Array, MapData, RingBuf},
+    maps::{ring_buf::RingBufItem, Array, HashMap, MapData, RingBuf},
     programs::{tc, SchedClassifier, TcAttachType},
     Bpf,
 };
@@ -68,7 +69,7 @@ impl Ebpf {
         notification_sender: kanal::Sender<Event>,
         data_sender: kanal::Sender<[u8; RawPacket::LEN]>,
         filter_channel_receiver: kanal::Receiver<(Protocol, bool)>,
-        _firewall_ingress_receiver: kanal::Receiver<FirewallRule>,
+        firewall_ingress_receiver: kanal::Receiver<FirewallRule>,
         terminate: Arc<AtomicBool>,
     ) {
         thread::spawn({
@@ -149,6 +150,7 @@ impl Ebpf {
                 let mut poll = Poll::new().unwrap();
                 let mut events = Events::with_capacity(128);
 
+                //filter-ebpf interface
                 let mut transport_filters: Array<_, u32> =
                     Array::try_from(bpf.take_map("TRANSPORT_FILTERS").unwrap()).unwrap();
 
@@ -157,8 +159,42 @@ impl Ebpf {
 
                 let mut link_filters: Array<_, u32> =
                     Array::try_from(bpf.take_map("LINK_FILTERS").unwrap()).unwrap();
+                // firewall-ebpf interface
+                let mut ipv4_firewall: HashMap<_, u32, u16> =
+                    HashMap::try_from(bpf.take_map("BLOCKLIST_IPV4_INGRESS").unwrap()).unwrap();
+                let mut ipv6_firewall: HashMap<_, u128, u16> =
+                    HashMap::try_from(bpf.take_map("BLOCKLIST_IPV6_INGRESS").unwrap()).unwrap();
 
                 spawn(move || loop {
+                    if let Ok(rule) = firewall_ingress_receiver.recv() {
+                        match rule.enabled {
+                            true => match rule.ip {
+                                IpAddr::V4(addr) => {
+                                    println!("{}", rule);
+                                    ipv4_firewall.insert(u32::from(addr), rule.port, 0).unwrap();
+                                }
+                                IpAddr::V6(addr) => {
+                                    let _ = ipv6_firewall.insert(
+                                        u128::from_be_bytes(addr.octets()),
+                                        rule.port,
+                                        0,
+                                    );
+                                }
+                            },
+
+                            false => match rule.ip {
+                                IpAddr::V4(addr) => {
+                                    let _ = ipv4_firewall.remove(&u32::from(addr));
+                                }
+
+                                IpAddr::V6(addr) => {
+                                    let _ =
+                                        ipv6_firewall.remove(&u128::from_be_bytes(addr.octets()));
+                                }
+                            },
+                        }
+                    }
+
                     if let Ok((filter, flag)) = filter_channel_receiver.recv() {
                         match filter {
                             Protocol::Transport(p) => {

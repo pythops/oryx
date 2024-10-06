@@ -1,3 +1,4 @@
+use core::fmt::Display;
 use crossterm::event::{Event, KeyCode, KeyEvent};
 use ratatui::{
     layout::{Constraint, Direction, Flex, Layout, Margin, Rect},
@@ -16,11 +17,16 @@ use crate::app::AppResult;
 pub struct FirewallRule {
     id: uuid::Uuid,
     name: String,
-    enabled: bool,
-    ip: IpAddr,
-    port: u16,
+    pub enabled: bool,
+    pub ip: IpAddr,
+    pub port: u16,
 }
 
+impl Display for FirewallRule {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} {}", self.ip, self.port)
+    }
+}
 #[derive(Debug, Clone, PartialEq)]
 pub enum FocusedInput {
     Name,
