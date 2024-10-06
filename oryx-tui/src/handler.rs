@@ -21,7 +21,7 @@ pub fn handle_key_events(
             KeyCode::Enter => {
                 if app.filter.focused_block == FocusedBlock::Apply {
                     app.filter
-                        .start(sender.clone(), app.data_channel_sender.clone());
+                        .start(sender.clone(), app.data_channel_sender.clone())?;
 
                     app.start_sniffing = true;
                 }

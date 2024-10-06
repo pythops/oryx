@@ -18,7 +18,7 @@ use network_types::{
 };
 use oryx_common::{
     protocols::{LinkProtocol, NetworkProtocol, Protocol, TransportProtocol},
-    to_u128, ProtoHdr, RawPacket,
+    ProtoHdr, RawPacket,
 };
 
 #[map]
@@ -99,8 +99,8 @@ fn process(ctx: TcContext) -> Result<i32, ()> {
     match ethhdr.ether_type {
         EtherType::Ipv4 => {
             let header: Ipv4Hdr = ctx.load(EthHdr::LEN).map_err(|_| ())?;
-            let src_addr = header.src_addr;
-            let dst_addr = header.dst_addr;
+            let src_addr = u32::from_be(header.src_addr);
+            let dst_addr = u32::from_be(header.dst_addr);
 
             match header.proto {
                 IpProto::Tcp => {
@@ -111,7 +111,7 @@ fn process(ctx: TcContext) -> Result<i32, ()> {
                     if unsafe { BLOCKLIST_IPV4_INGRESS.get(&src_addr) } == Some(&src_port)
                         || unsafe { BLOCKLIST_IPV4_EGRESS.get(&dst_addr) } == Some(&dst_port)
                     {
-                        return Ok(TC_ACT_SHOT); //DROP PACKET
+                        return Ok(TC_ACT_SHOT);
                     }
 
                     if filter_packet(Protocol::Network(NetworkProtocol::Ipv4))
@@ -132,13 +132,15 @@ fn process(ctx: TcContext) -> Result<i32, ()> {
                     if unsafe { BLOCKLIST_IPV4_INGRESS.get(&src_addr) } == Some(&src_port)
                         || unsafe { BLOCKLIST_IPV4_EGRESS.get(&dst_addr) } == Some(&dst_port)
                     {
-                        return Ok(TC_ACT_SHOT); //DROP PACKET
+                        return Ok(TC_ACT_SHOT);
                     }
+
                     if filter_packet(Protocol::Network(NetworkProtocol::Ipv4))
                         || filter_packet(Protocol::Transport(TransportProtocol::UDP))
                     {
-                        return Ok(TC_ACT_PIPE); //DONT FWD PACKET TO TUI
+                        return Ok(TC_ACT_PIPE);
                     }
+
                     submit(RawPacket::Ip(
                         IpHdr::V4(header),
                         ProtoHdr::Udp(unsafe { *udphdr }),
@@ -159,19 +161,11 @@ fn process(ctx: TcContext) -> Result<i32, ()> {
         }
         EtherType::Ipv6 => {
             let header: Ipv6Hdr = ctx.load(EthHdr::LEN).map_err(|_| ())?;
-            let src_addr = to_u128(unsafe { header.src_addr.in6_u.u6_addr16 });
-            let dst_addr = to_u128(unsafe { header.dst_addr.in6_u.u6_addr16 });
 
             match header.next_hdr {
                 IpProto::Tcp => {
                     let tcphdr: *const TcpHdr = ptr_at(&ctx, EthHdr::LEN + Ipv6Hdr::LEN)?;
-                    let src_port = u16::from_be(unsafe { (*tcphdr).source });
-                    let dst_port = u16::from_be(unsafe { (*tcphdr).dest });
-                    if unsafe { BLOCKLIST_IPV6_INGRESS.get(&src_addr) } == Some(&src_port)
-                        || unsafe { BLOCKLIST_IPV6_EGRESS.get(&dst_addr) } == Some(&dst_port)
-                    {
-                        return Ok(TC_ACT_SHOT); //DROP PACKET
-                    }
+
                     if filter_packet(Protocol::Network(NetworkProtocol::Ipv6))
                         || filter_packet(Protocol::Transport(TransportProtocol::TCP))
                     {
@@ -184,13 +178,7 @@ fn process(ctx: TcContext) -> Result<i32, ()> {
                 }
                 IpProto::Udp => {
                     let udphdr: *const UdpHdr = ptr_at(&ctx, EthHdr::LEN + Ipv6Hdr::LEN)?;
-                    let src_port = u16::from_be(unsafe { (*udphdr).source });
-                    let dst_port = u16::from_be(unsafe { (*udphdr).dest });
-                    if unsafe { BLOCKLIST_IPV6_INGRESS.get(&src_addr.into()) } == Some(&src_port)
-                        || unsafe { BLOCKLIST_IPV6_EGRESS.get(&dst_addr.into()) } == Some(&dst_port)
-                    {
-                        return Ok(TC_ACT_SHOT); //DROP PACKET
-                    }
+
                     if filter_packet(Protocol::Network(NetworkProtocol::Ipv6))
                         || filter_packet(Protocol::Transport(TransportProtocol::UDP))
                     {

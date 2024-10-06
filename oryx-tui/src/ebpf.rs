@@ -165,13 +165,12 @@ impl Ebpf {
                 let mut ipv6_firewall: HashMap<_, u128, u16> =
                     HashMap::try_from(bpf.take_map("BLOCKLIST_IPV6_INGRESS").unwrap()).unwrap();
 
-                spawn(move || loop {
+                thread::spawn(move || loop {
                     if let Ok(rule) = firewall_ingress_receiver.recv() {
                         match rule.enabled {
                             true => match rule.ip {
                                 IpAddr::V4(addr) => {
-                                    println!("{}", rule);
-                                    ipv4_firewall.insert(u32::from(addr), rule.port, 0).unwrap();
+                                    ipv4_firewall.insert(addr.to_bits(), rule.port, 0).unwrap();
                                 }
                                 IpAddr::V6(addr) => {
                                     let _ = ipv6_firewall.insert(
@@ -184,7 +183,7 @@ impl Ebpf {
 
                             false => match rule.ip {
                                 IpAddr::V4(addr) => {
-                                    let _ = ipv4_firewall.remove(&u32::from(addr));
+                                    ipv4_firewall.remove(&addr.to_bits()).unwrap();
                                 }
 
                                 IpAddr::V6(addr) => {
@@ -194,7 +193,9 @@ impl Ebpf {
                             },
                         }
                     }
+                });
 
+                thread::spawn(move || loop {
                     if let Ok((filter, flag)) = filter_channel_receiver.recv() {
                         match filter {
                             Protocol::Transport(p) => {
