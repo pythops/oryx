@@ -270,6 +270,14 @@ impl Firewall {
 
                         if let Some(id) = user_input.id {
                             let rule = self.rules.iter_mut().find(|rule| rule.id == id).unwrap();
+
+                            if rule.enabled {
+                                // set disable notification on previous rule definition
+                                rule.enabled = false;
+                                self.ingress_sender.send(rule.clone())?;
+                            }
+
+                            // update rule with user input
                             rule.name = user_input.name.field.to_string();
                             rule.ip = IpAddr::from_str(user_input.ip.field.value()).unwrap();
                             rule.port = u16::from_str(user_input.port.field.value()).unwrap();
@@ -331,6 +339,8 @@ impl Firewall {
 
                 KeyCode::Char('d') => {
                     if let Some(index) = self.state.selected() {
+                        self.rules[index].enabled = false;
+                        self.ingress_sender.send(self.rules[index].clone())?;
                         self.rules.remove(index);
                     }
                 }

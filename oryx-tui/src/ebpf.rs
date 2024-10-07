@@ -74,8 +74,8 @@ fn update_ipv4_blocklist(
             // add port to blocklist
             if let Some(first_zero) = blocked_ports.iter().enumerate().find(|&x| *x.1 == 0) {
                 blocked_ports[first_zero.0] = port;
-                dbg!("UPSERTING");
-                dbg!(blocked_ports[0], blocked_ports[1]);
+                // dbg!("UPSERTING");
+                // dbg!(blocked_ports[0], blocked_ports[1]);
                 ipv4_firewall
                     .insert(addr.to_bits(), blocked_ports, 0)
                     .unwrap();
@@ -84,10 +84,22 @@ fn update_ipv4_blocklist(
             }
         } else {
             //  remove port from blocklist
-            if let Some(matching_port) = blocked_ports.iter().enumerate().find(|&x| *x.1 == port) {
-                blocked_ports[matching_port.0] = 0;
-                dbg!("REMOVING");
-                dbg!(blocked_ports[0], blocked_ports[1]);
+            // on veut rebuild une blocklist avec les ports restants non nuls
+            // par example là [8888,0,80,0,..]
+            // hashmap = key:[0,0,0]
+            // => [8888,80,0 ....]
+            let non_null_ports = blocked_ports
+                .into_iter()
+                .filter(|p| (*p != 0 && *p != port))
+                .collect::<Vec<u16>>();
+            let mut blocked_ports = [0; 32];
+            for (idx, p) in non_null_ports.iter().enumerate() {
+                blocked_ports[idx] = *p;
+            }
+            if blocked_ports.iter().sum::<u16>() == 0 {
+                //now block_list is empty, we need to delete key
+                ipv4_firewall.remove(&addr.to_bits()).unwrap();
+            } else {
                 ipv4_firewall
                     .insert(addr.to_bits(), blocked_ports, 0)
                     .unwrap();
@@ -96,7 +108,7 @@ fn update_ipv4_blocklist(
     } else {
         // shouldn't be disabling if blocklist is empty
         assert!(enabled);
-        //create new blocklist with port as first element
+        // create new blocklist with port as first element
         let mut blocked_ports: [u16; 32] = [0; 32];
         blocked_ports[0] = port;
         ipv4_firewall
