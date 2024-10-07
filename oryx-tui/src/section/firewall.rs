@@ -313,6 +313,7 @@ impl Firewall {
                             {
                                 let new_port =
                                     BlockedPort::from_str(user_input.port.field.value()).unwrap();
+
                                 if exiting_rule_with_same_ip.port == new_port {
                                     Notification::send(
                                         "Duplicate Rule",
@@ -320,6 +321,28 @@ impl Firewall {
                                         sender.clone(),
                                     )?;
                                     return Err("Rule validation error".into());
+                                }
+
+                                match exiting_rule_with_same_ip.port {
+                                    BlockedPort::Single(_) => {
+                                        if new_port == BlockedPort::All {
+                                            Notification::send(
+                                                "Duplicate Rule",
+                                                crate::notification::NotificationLevel::Warning,
+                                                sender.clone(),
+                                            )?;
+                                            return Err("Rule validation error".into());
+                                        }
+                                    }
+
+                                    BlockedPort::All => {
+                                        Notification::send(
+                                            "Duplicate Rule",
+                                            crate::notification::NotificationLevel::Warning,
+                                            sender.clone(),
+                                        )?;
+                                        return Err("Rule validation error".into());
+                                    }
                                 }
                             }
 
