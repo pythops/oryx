@@ -1,6 +1,6 @@
 use std::{
     io,
-    net::IpAddr,
+    net::{IpAddr, Ipv4Addr, Ipv6Addr},
     os::fd::AsRawFd,
     sync::{atomic::AtomicBool, Arc},
     thread::{self, spawn},
@@ -60,6 +60,86 @@ impl Source for RingBuffer<'_> {
 
     fn deregister(&mut self, registry: &Registry) -> io::Result<()> {
         SourceFd(&self.buffer.as_raw_fd()).deregister(registry)
+    }
+}
+
+fn update_ipv4_blocklist(
+    ipv4_firewall: &mut HashMap<MapData, u32, [u16; 32]>,
+    addr: Ipv4Addr,
+    port: u16,
+    enabled: bool,
+) {
+    if let Ok(mut blocked_ports) = ipv4_firewall.get(&addr.to_bits(), 0) {
+        if enabled {
+            // add port to blocklist
+            if let Some(first_zero) = blocked_ports.iter().enumerate().find(|&x| *x.1 == 0) {
+                blocked_ports[first_zero.0] = port;
+                dbg!("UPSERTING");
+                dbg!(blocked_ports[0], blocked_ports[1]);
+                ipv4_firewall
+                    .insert(addr.to_bits(), blocked_ports, 0)
+                    .unwrap();
+            } else {
+                todo!(); // list is full
+            }
+        } else {
+            //  remove port from blocklist
+            if let Some(matching_port) = blocked_ports.iter().enumerate().find(|&x| *x.1 == port) {
+                blocked_ports[matching_port.0] = 0;
+                dbg!("REMOVING");
+                dbg!(blocked_ports[0], blocked_ports[1]);
+                ipv4_firewall
+                    .insert(addr.to_bits(), blocked_ports, 0)
+                    .unwrap();
+            }
+        }
+    } else {
+        // shouldn't be disabling if blocklist is empty
+        assert!(enabled);
+        //create new blocklist with port as first element
+        let mut blocked_ports: [u16; 32] = [0; 32];
+        blocked_ports[0] = port;
+        ipv4_firewall
+            .insert(addr.to_bits(), blocked_ports, 0)
+            .unwrap();
+    }
+}
+
+fn update_ipv6_blocklist(
+    ipv6_firewall: &mut HashMap<MapData, u128, [u16; 32]>,
+    addr: Ipv6Addr,
+    port: u16,
+    enabled: bool,
+) {
+    if let Ok(mut blocked_ports) = ipv6_firewall.get(&addr.to_bits(), 0) {
+        if enabled {
+            // add port to blocklist
+            if let Some(first_zero) = blocked_ports.iter().enumerate().find(|&x| *x.1 == 0) {
+                blocked_ports[first_zero.0] = port;
+                ipv6_firewall
+                    .insert(addr.to_bits(), blocked_ports, 0)
+                    .unwrap();
+            } else {
+                todo!(); // list is full
+            }
+        } else {
+            //  remove port from blocklist
+            if let Some(matching_port) = blocked_ports.iter().enumerate().find(|&x| *x.1 == port) {
+                blocked_ports[matching_port.0] = 0;
+                ipv6_firewall
+                    .insert(addr.to_bits(), blocked_ports, 0)
+                    .unwrap();
+            }
+        }
+    } else {
+        // shouldn't be disabling if blocklist is empty
+        assert!(enabled);
+        //create new blocklist with port as first element
+        let mut blocked_ports: [u16; 32] = [0; 32];
+        blocked_ports[0] = port;
+        ipv6_firewall
+            .insert(addr.to_bits(), blocked_ports, 0)
+            .unwrap();
     }
 }
 
@@ -160,37 +240,27 @@ impl Ebpf {
                 let mut link_filters: Array<_, u32> =
                     Array::try_from(bpf.take_map("LINK_FILTERS").unwrap()).unwrap();
                 // firewall-ebpf interface
-                let mut ipv4_firewall: HashMap<_, u32, u16> =
+                let mut ipv4_firewall: HashMap<_, u32, [u16; 32]> =
                     HashMap::try_from(bpf.take_map("BLOCKLIST_IPV4_INGRESS").unwrap()).unwrap();
-                let mut ipv6_firewall: HashMap<_, u128, u16> =
+                let mut ipv6_firewall: HashMap<_, u128, [u16; 32]> =
                     HashMap::try_from(bpf.take_map("BLOCKLIST_IPV6_INGRESS").unwrap()).unwrap();
 
                 thread::spawn(move || loop {
                     if let Ok(rule) = firewall_ingress_receiver.recv() {
-                        match rule.enabled {
-                            true => match rule.ip {
-                                IpAddr::V4(addr) => {
-                                    ipv4_firewall.insert(addr.to_bits(), rule.port, 0).unwrap();
-                                }
-                                IpAddr::V6(addr) => {
-                                    let _ = ipv6_firewall.insert(
-                                        u128::from_be_bytes(addr.octets()),
-                                        rule.port,
-                                        0,
-                                    );
-                                }
-                            },
+                        match rule.ip {
+                            IpAddr::V4(addr) => update_ipv4_blocklist(
+                                &mut ipv4_firewall,
+                                addr,
+                                rule.port,
+                                rule.enabled,
+                            ),
 
-                            false => match rule.ip {
-                                IpAddr::V4(addr) => {
-                                    ipv4_firewall.remove(&addr.to_bits()).unwrap();
-                                }
-
-                                IpAddr::V6(addr) => {
-                                    let _ =
-                                        ipv6_firewall.remove(&u128::from_be_bytes(addr.octets()));
-                                }
-                            },
+                            IpAddr::V6(addr) => update_ipv6_blocklist(
+                                &mut ipv6_firewall,
+                                addr,
+                                rule.port,
+                                rule.enabled,
+                            ),
                         }
                     }
                 });

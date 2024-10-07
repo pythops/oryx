@@ -34,13 +34,17 @@ static TRANSPORT_FILTERS: Array<u32> = Array::with_max_entries(8, 0);
 static LINK_FILTERS: Array<u32> = Array::with_max_entries(8, 0);
 
 #[map]
-static BLOCKLIST_IPV6_INGRESS: HashMap<u128, u16> = HashMap::<u128, u16>::with_max_entries(128, 0);
+static BLOCKLIST_IPV6_INGRESS: HashMap<u128, [u16; 32]> =
+    HashMap::<u128, [u16; 32]>::with_max_entries(128, 0);
 #[map]
-static BLOCKLIST_IPV6_EGRESS: HashMap<u128, u16> = HashMap::<u128, u16>::with_max_entries(128, 0);
+static BLOCKLIST_IPV6_EGRESS: HashMap<u128, [u16; 32]> =
+    HashMap::<u128, [u16; 32]>::with_max_entries(128, 0);
 #[map]
-static BLOCKLIST_IPV4_INGRESS: HashMap<u32, u16> = HashMap::<u32, u16>::with_max_entries(128, 0);
+static BLOCKLIST_IPV4_INGRESS: HashMap<u32, [u16; 32]> =
+    HashMap::<u32, [u16; 32]>::with_max_entries(128, 0);
 #[map]
-static BLOCKLIST_IPV4_EGRESS: HashMap<u32, u16> = HashMap::<u32, u16>::with_max_entries(128, 0);
+static BLOCKLIST_IPV4_EGRESS: HashMap<u32, [u16; 32]> =
+    HashMap::<u32, [u16; 32]>::with_max_entries(128, 0);
 
 #[classifier]
 pub fn oryx(ctx: TcContext) -> i32 {
@@ -68,6 +72,28 @@ fn ptr_at<T>(ctx: &TcContext, offset: usize) -> Result<*const T, ()> {
     }
 
     Ok((start + offset) as *const T)
+}
+
+#[inline]
+fn filter_for_ipv4_address(
+    addr: u32,
+    port: u16,
+    blocked_ports_map: &HashMap<u32, [u16; 32]>,
+) -> bool {
+    if let Some(blocked_ports) = unsafe { blocked_ports_map.get(&addr) } {
+        for (idx, blocked_port) in blocked_ports.iter().enumerate() {
+            if *blocked_port == 0 {
+                if idx == 0 {
+                    return true;
+                } else {
+                    break;
+                }
+            } else if *blocked_port == port {
+                return true;
+            }
+        }
+    }
+    false
 }
 
 #[inline]
@@ -108,8 +134,8 @@ fn process(ctx: TcContext) -> Result<i32, ()> {
                     let src_port = u16::from_be(unsafe { (*tcphdr).source });
                     let dst_port = u16::from_be(unsafe { (*tcphdr).dest });
 
-                    if unsafe { BLOCKLIST_IPV4_INGRESS.get(&src_addr) } == Some(&src_port)
-                        || unsafe { BLOCKLIST_IPV4_EGRESS.get(&dst_addr) } == Some(&dst_port)
+                    if filter_for_ipv4_address(src_addr, src_port, &BLOCKLIST_IPV4_INGRESS)
+                        || filter_for_ipv4_address(dst_addr, dst_port, &BLOCKLIST_IPV4_EGRESS)
                     {
                         return Ok(TC_ACT_SHOT);
                     }
@@ -129,8 +155,8 @@ fn process(ctx: TcContext) -> Result<i32, ()> {
                     let src_port = u16::from_be(unsafe { (*udphdr).source });
                     let dst_port = u16::from_be(unsafe { (*udphdr).dest });
 
-                    if unsafe { BLOCKLIST_IPV4_INGRESS.get(&src_addr) } == Some(&src_port)
-                        || unsafe { BLOCKLIST_IPV4_EGRESS.get(&dst_addr) } == Some(&dst_port)
+                    if filter_for_ipv4_address(src_addr, src_port, &BLOCKLIST_IPV4_INGRESS)
+                        || filter_for_ipv4_address(dst_addr, dst_port, &BLOCKLIST_IPV4_EGRESS)
                     {
                         return Ok(TC_ACT_SHOT);
                     }
