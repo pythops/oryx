@@ -62,7 +62,9 @@ pub fn handle_key_events(
                         app.filter.handle_key_events(key_event, true);
                     }
                     ActivePopup::NewFirewallRule => {
-                        app.section.firewall.handle_keys(key_event)?;
+                        app.section
+                            .firewall
+                            .handle_keys(key_event, sender.clone())?;
                         app.is_editing = false;
                     }
                     _ => {}
@@ -78,7 +80,12 @@ pub fn handle_key_events(
                     }
                 }
                 ActivePopup::NewFirewallRule => {
-                    if app.section.firewall.handle_keys(key_event).is_ok() {
+                    if app
+                        .section
+                        .firewall
+                        .handle_keys(key_event, sender.clone())
+                        .is_ok()
+                    {
                         app.active_popup = None;
                         app.is_editing = false;
                     }
@@ -91,7 +98,9 @@ pub fn handle_key_events(
                     app.filter.handle_key_events(key_event, true);
                 }
                 ActivePopup::NewFirewallRule => {
-                    app.section.firewall.handle_keys(key_event)?;
+                    app.section
+                        .firewall
+                        .handle_keys(key_event, sender.clone())?;
                 }
                 _ => {}
             },
@@ -106,7 +115,7 @@ pub fn handle_key_events(
             _ => {}
         }
 
-        app.section.handle_keys(key_event)?;
+        app.section.handle_keys(key_event, sender.clone())?;
         return Ok(());
     }
 
@@ -145,14 +154,14 @@ pub fn handle_key_events(
         KeyCode::Char('/') => {
             if app.section.focused_section == FocusedSection::Inspection {
                 app.is_editing = true;
-                app.section.handle_keys(key_event)?;
+                app.section.handle_keys(key_event, sender.clone())?;
             }
         }
 
         KeyCode::Char('n') | KeyCode::Char('e') => {
             if app.section.focused_section == FocusedSection::Firewall {
                 app.is_editing = true;
-                app.section.handle_keys(key_event)?;
+                app.section.handle_keys(key_event, sender)?;
                 app.active_popup = Some(ActivePopup::NewFirewallRule);
             }
         }
@@ -187,7 +196,7 @@ pub fn handle_key_events(
             }
         }
         _ => {
-            app.section.handle_keys(key_event)?;
+            app.section.handle_keys(key_event, sender.clone())?;
         }
     }
 

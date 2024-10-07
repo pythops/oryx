@@ -11,7 +11,7 @@ use std::{net::IpAddr, num::ParseIntError, str::FromStr};
 use tui_input::{backend::crossterm::EventHandler, Input};
 use uuid;
 
-use crate::app::AppResult;
+use crate::{app::AppResult, notification::Notification};
 
 #[derive(Debug, Clone)]
 pub struct FirewallRule {
@@ -41,9 +41,9 @@ impl FromStr for BlockedPort {
     type Err = ParseIntError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if s == "*" {
-            return Ok(BlockedPort::All);
+            Ok(BlockedPort::All)
         } else {
-            return Ok(BlockedPort::Single(u16::from_str(s)?));
+            Ok(BlockedPort::Single(u16::from_str(s)?))
         }
     }
 }
@@ -283,7 +283,11 @@ impl Firewall {
         self.rules.retain(|r| r.name != rule.name);
     }
 
-    pub fn handle_keys(&mut self, key_event: KeyEvent) -> AppResult<()> {
+    pub fn handle_keys(
+        &mut self,
+        key_event: KeyEvent,
+        sender: kanal::Sender<crate::event::Event>,
+    ) -> AppResult<()> {
         if let Some(user_input) = &mut self.user_input {
             match key_event.code {
                 KeyCode::Esc => {
@@ -296,14 +300,6 @@ impl Firewall {
 
                         if let Some(id) = user_input.id {
                             let rule = self.rules.iter_mut().find(|rule| rule.id == id).unwrap();
-
-                            if rule.enabled {
-                                // set disable notification on previous rule definition
-                                rule.enabled = false;
-                                self.ingress_sender.send(rule.clone())?;
-                            }
-
-                            // update rule with user input
                             rule.name = user_input.name.field.to_string();
                             rule.ip = IpAddr::from_str(user_input.ip.field.value()).unwrap();
                             rule.port =
@@ -360,7 +356,15 @@ impl Firewall {
                 KeyCode::Char('e') => {
                     if let Some(index) = self.state.selected() {
                         let rule = self.rules[index].clone();
-                        self.user_input = Some(rule.into());
+                        if rule.enabled {
+                            Notification::send(
+                                "Can not edit enabled rule",
+                                crate::notification::NotificationLevel::Warning,
+                                sender.clone(),
+                            )?;
+                        } else {
+                            self.user_input = Some(rule.into());
+                        }
                     }
                 }
 
