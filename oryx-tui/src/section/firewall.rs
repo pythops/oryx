@@ -22,7 +22,7 @@ pub struct FirewallRule {
     pub port: BlockedPort,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum BlockedPort {
     Single(u16),
     All,
@@ -305,6 +305,24 @@ impl Firewall {
                             rule.port =
                                 BlockedPort::from_str(user_input.port.field.value()).unwrap();
                         } else {
+                            if let Some(exiting_rule_with_same_ip) =
+                                self.rules.iter().find(|rule| {
+                                    rule.ip
+                                        == IpAddr::from_str(user_input.ip.field.value()).unwrap()
+                                })
+                            {
+                                let new_port =
+                                    BlockedPort::from_str(user_input.port.field.value()).unwrap();
+                                if exiting_rule_with_same_ip.port == new_port {
+                                    Notification::send(
+                                        "Duplicate Rule",
+                                        crate::notification::NotificationLevel::Warning,
+                                        sender.clone(),
+                                    )?;
+                                    return Err("Rule validation error".into());
+                                }
+                            }
+
                             let rule = FirewallRule {
                                 id: uuid::Uuid::new_v4(),
                                 name: user_input.name.field.to_string(),
