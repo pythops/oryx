@@ -7,7 +7,7 @@ use ratatui::{
     widgets::{Block, Borders, Cell, Clear, HighlightSpacing, Padding, Row, Table, TableState},
     Frame,
 };
-use std::{net::IpAddr, str::FromStr};
+use std::{net::IpAddr, num::ParseIntError, str::FromStr};
 use tui_input::{backend::crossterm::EventHandler, Input};
 use uuid;
 
@@ -19,7 +19,33 @@ pub struct FirewallRule {
     name: String,
     pub enabled: bool,
     pub ip: IpAddr,
-    pub port: u16,
+    pub port: BlockedPort,
+}
+
+#[derive(Debug, Clone)]
+pub enum BlockedPort {
+    Single(u16),
+    All,
+}
+
+impl Display for BlockedPort {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            BlockedPort::Single(p) => write!(f, "{}", p),
+            BlockedPort::All => write!(f, "*"),
+        }
+    }
+}
+
+impl FromStr for BlockedPort {
+    type Err = ParseIntError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s == "*" {
+            return Ok(BlockedPort::All);
+        } else {
+            return Ok(BlockedPort::Single(u16::from_str(s)?));
+        }
+    }
 }
 
 impl Display for FirewallRule {
@@ -80,7 +106,7 @@ impl UserInput {
         self.port.error = None;
         if self.port.field.value().is_empty() {
             self.port.error = Some("Required field.".to_string());
-        } else if u16::from_str(self.port.field.value()).is_err() {
+        } else if BlockedPort::from_str(self.port.field.value()).is_err() {
             self.port.error = Some("Invalid Port number.".to_string());
         }
     }
@@ -280,13 +306,14 @@ impl Firewall {
                             // update rule with user input
                             rule.name = user_input.name.field.to_string();
                             rule.ip = IpAddr::from_str(user_input.ip.field.value()).unwrap();
-                            rule.port = u16::from_str(user_input.port.field.value()).unwrap();
+                            rule.port =
+                                BlockedPort::from_str(user_input.port.field.value()).unwrap();
                         } else {
                             let rule = FirewallRule {
                                 id: uuid::Uuid::new_v4(),
                                 name: user_input.name.field.to_string(),
                                 ip: IpAddr::from_str(user_input.ip.field.value()).unwrap(),
-                                port: u16::from_str(user_input.port.field.value()).unwrap(),
+                                port: BlockedPort::from_str(user_input.port.field.value()).unwrap(),
                                 enabled: false,
                             };
                             self.rules.push(rule);
