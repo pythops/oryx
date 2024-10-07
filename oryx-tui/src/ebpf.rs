@@ -116,12 +116,7 @@ fn update_ipv4_blocklist(
                 }
             }
         }
-    }
-    // no hashmap entry, create new blocklist
-    else {
-        // shouldn't be disabling if blocklist is empty
-        assert!(enabled);
-
+    } else if enabled {
         let mut blocked_ports: [u16; 32] = [0; 32];
         match port {
             BlockedPort::Single(port) => {
@@ -189,12 +184,7 @@ fn update_ipv6_blocklist(
                 }
             }
         }
-    }
-    // no hashmap entry, create new blocklist
-    else {
-        // shouldn't be disabling if blocklist is empty
-        assert!(enabled);
-
+    } else if enabled {
         let mut blocked_ports: [u16; 32] = [0; 32];
         match port {
             BlockedPort::Single(port) => {
