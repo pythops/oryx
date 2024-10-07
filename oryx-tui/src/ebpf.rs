@@ -67,39 +67,38 @@ fn update_ipv4_blocklist(
     ipv4_firewall: &mut HashMap<MapData, u32, [u16; 32]>,
     addr: Ipv4Addr,
     port: BlockedPort,
-    enabled: bool,
+    to_insert: bool,
 ) {
-    // hashmap entry exists
     if let Ok(mut blocked_ports) = ipv4_firewall.get(&addr.to_bits(), 0) {
         match port {
-            // single port update
             BlockedPort::Single(port) => {
-                if enabled {
-                    // add port to blocklist
-                    if let Some(first_zero) = blocked_ports.iter().enumerate().find(|&x| *x.1 == 0)
+                if to_insert {
+                    if let Some((first_zero_index, _)) = blocked_ports
+                        .iter()
+                        .enumerate()
+                        .find(|(_, &value)| value == 0)
                     {
-                        blocked_ports[first_zero.0] = port;
-                        // dbg!("UPSERTING");
-                        // dbg!(blocked_ports[0], blocked_ports[1]);
+                        blocked_ports[first_zero_index] = port;
                         ipv4_firewall
                             .insert(addr.to_bits(), blocked_ports, 0)
                             .unwrap();
                     } else {
-                        todo!(); // list is full
+                        //TODO:
+                        unreachable!(); // list is full
                     }
                 } else {
-                    //  remove port from blocklist
-                    // eg: remove port 53 [8888,53,80,0,..] => [8888,0,80,0,..] => [8888,80,0 ....]
-                    let non_null_ports = blocked_ports
+                    let not_null_ports = blocked_ports
                         .into_iter()
                         .filter(|p| (*p != 0 && *p != port))
                         .collect::<Vec<u16>>();
+
                     let mut blocked_ports = [0; 32];
-                    for (idx, p) in non_null_ports.iter().enumerate() {
+
+                    for (idx, p) in not_null_ports.iter().enumerate() {
                         blocked_ports[idx] = *p;
                     }
-                    if blocked_ports.iter().sum::<u16>() == 0 {
-                        //if block_list is now empty, we need to delete key
+
+                    if blocked_ports.iter().all(|&port| port == 0) {
                         ipv4_firewall.remove(&addr.to_bits()).unwrap();
                     } else {
                         ipv4_firewall
@@ -109,14 +108,14 @@ fn update_ipv4_blocklist(
                 }
             }
             BlockedPort::All => {
-                if enabled {
+                if to_insert {
                     ipv4_firewall.insert(addr.to_bits(), [0; 32], 0).unwrap();
                 } else {
                     ipv4_firewall.remove(&addr.to_bits()).unwrap();
                 }
             }
         }
-    } else if enabled {
+    } else if to_insert {
         let mut blocked_ports: [u16; 32] = [0; 32];
         match port {
             BlockedPort::Single(port) => {
@@ -135,39 +134,38 @@ fn update_ipv6_blocklist(
     ipv6_firewall: &mut HashMap<MapData, u128, [u16; 32]>,
     addr: Ipv6Addr,
     port: BlockedPort,
-    enabled: bool,
+    to_insert: bool,
 ) {
-    // hashmap entry exists
     if let Ok(mut blocked_ports) = ipv6_firewall.get(&addr.to_bits(), 0) {
         match port {
-            // single port update
             BlockedPort::Single(port) => {
-                if enabled {
-                    // add port to blocklist
-                    if let Some(first_zero) = blocked_ports.iter().enumerate().find(|&x| *x.1 == 0)
+                if to_insert {
+                    if let Some((first_zero_index, _)) = blocked_ports
+                        .iter()
+                        .enumerate()
+                        .find(|(_, &value)| value == 0)
                     {
-                        blocked_ports[first_zero.0] = port;
-                        // dbg!("UPSERTING");
-                        // dbg!(blocked_ports[0], blocked_ports[1]);
+                        blocked_ports[first_zero_index] = port;
                         ipv6_firewall
                             .insert(addr.to_bits(), blocked_ports, 0)
                             .unwrap();
                     } else {
-                        todo!(); // list is full
+                        //TODO:
+                        unreachable!(); // list is full
                     }
                 } else {
-                    //  remove port from blocklist
-                    // eg: remove port 53 [8888,53,80,0,..] => [8888,0,80,0,..] => [8888,80,0 ....]
-                    let non_null_ports = blocked_ports
+                    let not_null_ports = blocked_ports
                         .into_iter()
                         .filter(|p| (*p != 0 && *p != port))
                         .collect::<Vec<u16>>();
+
                     let mut blocked_ports = [0; 32];
-                    for (idx, p) in non_null_ports.iter().enumerate() {
+
+                    for (idx, p) in not_null_ports.iter().enumerate() {
                         blocked_ports[idx] = *p;
                     }
-                    if blocked_ports.iter().sum::<u16>() == 0 {
-                        //if block_list is now empty, we need to delete key
+
+                    if blocked_ports.iter().all(|&port| port == 0) {
                         ipv6_firewall.remove(&addr.to_bits()).unwrap();
                     } else {
                         ipv6_firewall
@@ -177,14 +175,14 @@ fn update_ipv6_blocklist(
                 }
             }
             BlockedPort::All => {
-                if enabled {
+                if to_insert {
                     ipv6_firewall.insert(addr.to_bits(), [0; 32], 0).unwrap();
                 } else {
                     ipv6_firewall.remove(&addr.to_bits()).unwrap();
                 }
             }
         }
-    } else if enabled {
+    } else if to_insert {
         let mut blocked_ports: [u16; 32] = [0; 32];
         match port {
             BlockedPort::Single(port) => {
@@ -198,6 +196,7 @@ fn update_ipv6_blocklist(
             .unwrap();
     }
 }
+
 impl Ebpf {
     pub fn load_ingress(
         iface: String,

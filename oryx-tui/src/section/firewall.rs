@@ -279,6 +279,33 @@ impl Firewall {
         self.user_input = Some(UserInput::new());
     }
 
+    fn validate_duplicate_rules(rules: &[FirewallRule], user_input: &UserInput) -> AppResult<()> {
+        if let Some(exiting_rule_with_same_ip) = rules
+            .iter()
+            .find(|rule| rule.ip == IpAddr::from_str(user_input.ip.field.value()).unwrap())
+        {
+            let new_port = BlockedPort::from_str(user_input.port.field.value()).unwrap();
+
+            if exiting_rule_with_same_ip.port == new_port {
+                return Err("Rule validation error".into());
+            }
+
+            match exiting_rule_with_same_ip.port {
+                BlockedPort::Single(_) => {
+                    if new_port == BlockedPort::All {
+                        return Err("Rule validation error".into());
+                    }
+                }
+
+                BlockedPort::All => {
+                    return Err("Rule validation error".into());
+                }
+            }
+        }
+
+        Ok(())
+    }
+
     pub fn remove_rule(&mut self, rule: &FirewallRule) {
         self.rules.retain(|r| r.name != rule.name);
     }
@@ -298,54 +325,24 @@ impl Firewall {
                     if let Some(user_input) = &mut self.user_input {
                         user_input.validate()?;
 
+                        if let Err(e) = Firewall::validate_duplicate_rules(&self.rules, user_input)
+                        {
+                            Notification::send(
+                                "Duplicate Rule",
+                                crate::notification::NotificationLevel::Warning,
+                                sender.clone(),
+                            )?;
+                            return Err(e);
+                        }
+
                         if let Some(id) = user_input.id {
                             let rule = self.rules.iter_mut().find(|rule| rule.id == id).unwrap();
+
                             rule.name = user_input.name.field.to_string();
                             rule.ip = IpAddr::from_str(user_input.ip.field.value()).unwrap();
                             rule.port =
                                 BlockedPort::from_str(user_input.port.field.value()).unwrap();
                         } else {
-                            if let Some(exiting_rule_with_same_ip) =
-                                self.rules.iter().find(|rule| {
-                                    rule.ip
-                                        == IpAddr::from_str(user_input.ip.field.value()).unwrap()
-                                })
-                            {
-                                let new_port =
-                                    BlockedPort::from_str(user_input.port.field.value()).unwrap();
-
-                                if exiting_rule_with_same_ip.port == new_port {
-                                    Notification::send(
-                                        "Duplicate Rule",
-                                        crate::notification::NotificationLevel::Warning,
-                                        sender.clone(),
-                                    )?;
-                                    return Err("Rule validation error".into());
-                                }
-
-                                match exiting_rule_with_same_ip.port {
-                                    BlockedPort::Single(_) => {
-                                        if new_port == BlockedPort::All {
-                                            Notification::send(
-                                                "Duplicate Rule",
-                                                crate::notification::NotificationLevel::Warning,
-                                                sender.clone(),
-                                            )?;
-                                            return Err("Rule validation error".into());
-                                        }
-                                    }
-
-                                    BlockedPort::All => {
-                                        Notification::send(
-                                            "Duplicate Rule",
-                                            crate::notification::NotificationLevel::Warning,
-                                            sender.clone(),
-                                        )?;
-                                        return Err("Rule validation error".into());
-                                    }
-                                }
-                            }
-
                             let rule = FirewallRule {
                                 id: uuid::Uuid::new_v4(),
                                 name: user_input.name.field.to_string(),
