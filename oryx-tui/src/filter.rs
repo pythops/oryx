@@ -92,10 +92,14 @@ pub struct Filter {
     pub firewall_chans: IoChans,
     pub focused_block: FocusedBlock,
     pub firewall_ingress_receiver: kanal::Receiver<FirewallRule>,
+    pub firewall_egress_receiver: kanal::Receiver<FirewallRule>,
 }
 
 impl Filter {
-    pub fn new(firewall_ingress_receiver: kanal::Receiver<FirewallRule>) -> Self {
+    pub fn new(
+        firewall_ingress_receiver: kanal::Receiver<FirewallRule>,
+        firewall_egress_receiver: kanal::Receiver<FirewallRule>,
+    ) -> Self {
         Self {
             interface: Interface::new(),
             network: NetworkFilter::new(),
@@ -106,6 +110,7 @@ impl Filter {
             firewall_chans: IoChans::new(),
             focused_block: FocusedBlock::Interface,
             firewall_ingress_receiver,
+            firewall_egress_receiver,
         }
     }
 
@@ -148,7 +153,7 @@ impl Filter {
                 notification_sender,
                 data_sender,
                 self.filter_chans.egress.receiver.clone(),
-                self.firewall_chans.egress.receiver.clone(),
+                self.firewall_egress_receiver.clone(),
                 self.traffic_direction.terminate_egress.clone(),
             );
         }
@@ -282,7 +287,7 @@ impl Filter {
                 notification_sender.clone(),
                 data_sender.clone(),
                 self.filter_chans.egress.receiver.clone(),
-                self.firewall_chans.egress.receiver.clone(),
+                self.firewall_egress_receiver.clone(),
                 self.traffic_direction.terminate_egress.clone(),
             );
         }

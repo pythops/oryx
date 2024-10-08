@@ -263,15 +263,20 @@ pub struct Firewall {
     state: TableState,
     user_input: Option<UserInput>,
     ingress_sender: kanal::Sender<FirewallRule>,
+    egress_sender: kanal::Sender<FirewallRule>,
 }
 
 impl Firewall {
-    pub fn new(ingress_sender: kanal::Sender<FirewallRule>) -> Self {
+    pub fn new(
+        ingress_sender: kanal::Sender<FirewallRule>,
+        egress_sender: kanal::Sender<FirewallRule>,
+    ) -> Self {
         Self {
             rules: Vec::new(),
             state: TableState::default(),
             user_input: None,
             ingress_sender,
+            egress_sender,
         }
     }
 
@@ -390,7 +395,8 @@ impl Firewall {
                 KeyCode::Char(' ') => {
                     if let Some(index) = self.state.selected() {
                         self.rules[index].enabled = !self.rules[index].enabled;
-                        self.ingress_sender.send(self.rules[index].clone())?
+                        self.ingress_sender.send(self.rules[index].clone())?;
+                        self.egress_sender.send(self.rules[index].clone())?
                     }
                 }
 
@@ -413,6 +419,7 @@ impl Firewall {
                     if let Some(index) = self.state.selected() {
                         self.rules[index].enabled = false;
                         self.ingress_sender.send(self.rules[index].clone())?;
+                        self.egress_sender.send(self.rules[index].clone())?;
                         self.rules.remove(index);
                     }
                 }

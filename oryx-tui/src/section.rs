@@ -42,13 +42,14 @@ impl Section {
     pub fn new(
         packets: Arc<Mutex<Vec<AppPacket>>>,
         firewall_ingress_sender: kanal::Sender<FirewallRule>,
+        firewall_egress_sender: kanal::Sender<FirewallRule>,
     ) -> Self {
         Self {
             focused_section: FocusedSection::Inspection,
             inspection: Inspection::new(packets.clone()),
             stats: Stats::new(packets.clone()),
             alert: Alert::new(packets.clone()),
-            firewall: Firewall::new(firewall_ingress_sender),
+            firewall: Firewall::new(firewall_ingress_sender, firewall_egress_sender),
         }
     }
     fn title_span(&self, header_section: FocusedSection) -> Span {

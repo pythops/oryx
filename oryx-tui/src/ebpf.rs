@@ -3,7 +3,7 @@ use std::{
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
     os::fd::AsRawFd,
     sync::{atomic::AtomicBool, Arc},
-    thread::{self, spawn},
+    thread,
     time::Duration,
 };
 
@@ -383,7 +383,7 @@ impl Ebpf {
         notification_sender: kanal::Sender<Event>,
         data_sender: kanal::Sender<[u8; RawPacket::LEN]>,
         filter_channel_receiver: kanal::Receiver<(Protocol, bool)>,
-        _firewall_channel_receiver: kanal::Receiver<(Protocol, bool)>,
+        firewall_egress_receiver: kanal::Receiver<FirewallRule>,
         terminate: Arc<AtomicBool>,
     ) {
         thread::spawn({
@@ -460,6 +460,7 @@ impl Ebpf {
                 let mut poll = Poll::new().unwrap();
                 let mut events = Events::with_capacity(128);
 
+                //filter-ebpf interface
                 let mut transport_filters: Array<_, u32> =
                     Array::try_from(bpf.take_map("TRANSPORT_FILTERS").unwrap()).unwrap();
 
@@ -469,7 +470,32 @@ impl Ebpf {
                 let mut link_filters: Array<_, u32> =
                     Array::try_from(bpf.take_map("LINK_FILTERS").unwrap()).unwrap();
 
-                spawn(move || loop {
+                // firewall-ebpf interface
+                let mut ipv4_firewall: HashMap<_, u32, [u16; 32]> =
+                    HashMap::try_from(bpf.take_map("BLOCKLIST_IPV4_EGRESS").unwrap()).unwrap();
+                let mut ipv6_firewall: HashMap<_, u128, [u16; 32]> =
+                    HashMap::try_from(bpf.take_map("BLOCKLIST_IPV6_EGRESS").unwrap()).unwrap();
+                thread::spawn(move || loop {
+                    if let Ok(rule) = firewall_egress_receiver.recv() {
+                        match rule.ip {
+                            IpAddr::V4(addr) => update_ipv4_blocklist(
+                                &mut ipv4_firewall,
+                                addr,
+                                rule.port,
+                                rule.enabled,
+                            ),
+
+                            IpAddr::V6(addr) => update_ipv6_blocklist(
+                                &mut ipv6_firewall,
+                                addr,
+                                rule.port,
+                                rule.enabled,
+                            ),
+                        }
+                    }
+                });
+
+                thread::spawn(move || loop {
                     if let Ok((filter, flag)) = filter_channel_receiver.recv() {
                         match filter {
                             Protocol::Transport(p) => {
