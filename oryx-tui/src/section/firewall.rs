@@ -341,8 +341,59 @@ impl Firewall {
         self.rules.retain(|r| r.name != rule.name);
     }
 
-    pub fn remove_ingress_rules(&mut self) {}
-    pub fn remove_egress_rules(&mut self) {}
+    pub fn disable_ingress_rules(&mut self) {
+        self.rules.iter_mut().for_each(|rule| {
+            if rule.enabled && rule.direction == TrafficDirection::Ingress {
+                rule.enabled = false;
+            }
+        });
+    }
+    pub fn disable_egress_rules(&mut self) {
+        self.rules.iter_mut().for_each(|rule| {
+            if rule.enabled && rule.direction == TrafficDirection::Egress {
+                rule.enabled = false;
+            }
+        });
+    }
+
+    pub fn load_rule(
+        &mut self,
+        sender: kanal::Sender<crate::event::Event>,
+        is_ingress_loaded: bool,
+        is_egress_loaded: bool,
+    ) -> AppResult<()> {
+        if let Some(index) = self.state.selected() {
+            let rule = &mut self.rules[index];
+
+            match rule.direction {
+                TrafficDirection::Ingress => {
+                    if is_ingress_loaded {
+                        rule.enabled = !rule.enabled;
+                        self.ingress_sender.send(rule.clone())?;
+                    } else {
+                        Notification::send(
+                            "Ingress is not loaded.",
+                            crate::notification::NotificationLevel::Warning,
+                            sender.clone(),
+                        )?;
+                    }
+                }
+                TrafficDirection::Egress => {
+                    if is_egress_loaded {
+                        rule.enabled = !rule.enabled;
+                        self.egress_sender.send(rule.clone())?;
+                    } else {
+                        Notification::send(
+                            "Egress is not loaded.",
+                            crate::notification::NotificationLevel::Warning,
+                            sender.clone(),
+                        )?;
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
 
     pub fn handle_keys(
         &mut self,
@@ -428,20 +479,6 @@ impl Firewall {
             match key_event.code {
                 KeyCode::Char('n') => {
                     self.add_rule();
-                }
-
-                KeyCode::Char(' ') => {
-                    if let Some(index) = self.state.selected() {
-                        let rule = &mut self.rules[index];
-                        rule.enabled = !rule.enabled;
-
-                        match rule.direction {
-                            TrafficDirection::Ingress => {
-                                self.ingress_sender.send(rule.clone())?;
-                            }
-                            TrafficDirection::Egress => self.egress_sender.send(rule.clone())?,
-                        }
-                    }
                 }
 
                 KeyCode::Char('e') => {

@@ -75,6 +75,13 @@ pub fn handle_key_events(
                     if app.filter.focused_block == FocusedBlock::Apply {
                         app.filter
                             .update(sender.clone(), app.data_channel_sender.clone())?;
+                        if !app.filter.traffic_direction.is_ingress_loaded() {
+                            app.section.firewall.disable_ingress_rules();
+                        }
+
+                        if !app.filter.traffic_direction.is_egress_loaded() {
+                            app.section.firewall.disable_egress_rules();
+                        }
 
                         app.active_popup = None;
                     }
@@ -169,6 +176,16 @@ pub fn handle_key_events(
         KeyCode::Char('i') => {
             if app.section.inspection.can_show_popup() {
                 app.active_popup = Some(ActivePopup::PacketInfos);
+            }
+        }
+
+        KeyCode::Char(' ') => {
+            if app.section.focused_section == FocusedSection::Firewall {
+                app.section.firewall.load_rule(
+                    sender.clone(),
+                    app.filter.traffic_direction.is_ingress_loaded(),
+                    app.filter.traffic_direction.is_egress_loaded(),
+                )?;
             }
         }
 

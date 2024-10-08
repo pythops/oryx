@@ -82,6 +82,14 @@ impl TrafficDirectionFilter {
         self.selected_direction.clear();
     }
 
+    pub fn is_ingress_loaded(&self) -> bool {
+        self.applied_direction.contains(&TrafficDirection::Ingress)
+    }
+
+    pub fn is_egress_loaded(&self) -> bool {
+        self.applied_direction.contains(&TrafficDirection::Egress)
+    }
+
     pub fn render(&mut self, frame: &mut Frame, block: Rect, is_focused: bool) {
         let layout = Layout::default()
             .direction(Direction::Horizontal)
