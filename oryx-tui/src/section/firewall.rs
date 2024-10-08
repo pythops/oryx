@@ -280,10 +280,13 @@ impl Firewall {
     }
 
     fn validate_duplicate_rules(rules: &[FirewallRule], user_input: &UserInput) -> AppResult<()> {
-        if let Some(exiting_rule_with_same_ip) = rules
-            .iter()
-            .find(|rule| rule.ip == IpAddr::from_str(user_input.ip.field.value()).unwrap())
-        {
+        if let Some(exiting_rule_with_same_ip) = rules.iter().find(|rule| {
+            rule.ip == IpAddr::from_str(user_input.ip.field.value()).unwrap()
+                && match user_input.id {
+                    Some(uuid) => rule.id != uuid,
+                    None => true,
+                }
+        }) {
             let new_port = BlockedPort::from_str(user_input.port.field.value()).unwrap();
 
             if exiting_rule_with_same_ip.port == new_port {
