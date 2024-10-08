@@ -108,13 +108,13 @@ sudo oryx
 
 `ctrl + s`: Export the capture to `~/oryx/capture` file.
 
-### Inspection Section
+#### Inspection Section
 
 `i`: Show more infos about the selected packet.
 
 `/`: Start fuzzy search.
 
-### Firewall Section
+#### Firewall Section
 
 `Space`: Toggle firewall rules status.
 
