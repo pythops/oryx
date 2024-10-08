@@ -11,7 +11,7 @@ use std::{net::IpAddr, num::ParseIntError, str::FromStr};
 use tui_input::{backend::crossterm::EventHandler, Input};
 use uuid;
 
-use crate::{app::AppResult, notification::Notification};
+use crate::{app::AppResult, filter::direction::TrafficDirection, notification::Notification};
 
 #[derive(Debug, Clone)]
 pub struct FirewallRule {
@@ -20,6 +20,7 @@ pub struct FirewallRule {
     pub enabled: bool,
     pub ip: IpAddr,
     pub port: BlockedPort,
+    direction: TrafficDirection,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -48,6 +49,7 @@ impl FromStr for BlockedPort {
     }
 }
 
+// TODO: Add direction
 impl Display for FirewallRule {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{} {}", self.ip, self.port)
@@ -58,14 +60,16 @@ pub enum FocusedInput {
     Name,
     Ip,
     Port,
+    Direction,
 }
 
 #[derive(Debug, Clone)]
 struct UserInput {
     id: Option<uuid::Uuid>,
-    pub name: UserInputField,
-    pub ip: UserInputField,
-    pub port: UserInputField,
+    name: UserInputField,
+    ip: UserInputField,
+    port: UserInputField,
+    direction: TrafficDirection,
     focus_input: FocusedInput,
 }
 
@@ -82,6 +86,7 @@ impl UserInput {
             name: UserInputField::default(),
             ip: UserInputField::default(),
             port: UserInputField::default(),
+            direction: TrafficDirection::Ingress,
             focus_input: FocusedInput::Name,
         }
     }
@@ -137,7 +142,7 @@ impl UserInput {
             .direction(Direction::Horizontal)
             .constraints([
                 Constraint::Fill(1),
-                Constraint::Max(80),
+                Constraint::Percentage(80),
                 Constraint::Fill(1),
             ])
             .flex(ratatui::layout::Flex::SpaceBetween)
@@ -172,8 +177,22 @@ impl UserInput {
                         }
                     })
                     .fg(Color::Black),
+                Cell::from(self.direction.to_string())
+                    .bg({
+                        if self.focus_input == FocusedInput::Direction {
+                            Color::Gray
+                        } else {
+                            Color::DarkGray
+                        }
+                    })
+                    .fg(Color::Black),
             ]),
-            Row::new(vec![Cell::new(""), Cell::new(""), Cell::new("")]),
+            Row::new(vec![
+                Cell::new(""),
+                Cell::new(""),
+                Cell::new(""),
+                Cell::new(""),
+            ]),
             Row::new(vec![
                 Cell::from({
                     if let Some(error) = &self.name.error {
@@ -199,13 +218,15 @@ impl UserInput {
                     }
                 })
                 .red(),
+                Cell::new(""),
             ]),
         ];
 
         let widths = [
-            Constraint::Percentage(33),
-            Constraint::Percentage(33),
-            Constraint::Percentage(33),
+            Constraint::Percentage(25),
+            Constraint::Percentage(25),
+            Constraint::Percentage(25),
+            Constraint::Percentage(25),
         ];
 
         let table = Table::new(rows, widths)
@@ -214,6 +235,7 @@ impl UserInput {
                     Line::from("Name").centered(),
                     Line::from("IP").centered(),
                     Line::from("Port").centered(),
+                    Line::from("Direction").centered(),
                 ])
                 .style(Style::new().bold())
                 .bottom_margin(1),
@@ -252,6 +274,7 @@ impl From<FirewallRule> for UserInput {
                 field: Input::from(rule.port.to_string()),
                 error: None,
             },
+            direction: rule.direction,
             focus_input: FocusedInput::Name,
         }
     }
@@ -318,6 +341,9 @@ impl Firewall {
         self.rules.retain(|r| r.name != rule.name);
     }
 
+    pub fn remove_ingress_rules(&mut self) {}
+    pub fn remove_egress_rules(&mut self) {}
+
     pub fn handle_keys(
         &mut self,
         key_event: KeyEvent,
@@ -350,12 +376,14 @@ impl Firewall {
                             rule.ip = IpAddr::from_str(user_input.ip.field.value()).unwrap();
                             rule.port =
                                 BlockedPort::from_str(user_input.port.field.value()).unwrap();
+                            rule.direction = user_input.direction;
                         } else {
                             let rule = FirewallRule {
                                 id: uuid::Uuid::new_v4(),
                                 name: user_input.name.field.to_string(),
                                 ip: IpAddr::from_str(user_input.ip.field.value()).unwrap(),
                                 port: BlockedPort::from_str(user_input.port.field.value()).unwrap(),
+                                direction: user_input.direction,
                                 enabled: false,
                             };
                             self.rules.push(rule);
@@ -369,7 +397,8 @@ impl Firewall {
                         match user_input.focus_input {
                             FocusedInput::Name => user_input.focus_input = FocusedInput::Ip,
                             FocusedInput::Ip => user_input.focus_input = FocusedInput::Port,
-                            FocusedInput::Port => user_input.focus_input = FocusedInput::Name,
+                            FocusedInput::Port => user_input.focus_input = FocusedInput::Direction,
+                            FocusedInput::Direction => user_input.focus_input = FocusedInput::Name,
                         }
                     }
                 }
@@ -384,6 +413,15 @@ impl Firewall {
                     FocusedInput::Port => {
                         user_input.port.field.handle_event(&Event::Key(key_event));
                     }
+                    FocusedInput::Direction => match key_event.code {
+                        KeyCode::Char('j') | KeyCode::Down => {
+                            user_input.direction = TrafficDirection::Ingress;
+                        }
+                        KeyCode::Char('k') | KeyCode::Up => {
+                            user_input.direction = TrafficDirection::Egress;
+                        }
+                        _ => {}
+                    },
                 },
             }
         } else {
@@ -394,9 +432,15 @@ impl Firewall {
 
                 KeyCode::Char(' ') => {
                     if let Some(index) = self.state.selected() {
-                        self.rules[index].enabled = !self.rules[index].enabled;
-                        self.ingress_sender.send(self.rules[index].clone())?;
-                        self.egress_sender.send(self.rules[index].clone())?
+                        let rule = &mut self.rules[index];
+                        rule.enabled = !rule.enabled;
+
+                        match rule.direction {
+                            TrafficDirection::Ingress => {
+                                self.ingress_sender.send(rule.clone())?;
+                            }
+                            TrafficDirection::Egress => self.egress_sender.send(rule.clone())?,
+                        }
                     }
                 }
 
@@ -417,9 +461,16 @@ impl Firewall {
 
                 KeyCode::Char('d') => {
                     if let Some(index) = self.state.selected() {
-                        self.rules[index].enabled = false;
-                        self.ingress_sender.send(self.rules[index].clone())?;
-                        self.egress_sender.send(self.rules[index].clone())?;
+                        let rule = &mut self.rules[index];
+
+                        rule.enabled = false;
+                        match rule.direction {
+                            TrafficDirection::Ingress => {
+                                self.ingress_sender.send(rule.clone())?;
+                            }
+                            TrafficDirection::Egress => self.egress_sender.send(rule.clone())?,
+                        }
+
                         self.rules.remove(index);
                     }
                 }
@@ -483,16 +534,22 @@ impl Firewall {
             Constraint::Max(20),
             Constraint::Length(10),
             Constraint::Length(14),
+            Constraint::Length(14),
         ];
 
         let rows = self.rules.iter().map(|rule| {
             Row::new(vec![
                 Line::from(rule.name.clone()).centered().bold(),
-                Line::from(rule.ip.to_string()).centered().centered().bold(),
-                Line::from(rule.port.to_string())
-                    .centered()
-                    .centered()
-                    .bold(),
+                Line::from(rule.ip.to_string()).centered().bold(),
+                Line::from(rule.port.to_string()).centered().bold(),
+                Line::from({
+                    match rule.direction {
+                        TrafficDirection::Ingress => String::from("Ingress 󰁅  "),
+                        TrafficDirection::Egress => String::from("Egress  "),
+                    }
+                })
+                .centered()
+                .bold(),
                 Line::from({
                     if rule.enabled {
                         "Enabled".to_string()
@@ -500,7 +557,6 @@ impl Firewall {
                         "Disabled".to_string()
                     }
                 })
-                .centered()
                 .centered()
                 .bold(),
             ])
@@ -519,6 +575,7 @@ impl Firewall {
                     Line::from("Name").centered().blue(),
                     Line::from("IP").centered().blue(),
                     Line::from("Port").centered().blue(),
+                    Line::from("Direction").centered().blue(),
                     Line::from("Status").centered().blue(),
                 ])
                 .style(Style::new().bold())
