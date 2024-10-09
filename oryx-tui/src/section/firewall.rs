@@ -1,5 +1,6 @@
 use core::fmt::Display;
 use crossterm::event::{Event, KeyCode, KeyEvent};
+use oryx_common::MAX_FIREWALL_RULES;
 use ratatui::{
     layout::{Constraint, Direction, Flex, Layout, Margin, Rect},
     style::{Color, Style, Stylize},
@@ -487,6 +488,14 @@ impl Firewall {
         } else {
             match key_event.code {
                 KeyCode::Char('n') => {
+                    if self.rules.len() == MAX_FIREWALL_RULES as usize {
+                        Notification::send(
+                            "Max rules reached",
+                            crate::notification::NotificationLevel::Warning,
+                            sender.clone(),
+                        )?;
+                        return Err("Can not edit enabled rule".into());
+                    }
                     self.add_rule();
                 }
 

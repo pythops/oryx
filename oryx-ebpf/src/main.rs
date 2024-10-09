@@ -18,7 +18,7 @@ use network_types::{
 };
 use oryx_common::{
     protocols::{LinkProtocol, NetworkProtocol, Protocol, TransportProtocol},
-    ProtoHdr, RawPacket,
+    ProtoHdr, RawPacket, MAX_FIREWALL_RULES, MAX_RULES_PORT,
 };
 
 #[map]
@@ -34,12 +34,12 @@ static TRANSPORT_FILTERS: Array<u32> = Array::with_max_entries(8, 0);
 static LINK_FILTERS: Array<u32> = Array::with_max_entries(8, 0);
 
 #[map]
-static BLOCKLIST_IPV6: HashMap<u128, [u16; 32]> =
-    HashMap::<u128, [u16; 32]>::with_max_entries(128, 0);
+static BLOCKLIST_IPV6: HashMap<u128, [u16; MAX_RULES_PORT]> =
+    HashMap::<u128, [u16; MAX_RULES_PORT]>::with_max_entries(MAX_FIREWALL_RULES, 0);
 
 #[map]
-static BLOCKLIST_IPV4: HashMap<u32, [u16; 32]> =
-    HashMap::<u32, [u16; 32]>::with_max_entries(128, 0);
+static BLOCKLIST_IPV4: HashMap<u32, [u16; MAX_RULES_PORT]> =
+    HashMap::<u32, [u16; MAX_RULES_PORT]>::with_max_entries(MAX_FIREWALL_RULES, 0);
 
 #[classifier]
 pub fn oryx(ctx: TcContext) -> i32 {

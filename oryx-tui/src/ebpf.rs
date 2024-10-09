@@ -13,7 +13,7 @@ use aya::{
     programs::{tc, SchedClassifier, TcAttachType},
     Bpf,
 };
-use oryx_common::{protocols::Protocol, RawPacket};
+use oryx_common::{protocols::Protocol, RawPacket, MAX_RULES_PORT};
 
 use crate::{
     event::Event,
@@ -65,7 +65,7 @@ impl Source for RingBuffer<'_> {
 }
 
 fn update_ipv4_blocklist(
-    ipv4_firewall: &mut HashMap<MapData, u32, [u16; 32]>,
+    ipv4_firewall: &mut HashMap<MapData, u32, [u16; MAX_RULES_PORT]>,
     addr: Ipv4Addr,
     port: BlockedPort,
     to_insert: bool,
@@ -92,7 +92,7 @@ fn update_ipv4_blocklist(
                         .filter(|p| (*p != 0 && *p != port))
                         .collect::<Vec<u16>>();
 
-                    let mut blocked_ports = [0; 32];
+                    let mut blocked_ports = [0; MAX_RULES_PORT];
 
                     for (idx, p) in not_null_ports.iter().enumerate() {
                         blocked_ports[idx] = *p;
@@ -109,14 +109,16 @@ fn update_ipv4_blocklist(
             }
             BlockedPort::All => {
                 if to_insert {
-                    ipv4_firewall.insert(addr.to_bits(), [0; 32], 0).unwrap();
+                    ipv4_firewall
+                        .insert(addr.to_bits(), [0; MAX_RULES_PORT], 0)
+                        .unwrap();
                 } else {
                     ipv4_firewall.remove(&addr.to_bits()).unwrap();
                 }
             }
         }
     } else if to_insert {
-        let mut blocked_ports: [u16; 32] = [0; 32];
+        let mut blocked_ports: [u16; MAX_RULES_PORT] = [0; MAX_RULES_PORT];
         match port {
             BlockedPort::Single(port) => {
                 blocked_ports[0] = port;
@@ -131,7 +133,7 @@ fn update_ipv4_blocklist(
 }
 
 fn update_ipv6_blocklist(
-    ipv6_firewall: &mut HashMap<MapData, u128, [u16; 32]>,
+    ipv6_firewall: &mut HashMap<MapData, u128, [u16; MAX_RULES_PORT]>,
     addr: Ipv6Addr,
     port: BlockedPort,
     to_insert: bool,
@@ -159,7 +161,7 @@ fn update_ipv6_blocklist(
                         .filter(|p| (*p != 0 && *p != port))
                         .collect::<Vec<u16>>();
 
-                    let mut blocked_ports = [0; 32];
+                    let mut blocked_ports = [0; MAX_RULES_PORT];
 
                     for (idx, p) in not_null_ports.iter().enumerate() {
                         blocked_ports[idx] = *p;
@@ -176,14 +178,16 @@ fn update_ipv6_blocklist(
             }
             BlockedPort::All => {
                 if to_insert {
-                    ipv6_firewall.insert(addr.to_bits(), [0; 32], 0).unwrap();
+                    ipv6_firewall
+                        .insert(addr.to_bits(), [0; MAX_RULES_PORT], 0)
+                        .unwrap();
                 } else {
                     ipv6_firewall.remove(&addr.to_bits()).unwrap();
                 }
             }
         }
     } else if to_insert {
-        let mut blocked_ports: [u16; 32] = [0; 32];
+        let mut blocked_ports: [u16; MAX_RULES_PORT] = [0; MAX_RULES_PORT];
         match port {
             BlockedPort::Single(port) => {
                 blocked_ports[0] = port;
@@ -293,10 +297,12 @@ impl Ebpf {
 
                 let mut link_filters: Array<_, u32> =
                     Array::try_from(bpf.take_map("LINK_FILTERS").unwrap()).unwrap();
+
                 // firewall-ebpf interface
-                let mut ipv4_firewall: HashMap<_, u32, [u16; 32]> =
+                let mut ipv4_firewall: HashMap<_, u32, [u16; MAX_RULES_PORT]> =
                     HashMap::try_from(bpf.take_map("BLOCKLIST_IPV4").unwrap()).unwrap();
-                let mut ipv6_firewall: HashMap<_, u128, [u16; 32]> =
+
+                let mut ipv6_firewall: HashMap<_, u128, [u16; MAX_RULES_PORT]> =
                     HashMap::try_from(bpf.take_map("BLOCKLIST_IPV6").unwrap()).unwrap();
 
                 thread::spawn(move || loop {
@@ -481,10 +487,12 @@ impl Ebpf {
                     Array::try_from(bpf.take_map("LINK_FILTERS").unwrap()).unwrap();
 
                 // firewall-ebpf interface
-                let mut ipv4_firewall: HashMap<_, u32, [u16; 32]> =
+                let mut ipv4_firewall: HashMap<_, u32, [u16; MAX_RULES_PORT]> =
                     HashMap::try_from(bpf.take_map("BLOCKLIST_IPV4").unwrap()).unwrap();
-                let mut ipv6_firewall: HashMap<_, u128, [u16; 32]> =
+
+                let mut ipv6_firewall: HashMap<_, u128, [u16; MAX_RULES_PORT]> =
                     HashMap::try_from(bpf.take_map("BLOCKLIST_IPV6").unwrap()).unwrap();
+
                 thread::spawn(move || loop {
                     if let Ok(signal) = firewall_egress_receiver.recv() {
                         match signal {
