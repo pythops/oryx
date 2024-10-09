@@ -166,9 +166,10 @@ pub fn handle_key_events(
         }
 
         KeyCode::Char('n') | KeyCode::Char('e') => {
-            if app.section.focused_section == FocusedSection::Firewall {
+            if app.section.focused_section == FocusedSection::Firewall
+                && app.section.handle_keys(key_event, sender).is_ok()
+            {
                 app.is_editing = true;
-                app.section.handle_keys(key_event, sender)?;
                 app.active_popup = Some(ActivePopup::NewFirewallRule);
             }
         }

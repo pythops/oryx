@@ -499,6 +499,7 @@ impl Firewall {
                                 crate::notification::NotificationLevel::Warning,
                                 sender.clone(),
                             )?;
+                            return Err("Can not edit enabled rule".into());
                         } else {
                             self.user_input = Some(rule.into());
                         }
