@@ -17,6 +17,7 @@ use oryx_common::{protocols::Protocol, RawPacket};
 
 use crate::{
     event::Event,
+    filter::FilterChannelSignal,
     notification::{Notification, NotificationLevel},
     section::firewall::{BlockedPort, FirewallSignal},
 };
@@ -201,7 +202,7 @@ impl Ebpf {
         iface: String,
         notification_sender: kanal::Sender<Event>,
         data_sender: kanal::Sender<[u8; RawPacket::LEN]>,
-        filter_channel_receiver: kanal::Receiver<(Protocol, bool)>,
+        filter_channel_receiver: kanal::Receiver<FilterChannelSignal>,
         firewall_ingress_receiver: kanal::Receiver<FirewallSignal>,
         terminate: Arc<AtomicBool>,
     ) {
@@ -324,16 +325,21 @@ impl Ebpf {
                 });
 
                 thread::spawn(move || loop {
-                    if let Ok((filter, flag)) = filter_channel_receiver.recv() {
-                        match filter {
-                            Protocol::Transport(p) => {
-                                let _ = transport_filters.set(p as u32, flag as u32, 0);
-                            }
-                            Protocol::Network(p) => {
-                                let _ = network_filters.set(p as u32, flag as u32, 0);
-                            }
-                            Protocol::Link(p) => {
-                                let _ = link_filters.set(p as u32, flag as u32, 0);
+                    if let Ok(signal) = filter_channel_receiver.recv() {
+                        match signal {
+                            FilterChannelSignal::Update((filter, flag)) => match filter {
+                                Protocol::Transport(p) => {
+                                    let _ = transport_filters.set(p as u32, flag as u32, 0);
+                                }
+                                Protocol::Network(p) => {
+                                    let _ = network_filters.set(p as u32, flag as u32, 0);
+                                }
+                                Protocol::Link(p) => {
+                                    let _ = link_filters.set(p as u32, flag as u32, 0);
+                                }
+                            },
+                            FilterChannelSignal::Kill => {
+                                break;
                             }
                         }
                     }
@@ -386,7 +392,7 @@ impl Ebpf {
         iface: String,
         notification_sender: kanal::Sender<Event>,
         data_sender: kanal::Sender<[u8; RawPacket::LEN]>,
-        filter_channel_receiver: kanal::Receiver<(Protocol, bool)>,
+        filter_channel_receiver: kanal::Receiver<FilterChannelSignal>,
         firewall_egress_receiver: kanal::Receiver<FirewallSignal>,
         terminate: Arc<AtomicBool>,
     ) {
@@ -505,20 +511,26 @@ impl Ebpf {
                 });
 
                 thread::spawn(move || loop {
-                    if let Ok((filter, flag)) = filter_channel_receiver.recv() {
-                        match filter {
-                            Protocol::Transport(p) => {
-                                let _ = transport_filters.set(p as u32, flag as u32, 0);
-                            }
-                            Protocol::Network(p) => {
-                                let _ = network_filters.set(p as u32, flag as u32, 0);
-                            }
-                            Protocol::Link(p) => {
-                                let _ = link_filters.set(p as u32, flag as u32, 0);
+                    if let Ok(signal) = filter_channel_receiver.recv() {
+                        match signal {
+                            FilterChannelSignal::Update((filter, flag)) => match filter {
+                                Protocol::Transport(p) => {
+                                    let _ = transport_filters.set(p as u32, flag as u32, 0);
+                                }
+                                Protocol::Network(p) => {
+                                    let _ = network_filters.set(p as u32, flag as u32, 0);
+                                }
+                                Protocol::Link(p) => {
+                                    let _ = link_filters.set(p as u32, flag as u32, 0);
+                                }
+                            },
+                            FilterChannelSignal::Kill => {
+                                break;
                             }
                         }
                     }
                 });
+
                 let mut ring_buf = RingBuffer::new(&mut bpf);
 
                 poll.registry()

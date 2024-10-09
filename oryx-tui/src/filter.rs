@@ -33,9 +33,15 @@ use crate::{
 };
 
 #[derive(Debug, Clone)]
+pub enum FilterChannelSignal {
+    Update((Protocol, bool)),
+    Kill,
+}
+
+#[derive(Debug, Clone)]
 pub struct Channels {
-    pub sender: kanal::Sender<(Protocol, bool)>,
-    pub receiver: kanal::Receiver<(Protocol, bool)>,
+    pub sender: kanal::Sender<FilterChannelSignal>,
+    pub receiver: kanal::Receiver<FilterChannelSignal>,
 }
 
 #[derive(Debug, Clone)]
@@ -191,20 +197,32 @@ impl Filter {
                 self.filter_chans
                     .ingress
                     .sender
-                    .send((Protocol::Transport(*protocol), false))?;
+                    .send(FilterChannelSignal::Update((
+                        Protocol::Transport(*protocol),
+                        false,
+                    )))?;
                 self.filter_chans
                     .egress
                     .sender
-                    .send((Protocol::Transport(*protocol), false))?;
+                    .send(FilterChannelSignal::Update((
+                        Protocol::Transport(*protocol),
+                        false,
+                    )))?;
             } else {
                 self.filter_chans
                     .ingress
                     .sender
-                    .send((Protocol::Transport(*protocol), true))?;
+                    .send(FilterChannelSignal::Update((
+                        Protocol::Transport(*protocol),
+                        true,
+                    )))?;
                 self.filter_chans
                     .egress
                     .sender
-                    .send((Protocol::Transport(*protocol), true))?;
+                    .send(FilterChannelSignal::Update((
+                        Protocol::Transport(*protocol),
+                        true,
+                    )))?;
             }
         }
 
@@ -213,20 +231,32 @@ impl Filter {
                 self.filter_chans
                     .ingress
                     .sender
-                    .send((Protocol::Network(*protocol), false))?;
+                    .send(FilterChannelSignal::Update((
+                        Protocol::Network(*protocol),
+                        false,
+                    )))?;
                 self.filter_chans
                     .egress
                     .sender
-                    .send((Protocol::Network(*protocol), false))?;
+                    .send(FilterChannelSignal::Update((
+                        Protocol::Network(*protocol),
+                        false,
+                    )))?;
             } else {
                 self.filter_chans
                     .ingress
                     .sender
-                    .send((Protocol::Network(*protocol), true))?;
+                    .send(FilterChannelSignal::Update((
+                        Protocol::Network(*protocol),
+                        true,
+                    )))?;
                 self.filter_chans
                     .egress
                     .sender
-                    .send((Protocol::Network(*protocol), true))?;
+                    .send(FilterChannelSignal::Update((
+                        Protocol::Network(*protocol),
+                        true,
+                    )))?;
             }
         }
 
@@ -235,20 +265,32 @@ impl Filter {
                 self.filter_chans
                     .ingress
                     .sender
-                    .send((Protocol::Link(*protocol), false))?;
+                    .send(FilterChannelSignal::Update((
+                        Protocol::Link(*protocol),
+                        false,
+                    )))?;
                 self.filter_chans
                     .egress
                     .sender
-                    .send((Protocol::Link(*protocol), false))?;
+                    .send(FilterChannelSignal::Update((
+                        Protocol::Link(*protocol),
+                        false,
+                    )))?;
             } else {
                 self.filter_chans
                     .ingress
                     .sender
-                    .send((Protocol::Link(*protocol), true))?;
+                    .send(FilterChannelSignal::Update((
+                        Protocol::Link(*protocol),
+                        true,
+                    )))?;
                 self.filter_chans
                     .egress
                     .sender
-                    .send((Protocol::Link(*protocol), true))?;
+                    .send(FilterChannelSignal::Update((
+                        Protocol::Link(*protocol),
+                        true,
+                    )))?;
             }
         }
 
@@ -271,6 +313,10 @@ impl Filter {
                 .contains(&TrafficDirection::Egress)
         {
             self.firewall_egress_sender.send(FirewallSignal::Kill)?;
+            self.filter_chans
+                .egress
+                .sender
+                .send(FilterChannelSignal::Kill)?;
             self.traffic_direction.terminate(TrafficDirection::Egress);
         }
 
@@ -311,6 +357,10 @@ impl Filter {
                 .contains(&TrafficDirection::Ingress)
         {
             self.firewall_ingress_sender.send(FirewallSignal::Kill)?;
+            self.filter_chans
+                .ingress
+                .sender
+                .send(FilterChannelSignal::Kill)?;
             self.traffic_direction.terminate(TrafficDirection::Ingress);
         }
 
