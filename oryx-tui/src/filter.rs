@@ -18,9 +18,9 @@ use oryx_common::{
     RawPacket,
 };
 use ratatui::{
-    layout::{Alignment, Constraint, Direction, Flex, Layout, Rect},
+    layout::{Alignment, Constraint, Direction, Flex, Layout, Margin, Rect},
     style::{Style, Stylize},
-    text::{Line, Span},
+    text::{Line, Span, Text},
     widgets::{Block, BorderType, Borders, Clear, Padding, Row, Table, TableState},
     Frame,
 };
@@ -570,6 +570,16 @@ impl Filter {
     }
 
     pub fn render_on_setup(&mut self, frame: &mut Frame) {
+        let (filters_block, help_block) = {
+            let chunks = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([Constraint::Fill(1), Constraint::Length(3)])
+                .flex(ratatui::layout::Flex::SpaceBetween)
+                .split(frame.area());
+
+            (chunks[0], chunks[1])
+        };
+
         let (
             interface_block,
             transport_filter_block,
@@ -590,7 +600,7 @@ impl Filter {
                 ])
                 .margin(1)
                 .flex(Flex::SpaceAround)
-                .split(frame.area());
+                .split(filters_block);
             (
                 chunks[0], chunks[1], chunks[2], chunks[3], chunks[4], chunks[5],
             )
@@ -638,6 +648,38 @@ impl Filter {
             .build();
 
         frame.render_widget(start, start_block);
+
+        let help = Text::from(vec![
+            Line::from(""),
+            Line::from(vec![
+                Span::from("k,⬆").bold(),
+                Span::from(": Scroll up").bold(),
+                Span::from(" | ").bold(),
+                Span::from("j,⬇").bold(),
+                Span::from(": Scroll down").bold(),
+                Span::from(" | ").bold(),
+                Span::from("󱞦 ").bold(),
+                Span::from(": Apply").bold(),
+                Span::from(" | ").bold(),
+                Span::from(" ").bold(),
+                Span::from(": Naviguate").bold(),
+            ]),
+        ])
+        .centered();
+        frame.render_widget(
+            Block::new()
+                .borders(Borders::ALL)
+                .blue()
+                .border_type(BorderType::Rounded),
+            help_block,
+        );
+        frame.render_widget(
+            help,
+            help_block.inner(Margin {
+                horizontal: 1,
+                vertical: 0,
+            }),
+        );
     }
 
     pub fn render_on_sniffing(&mut self, frame: &mut Frame, block: Rect) {
@@ -762,11 +804,21 @@ impl Filter {
             .direction(Direction::Horizontal)
             .constraints([
                 Constraint::Fill(1),
-                Constraint::Length(60),
+                Constraint::Max(82),
                 Constraint::Fill(1),
             ])
             .flex(ratatui::layout::Flex::SpaceBetween)
             .split(layout[1])[1];
+
+        let (filters_block, help_block) = {
+            let chunks = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([Constraint::Fill(1), Constraint::Length(3)])
+                .flex(ratatui::layout::Flex::SpaceBetween)
+                .split(block);
+
+            (chunks[0], chunks[1])
+        };
 
         let (
             transport_filter_block,
@@ -778,6 +830,7 @@ impl Filter {
             let chunks = Layout::default()
                 .direction(Direction::Vertical)
                 .constraints([
+                    Constraint::Length(1),
                     Constraint::Length(NB_TRANSPORT_PROTOCOL + 4),
                     Constraint::Length(NB_NETWORK_PROTOCOL + 4),
                     Constraint::Length(NB_LINK_PROTOCOL + 4),
@@ -786,17 +839,18 @@ impl Filter {
                 ])
                 .margin(1)
                 .flex(Flex::SpaceBetween)
-                .split(block);
-            (chunks[0], chunks[1], chunks[2], chunks[3], chunks[4])
+                .split(filters_block);
+            (chunks[1], chunks[2], chunks[3], chunks[4], chunks[5])
         };
 
         frame.render_widget(Clear, block);
+
         frame.render_widget(
             Block::new()
                 .borders(Borders::all())
                 .border_type(BorderType::Thick)
                 .border_style(Style::default().green()),
-            block,
+            filters_block,
         );
 
         self.network.render(
@@ -834,5 +888,40 @@ impl Filter {
             .centered()
             .build();
         frame.render_widget(apply, apply_block);
+
+        let help = Text::from(vec![
+            Line::from(""),
+            Line::from(vec![
+                Span::from("k,⬆").bold(),
+                Span::from(": Move up").bold(),
+                Span::from(" | ").bold(),
+                Span::from("j,⬇").bold(),
+                Span::from(": Move down").bold(),
+                Span::from(" | ").bold(),
+                Span::from("󱊷 ").bold(),
+                Span::from(": Discard").bold(),
+                Span::from(" | ").bold(),
+                Span::from("󱞦 ").bold(),
+                Span::from(": Apply").bold(),
+                Span::from(" | ").bold(),
+                Span::from(" ").bold(),
+                Span::from(": Naviguate").bold(),
+            ]),
+        ])
+        .centered();
+        frame.render_widget(
+            Block::new()
+                .borders(Borders::ALL)
+                .blue()
+                .border_type(BorderType::Rounded),
+            help_block,
+        );
+        frame.render_widget(
+            help,
+            help_block.inner(Margin {
+                horizontal: 1,
+                vertical: 0,
+            }),
+        );
     }
 }

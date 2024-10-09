@@ -11,9 +11,9 @@ use firewall::{Firewall, FirewallSignal};
 
 use inspection::Inspection;
 use ratatui::{
-    layout::{Alignment, Rect},
+    layout::{Alignment, Constraint, Direction, Layout, Margin, Rect},
     style::{Color, Style, Stylize},
-    text::{Line, Span},
+    text::{Line, Span, Text},
     widgets::{Block, BorderType, Borders, Padding},
     Frame,
 };
@@ -89,6 +89,72 @@ impl Section {
         }
     }
 
+    fn render_footer_help(&self, frame: &mut Frame, block: Rect) {
+        let message = match self.focused_section {
+            FocusedSection::Inspection => Line::from(vec![
+                Span::from("k,⬆").bold(),
+                Span::from(": Move up").bold(),
+                Span::from(" | ").bold(),
+                Span::from("j,⬇").bold(),
+                Span::from(": Move down").bold(),
+                Span::from(" | ").bold(),
+                Span::from("/").bold(),
+                Span::from(": Search").bold(),
+                Span::from(" | ").bold(),
+                Span::from("i").bold(),
+                Span::from(": Infos").bold(),
+                Span::from(" | ").bold(),
+                Span::from("f").bold(),
+                Span::from(": Filters").bold(),
+                Span::from(" | ").bold(),
+                Span::from(" ").bold(),
+                Span::from(": Naviguate").bold(),
+            ]),
+            FocusedSection::Firewall => Line::from(vec![
+                Span::from("k,⬆").bold(),
+                Span::from(": Move up").bold(),
+                Span::from(" | ").bold(),
+                Span::from("j,⬇").bold(),
+                Span::from(": Move down").bold(),
+                Span::from(" | ").bold(),
+                Span::from("n").bold(),
+                Span::from(": New Rule").bold(),
+                Span::from(" | ").bold(),
+                Span::from("d").bold(),
+                Span::from(": Delete Rule").bold(),
+                Span::from(" | ").bold(),
+                Span::from("f").bold(),
+                Span::from(": Filters").bold(),
+                Span::from(" | ").bold(),
+                Span::from(" ").bold(),
+                Span::from(": Naviguate").bold(),
+            ]),
+            _ => Line::from(vec![
+                Span::from("f").bold(),
+                Span::from(": Filters").bold(),
+                Span::from(" | ").bold(),
+                Span::from(" ").bold(),
+                Span::from(": Naviguate").bold(),
+            ]),
+        };
+
+        let help = Text::from(vec![Line::from(""), message]).centered();
+        frame.render_widget(
+            Block::new()
+                .borders(Borders::ALL)
+                .blue()
+                .border_type(BorderType::Rounded),
+            block,
+        );
+        frame.render_widget(
+            help,
+            block.inner(Margin {
+                horizontal: 1,
+                vertical: 0,
+            }),
+        );
+    }
+
     pub fn render_header(&mut self, frame: &mut Frame, block: Rect) {
         frame.render_widget(
             Block::default()
@@ -110,12 +176,24 @@ impl Section {
         );
     }
     pub fn render(&mut self, frame: &mut Frame, block: Rect, network_interace: &str) {
-        self.render_header(frame, block);
+        let (section_block, help_block) = {
+            let chunks = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([Constraint::Fill(1), Constraint::Length(3)])
+                .flex(ratatui::layout::Flex::SpaceBetween)
+                .split(block);
+
+            (chunks[0], chunks[1])
+        };
+
+        self.render_header(frame, section_block);
+        self.render_footer_help(frame, help_block);
+
         match self.focused_section {
-            FocusedSection::Inspection => self.inspection.render(frame, block),
-            FocusedSection::Stats => self.stats.render(frame, block, network_interace),
-            FocusedSection::Alerts => self.alert.render(frame, block),
-            FocusedSection::Firewall => self.firewall.render(frame, block),
+            FocusedSection::Inspection => self.inspection.render(frame, section_block),
+            FocusedSection::Stats => self.stats.render(frame, section_block, network_interace),
+            FocusedSection::Alerts => self.alert.render(frame, section_block),
+            FocusedSection::Firewall => self.firewall.render(frame, section_block),
         }
     }
 
