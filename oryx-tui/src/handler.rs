@@ -13,7 +13,7 @@ use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 pub fn handle_key_events(
     key_event: KeyEvent,
     app: &mut App,
-    sender: kanal::Sender<Event>,
+    event_sender: kanal::Sender<Event>,
 ) -> AppResult<()> {
     // Start Phase
     if !app.start_sniffing {
@@ -21,7 +21,7 @@ pub fn handle_key_events(
             KeyCode::Enter => {
                 if app.filter.focused_block == FocusedBlock::Apply {
                     app.filter
-                        .start(sender.clone(), app.data_channel_sender.clone())?;
+                        .start(event_sender.clone(), app.data_channel_sender.clone())?;
 
                     app.start_sniffing = true;
                 }
@@ -64,7 +64,7 @@ pub fn handle_key_events(
                     ActivePopup::NewFirewallRule => {
                         app.section
                             .firewall
-                            .handle_keys(key_event, sender.clone())?;
+                            .handle_keys(key_event, event_sender.clone())?;
                         app.is_editing = false;
                     }
                     _ => {}
@@ -74,7 +74,7 @@ pub fn handle_key_events(
                 ActivePopup::UpdateFilters => {
                     if app.filter.focused_block == FocusedBlock::Apply {
                         app.filter
-                            .update(sender.clone(), app.data_channel_sender.clone())?;
+                            .update(event_sender.clone(), app.data_channel_sender.clone())?;
                         if !app.filter.traffic_direction.is_ingress_loaded() {
                             app.section.firewall.disable_ingress_rules();
                         }
@@ -90,7 +90,7 @@ pub fn handle_key_events(
                     if app
                         .section
                         .firewall
-                        .handle_keys(key_event, sender.clone())
+                        .handle_keys(key_event, event_sender.clone())
                         .is_ok()
                     {
                         app.active_popup = None;
@@ -107,7 +107,7 @@ pub fn handle_key_events(
                 ActivePopup::NewFirewallRule => {
                     app.section
                         .firewall
-                        .handle_keys(key_event, sender.clone())?;
+                        .handle_keys(key_event, event_sender.clone())?;
                 }
                 _ => {}
             },
@@ -122,7 +122,7 @@ pub fn handle_key_events(
             _ => {}
         }
 
-        app.section.handle_keys(key_event, sender.clone())?;
+        app.section.handle_keys(key_event, event_sender.clone())?;
         return Ok(());
     }
 
@@ -140,7 +140,7 @@ pub fn handle_key_events(
             if key_event.modifiers == KeyModifiers::CONTROL {
                 app.filter.terminate();
                 thread::sleep(Duration::from_millis(150));
-                sender.send(Event::Reset)?;
+                event_sender.send(Event::Reset)?;
             }
         }
 
@@ -161,13 +161,13 @@ pub fn handle_key_events(
         KeyCode::Char('/') => {
             if app.section.focused_section == FocusedSection::Inspection {
                 app.is_editing = true;
-                app.section.handle_keys(key_event, sender.clone())?;
+                app.section.handle_keys(key_event, event_sender.clone())?;
             }
         }
 
         KeyCode::Char('n') | KeyCode::Char('e') => {
             if app.section.focused_section == FocusedSection::Firewall
-                && app.section.handle_keys(key_event, sender).is_ok()
+                && app.section.handle_keys(key_event, event_sender).is_ok()
             {
                 app.is_editing = true;
                 app.active_popup = Some(ActivePopup::NewFirewallRule);
@@ -183,7 +183,7 @@ pub fn handle_key_events(
         KeyCode::Char(' ') => {
             if app.section.focused_section == FocusedSection::Firewall {
                 app.section.firewall.load_rule(
-                    sender.clone(),
+                    event_sender.clone(),
                     app.filter.traffic_direction.is_ingress_loaded(),
                     app.filter.traffic_direction.is_egress_loaded(),
                 )?;
@@ -196,7 +196,7 @@ pub fn handle_key_events(
                 Notification::send(
                     "There is no packets".to_string(),
                     NotificationLevel::Info,
-                    sender,
+                    event_sender,
                 )?;
             } else {
                 match export(&app_packets) {
@@ -204,17 +204,17 @@ pub fn handle_key_events(
                         Notification::send(
                             "Packets exported to ~/oryx/capture file".to_string(),
                             NotificationLevel::Info,
-                            sender,
+                            event_sender,
                         )?;
                     }
                     Err(e) => {
-                        Notification::send(e.to_string(), NotificationLevel::Error, sender)?;
+                        Notification::send(e.to_string(), NotificationLevel::Error, event_sender)?;
                     }
                 }
             }
         }
         _ => {
-            app.section.handle_keys(key_event, sender.clone())?;
+            app.section.handle_keys(key_event, event_sender.clone())?;
         }
     }
 
