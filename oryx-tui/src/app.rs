@@ -77,7 +77,12 @@ impl App {
         Self {
             running: true,
             help: Help::new(),
-            filter: Filter::new(firewall_ingress_receiver, firewall_egress_receiver),
+            filter: Filter::new(
+                firewall_ingress_sender.clone(),
+                firewall_ingress_receiver,
+                firewall_egress_sender.clone(),
+                firewall_egress_receiver,
+            ),
             start_sniffing: false,
             packets: packets.clone(),
             notifications: Vec::new(),

@@ -15,6 +15,10 @@ show interface:
     sudo tc filter show dev $interface egress
 
 # Run oryx debug
+run-debug:
+    echo "" > log-file
+    RUST_LOG=info cargo xtask run 2> log-file
+
 run:
     cargo xtask run
 

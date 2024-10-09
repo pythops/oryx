@@ -28,7 +28,8 @@ use transport::TransportFilter;
 use tui_big_text::{BigText, PixelSize};
 
 use crate::{
-    app::AppResult, ebpf::Ebpf, event::Event, interface::Interface, section::firewall::FirewallRule,
+    app::AppResult, ebpf::Ebpf, event::Event, interface::Interface,
+    section::firewall::FirewallSignal,
 };
 
 #[derive(Debug, Clone)]
@@ -91,14 +92,18 @@ pub struct Filter {
     pub filter_chans: IoChans,
     pub firewall_chans: IoChans,
     pub focused_block: FocusedBlock,
-    pub firewall_ingress_receiver: kanal::Receiver<FirewallRule>,
-    pub firewall_egress_receiver: kanal::Receiver<FirewallRule>,
+    pub firewall_ingress_sender: kanal::Sender<FirewallSignal>,
+    pub firewall_ingress_receiver: kanal::Receiver<FirewallSignal>,
+    pub firewall_egress_sender: kanal::Sender<FirewallSignal>,
+    pub firewall_egress_receiver: kanal::Receiver<FirewallSignal>,
 }
 
 impl Filter {
     pub fn new(
-        firewall_ingress_receiver: kanal::Receiver<FirewallRule>,
-        firewall_egress_receiver: kanal::Receiver<FirewallRule>,
+        firewall_ingress_sender: kanal::Sender<FirewallSignal>,
+        firewall_ingress_receiver: kanal::Receiver<FirewallSignal>,
+        firewall_egress_sender: kanal::Sender<FirewallSignal>,
+        firewall_egress_receiver: kanal::Receiver<FirewallSignal>,
     ) -> Self {
         Self {
             interface: Interface::new(),
@@ -109,7 +114,9 @@ impl Filter {
             filter_chans: IoChans::new(),
             firewall_chans: IoChans::new(),
             focused_block: FocusedBlock::Interface,
+            firewall_ingress_sender,
             firewall_ingress_receiver,
+            firewall_egress_sender,
             firewall_egress_receiver,
         }
     }
@@ -263,6 +270,7 @@ impl Filter {
                 .selected_direction
                 .contains(&TrafficDirection::Egress)
         {
+            self.firewall_egress_sender.send(FirewallSignal::Kill)?;
             self.traffic_direction.terminate(TrafficDirection::Egress);
         }
 
@@ -302,6 +310,7 @@ impl Filter {
                 .selected_direction
                 .contains(&TrafficDirection::Ingress)
         {
+            self.firewall_ingress_sender.send(FirewallSignal::Kill)?;
             self.traffic_direction.terminate(TrafficDirection::Ingress);
         }
 

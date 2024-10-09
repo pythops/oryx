@@ -14,6 +14,12 @@ use uuid;
 use crate::{app::AppResult, filter::direction::TrafficDirection, notification::Notification};
 
 #[derive(Debug, Clone)]
+pub enum FirewallSignal {
+    Rule(FirewallRule),
+    Kill,
+}
+
+#[derive(Debug, Clone)]
 pub struct FirewallRule {
     id: uuid::Uuid,
     name: String,
@@ -285,14 +291,14 @@ pub struct Firewall {
     rules: Vec<FirewallRule>,
     state: TableState,
     user_input: Option<UserInput>,
-    ingress_sender: kanal::Sender<FirewallRule>,
-    egress_sender: kanal::Sender<FirewallRule>,
+    ingress_sender: kanal::Sender<FirewallSignal>,
+    egress_sender: kanal::Sender<FirewallSignal>,
 }
 
 impl Firewall {
     pub fn new(
-        ingress_sender: kanal::Sender<FirewallRule>,
-        egress_sender: kanal::Sender<FirewallRule>,
+        ingress_sender: kanal::Sender<FirewallSignal>,
+        egress_sender: kanal::Sender<FirewallSignal>,
     ) -> Self {
         Self {
             rules: Vec::new(),
@@ -369,7 +375,8 @@ impl Firewall {
                 TrafficDirection::Ingress => {
                     if is_ingress_loaded {
                         rule.enabled = !rule.enabled;
-                        self.ingress_sender.send(rule.clone())?;
+                        self.ingress_sender
+                            .send(FirewallSignal::Rule(rule.clone()))?;
                     } else {
                         Notification::send(
                             "Ingress is not loaded.",
@@ -381,7 +388,8 @@ impl Firewall {
                 TrafficDirection::Egress => {
                     if is_egress_loaded {
                         rule.enabled = !rule.enabled;
-                        self.egress_sender.send(rule.clone())?;
+                        self.egress_sender
+                            .send(FirewallSignal::Rule(rule.clone()))?;
                     } else {
                         Notification::send(
                             "Egress is not loaded.",
@@ -503,9 +511,12 @@ impl Firewall {
                         rule.enabled = false;
                         match rule.direction {
                             TrafficDirection::Ingress => {
-                                self.ingress_sender.send(rule.clone())?;
+                                self.ingress_sender
+                                    .send(FirewallSignal::Rule(rule.clone()))?;
                             }
-                            TrafficDirection::Egress => self.egress_sender.send(rule.clone())?,
+                            TrafficDirection::Egress => self
+                                .egress_sender
+                                .send(FirewallSignal::Rule(rule.clone()))?,
                         }
 
                         self.rules.remove(index);

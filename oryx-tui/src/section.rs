@@ -7,7 +7,7 @@ use std::sync::{Arc, Mutex};
 
 use alert::Alert;
 use crossterm::event::{KeyCode, KeyEvent};
-use firewall::{Firewall, FirewallRule};
+use firewall::{Firewall, FirewallSignal};
 
 use inspection::Inspection;
 use ratatui::{
@@ -41,8 +41,8 @@ pub struct Section {
 impl Section {
     pub fn new(
         packets: Arc<Mutex<Vec<AppPacket>>>,
-        firewall_ingress_sender: kanal::Sender<FirewallRule>,
-        firewall_egress_sender: kanal::Sender<FirewallRule>,
+        firewall_ingress_sender: kanal::Sender<FirewallSignal>,
+        firewall_egress_sender: kanal::Sender<FirewallSignal>,
     ) -> Self {
         Self {
             focused_section: FocusedSection::Inspection,

@@ -18,7 +18,7 @@ use oryx_common::{protocols::Protocol, RawPacket};
 use crate::{
     event::Event,
     notification::{Notification, NotificationLevel},
-    section::firewall::{BlockedPort, FirewallRule},
+    section::firewall::{BlockedPort, FirewallSignal},
 };
 use mio::{event::Source, unix::SourceFd, Events, Interest, Poll, Registry, Token};
 
@@ -83,8 +83,7 @@ fn update_ipv4_blocklist(
                             .insert(addr.to_bits(), blocked_ports, 0)
                             .unwrap();
                     } else {
-                        //TODO:
-                        unreachable!(); // list is full
+                        unreachable!();
                     }
                 } else {
                     let not_null_ports = blocked_ports
@@ -203,7 +202,7 @@ impl Ebpf {
         notification_sender: kanal::Sender<Event>,
         data_sender: kanal::Sender<[u8; RawPacket::LEN]>,
         filter_channel_receiver: kanal::Receiver<(Protocol, bool)>,
-        firewall_ingress_receiver: kanal::Receiver<FirewallRule>,
+        firewall_ingress_receiver: kanal::Receiver<FirewallSignal>,
         terminate: Arc<AtomicBool>,
     ) {
         thread::spawn({
@@ -300,21 +299,26 @@ impl Ebpf {
                     HashMap::try_from(bpf.take_map("BLOCKLIST_IPV6_INGRESS").unwrap()).unwrap();
 
                 thread::spawn(move || loop {
-                    if let Ok(rule) = firewall_ingress_receiver.recv() {
-                        match rule.ip {
-                            IpAddr::V4(addr) => update_ipv4_blocklist(
-                                &mut ipv4_firewall,
-                                addr,
-                                rule.port,
-                                rule.enabled,
-                            ),
+                    if let Ok(signal) = firewall_ingress_receiver.recv() {
+                        match signal {
+                            FirewallSignal::Rule(rule) => match rule.ip {
+                                IpAddr::V4(addr) => update_ipv4_blocklist(
+                                    &mut ipv4_firewall,
+                                    addr,
+                                    rule.port,
+                                    rule.enabled,
+                                ),
 
-                            IpAddr::V6(addr) => update_ipv6_blocklist(
-                                &mut ipv6_firewall,
-                                addr,
-                                rule.port,
-                                rule.enabled,
-                            ),
+                                IpAddr::V6(addr) => update_ipv6_blocklist(
+                                    &mut ipv6_firewall,
+                                    addr,
+                                    rule.port,
+                                    rule.enabled,
+                                ),
+                            },
+                            FirewallSignal::Kill => {
+                                break;
+                            }
                         }
                     }
                 });
@@ -383,7 +387,7 @@ impl Ebpf {
         notification_sender: kanal::Sender<Event>,
         data_sender: kanal::Sender<[u8; RawPacket::LEN]>,
         filter_channel_receiver: kanal::Receiver<(Protocol, bool)>,
-        firewall_egress_receiver: kanal::Receiver<FirewallRule>,
+        firewall_egress_receiver: kanal::Receiver<FirewallSignal>,
         terminate: Arc<AtomicBool>,
     ) {
         thread::spawn({
@@ -476,21 +480,26 @@ impl Ebpf {
                 let mut ipv6_firewall: HashMap<_, u128, [u16; 32]> =
                     HashMap::try_from(bpf.take_map("BLOCKLIST_IPV6_EGRESS").unwrap()).unwrap();
                 thread::spawn(move || loop {
-                    if let Ok(rule) = firewall_egress_receiver.recv() {
-                        match rule.ip {
-                            IpAddr::V4(addr) => update_ipv4_blocklist(
-                                &mut ipv4_firewall,
-                                addr,
-                                rule.port,
-                                rule.enabled,
-                            ),
+                    if let Ok(signal) = firewall_egress_receiver.recv() {
+                        match signal {
+                            FirewallSignal::Rule(rule) => match rule.ip {
+                                IpAddr::V4(addr) => update_ipv4_blocklist(
+                                    &mut ipv4_firewall,
+                                    addr,
+                                    rule.port,
+                                    rule.enabled,
+                                ),
 
-                            IpAddr::V6(addr) => update_ipv6_blocklist(
-                                &mut ipv6_firewall,
-                                addr,
-                                rule.port,
-                                rule.enabled,
-                            ),
+                                IpAddr::V6(addr) => update_ipv6_blocklist(
+                                    &mut ipv6_firewall,
+                                    addr,
+                                    rule.port,
+                                    rule.enabled,
+                                ),
+                            },
+                            FirewallSignal::Kill => {
+                                break;
+                            }
                         }
                     }
                 });
