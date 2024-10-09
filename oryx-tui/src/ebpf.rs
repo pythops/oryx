@@ -295,9 +295,9 @@ impl Ebpf {
                     Array::try_from(bpf.take_map("LINK_FILTERS").unwrap()).unwrap();
                 // firewall-ebpf interface
                 let mut ipv4_firewall: HashMap<_, u32, [u16; 32]> =
-                    HashMap::try_from(bpf.take_map("BLOCKLIST_IPV4_INGRESS").unwrap()).unwrap();
+                    HashMap::try_from(bpf.take_map("BLOCKLIST_IPV4").unwrap()).unwrap();
                 let mut ipv6_firewall: HashMap<_, u128, [u16; 32]> =
-                    HashMap::try_from(bpf.take_map("BLOCKLIST_IPV6_INGRESS").unwrap()).unwrap();
+                    HashMap::try_from(bpf.take_map("BLOCKLIST_IPV6").unwrap()).unwrap();
 
                 thread::spawn(move || loop {
                     if let Ok(signal) = firewall_ingress_receiver.recv() {
@@ -482,9 +482,9 @@ impl Ebpf {
 
                 // firewall-ebpf interface
                 let mut ipv4_firewall: HashMap<_, u32, [u16; 32]> =
-                    HashMap::try_from(bpf.take_map("BLOCKLIST_IPV4_EGRESS").unwrap()).unwrap();
+                    HashMap::try_from(bpf.take_map("BLOCKLIST_IPV4").unwrap()).unwrap();
                 let mut ipv6_firewall: HashMap<_, u128, [u16; 32]> =
-                    HashMap::try_from(bpf.take_map("BLOCKLIST_IPV6_EGRESS").unwrap()).unwrap();
+                    HashMap::try_from(bpf.take_map("BLOCKLIST_IPV6").unwrap()).unwrap();
                 thread::spawn(move || loop {
                     if let Ok(signal) = firewall_egress_receiver.recv() {
                         match signal {
