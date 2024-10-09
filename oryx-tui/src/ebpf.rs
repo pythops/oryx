@@ -1,22 +1,25 @@
 use std::{
     io,
+    net::{IpAddr, Ipv4Addr, Ipv6Addr},
     os::fd::AsRawFd,
     sync::{atomic::AtomicBool, Arc},
-    thread::{self, spawn},
+    thread,
     time::Duration,
 };
 
 use aya::{
     include_bytes_aligned,
-    maps::{ring_buf::RingBufItem, Array, MapData, RingBuf},
+    maps::{ring_buf::RingBufItem, Array, HashMap, MapData, RingBuf},
     programs::{tc, SchedClassifier, TcAttachType},
     Bpf,
 };
-use oryx_common::{protocols::Protocol, RawPacket};
+use oryx_common::{protocols::Protocol, RawPacket, MAX_RULES_PORT};
 
 use crate::{
     event::Event,
+    filter::FilterChannelSignal,
     notification::{Notification, NotificationLevel},
+    section::firewall::{BlockedPort, FirewallSignal},
 };
 use mio::{event::Source, unix::SourceFd, Events, Interest, Poll, Registry, Token};
 
@@ -61,12 +64,150 @@ impl Source for RingBuffer<'_> {
     }
 }
 
+fn update_ipv4_blocklist(
+    ipv4_firewall: &mut HashMap<MapData, u32, [u16; MAX_RULES_PORT]>,
+    addr: Ipv4Addr,
+    port: BlockedPort,
+    to_insert: bool,
+) {
+    if let Ok(mut blocked_ports) = ipv4_firewall.get(&addr.to_bits(), 0) {
+        match port {
+            BlockedPort::Single(port) => {
+                if to_insert {
+                    if let Some((first_zero_index, _)) = blocked_ports
+                        .iter()
+                        .enumerate()
+                        .find(|(_, &value)| value == 0)
+                    {
+                        blocked_ports[first_zero_index] = port;
+                        ipv4_firewall
+                            .insert(addr.to_bits(), blocked_ports, 0)
+                            .unwrap();
+                    } else {
+                        unreachable!();
+                    }
+                } else {
+                    let not_null_ports = blocked_ports
+                        .into_iter()
+                        .filter(|p| (*p != 0 && *p != port))
+                        .collect::<Vec<u16>>();
+
+                    let mut blocked_ports = [0; MAX_RULES_PORT];
+
+                    for (idx, p) in not_null_ports.iter().enumerate() {
+                        blocked_ports[idx] = *p;
+                    }
+
+                    if blocked_ports.iter().all(|&port| port == 0) {
+                        ipv4_firewall.remove(&addr.to_bits()).unwrap();
+                    } else {
+                        ipv4_firewall
+                            .insert(addr.to_bits(), blocked_ports, 0)
+                            .unwrap();
+                    }
+                }
+            }
+            BlockedPort::All => {
+                if to_insert {
+                    ipv4_firewall
+                        .insert(addr.to_bits(), [0; MAX_RULES_PORT], 0)
+                        .unwrap();
+                } else {
+                    ipv4_firewall.remove(&addr.to_bits()).unwrap();
+                }
+            }
+        }
+    } else if to_insert {
+        let mut blocked_ports: [u16; MAX_RULES_PORT] = [0; MAX_RULES_PORT];
+        match port {
+            BlockedPort::Single(port) => {
+                blocked_ports[0] = port;
+            }
+            BlockedPort::All => {}
+        }
+
+        ipv4_firewall
+            .insert(addr.to_bits(), blocked_ports, 0)
+            .unwrap();
+    }
+}
+
+fn update_ipv6_blocklist(
+    ipv6_firewall: &mut HashMap<MapData, u128, [u16; MAX_RULES_PORT]>,
+    addr: Ipv6Addr,
+    port: BlockedPort,
+    to_insert: bool,
+) {
+    if let Ok(mut blocked_ports) = ipv6_firewall.get(&addr.to_bits(), 0) {
+        match port {
+            BlockedPort::Single(port) => {
+                if to_insert {
+                    if let Some((first_zero_index, _)) = blocked_ports
+                        .iter()
+                        .enumerate()
+                        .find(|(_, &value)| value == 0)
+                    {
+                        blocked_ports[first_zero_index] = port;
+                        ipv6_firewall
+                            .insert(addr.to_bits(), blocked_ports, 0)
+                            .unwrap();
+                    } else {
+                        //TODO:
+                        unreachable!(); // list is full
+                    }
+                } else {
+                    let not_null_ports = blocked_ports
+                        .into_iter()
+                        .filter(|p| (*p != 0 && *p != port))
+                        .collect::<Vec<u16>>();
+
+                    let mut blocked_ports = [0; MAX_RULES_PORT];
+
+                    for (idx, p) in not_null_ports.iter().enumerate() {
+                        blocked_ports[idx] = *p;
+                    }
+
+                    if blocked_ports.iter().all(|&port| port == 0) {
+                        ipv6_firewall.remove(&addr.to_bits()).unwrap();
+                    } else {
+                        ipv6_firewall
+                            .insert(addr.to_bits(), blocked_ports, 0)
+                            .unwrap();
+                    }
+                }
+            }
+            BlockedPort::All => {
+                if to_insert {
+                    ipv6_firewall
+                        .insert(addr.to_bits(), [0; MAX_RULES_PORT], 0)
+                        .unwrap();
+                } else {
+                    ipv6_firewall.remove(&addr.to_bits()).unwrap();
+                }
+            }
+        }
+    } else if to_insert {
+        let mut blocked_ports: [u16; MAX_RULES_PORT] = [0; MAX_RULES_PORT];
+        match port {
+            BlockedPort::Single(port) => {
+                blocked_ports[0] = port;
+            }
+            BlockedPort::All => {}
+        }
+
+        ipv6_firewall
+            .insert(addr.to_bits(), blocked_ports, 0)
+            .unwrap();
+    }
+}
+
 impl Ebpf {
     pub fn load_ingress(
         iface: String,
         notification_sender: kanal::Sender<Event>,
         data_sender: kanal::Sender<[u8; RawPacket::LEN]>,
-        filter_channel_receiver: kanal::Receiver<(Protocol, bool)>,
+        filter_channel_receiver: kanal::Receiver<FilterChannelSignal>,
+        firewall_ingress_receiver: kanal::Receiver<FirewallSignal>,
         terminate: Arc<AtomicBool>,
     ) {
         thread::spawn({
@@ -147,6 +288,7 @@ impl Ebpf {
                 let mut poll = Poll::new().unwrap();
                 let mut events = Events::with_capacity(128);
 
+                //filter-ebpf interface
                 let mut transport_filters: Array<_, u32> =
                     Array::try_from(bpf.take_map("TRANSPORT_FILTERS").unwrap()).unwrap();
 
@@ -156,17 +298,54 @@ impl Ebpf {
                 let mut link_filters: Array<_, u32> =
                     Array::try_from(bpf.take_map("LINK_FILTERS").unwrap()).unwrap();
 
-                spawn(move || loop {
-                    if let Ok((filter, flag)) = filter_channel_receiver.recv() {
-                        match filter {
-                            Protocol::Transport(p) => {
-                                let _ = transport_filters.set(p as u32, flag as u32, 0);
+                // firewall-ebpf interface
+                let mut ipv4_firewall: HashMap<_, u32, [u16; MAX_RULES_PORT]> =
+                    HashMap::try_from(bpf.take_map("BLOCKLIST_IPV4").unwrap()).unwrap();
+
+                let mut ipv6_firewall: HashMap<_, u128, [u16; MAX_RULES_PORT]> =
+                    HashMap::try_from(bpf.take_map("BLOCKLIST_IPV6").unwrap()).unwrap();
+
+                thread::spawn(move || loop {
+                    if let Ok(signal) = firewall_ingress_receiver.recv() {
+                        match signal {
+                            FirewallSignal::Rule(rule) => match rule.ip {
+                                IpAddr::V4(addr) => update_ipv4_blocklist(
+                                    &mut ipv4_firewall,
+                                    addr,
+                                    rule.port,
+                                    rule.enabled,
+                                ),
+
+                                IpAddr::V6(addr) => update_ipv6_blocklist(
+                                    &mut ipv6_firewall,
+                                    addr,
+                                    rule.port,
+                                    rule.enabled,
+                                ),
+                            },
+                            FirewallSignal::Kill => {
+                                break;
                             }
-                            Protocol::Network(p) => {
-                                let _ = network_filters.set(p as u32, flag as u32, 0);
-                            }
-                            Protocol::Link(p) => {
-                                let _ = link_filters.set(p as u32, flag as u32, 0);
+                        }
+                    }
+                });
+
+                thread::spawn(move || loop {
+                    if let Ok(signal) = filter_channel_receiver.recv() {
+                        match signal {
+                            FilterChannelSignal::Update((filter, flag)) => match filter {
+                                Protocol::Transport(p) => {
+                                    let _ = transport_filters.set(p as u32, flag as u32, 0);
+                                }
+                                Protocol::Network(p) => {
+                                    let _ = network_filters.set(p as u32, flag as u32, 0);
+                                }
+                                Protocol::Link(p) => {
+                                    let _ = link_filters.set(p as u32, flag as u32, 0);
+                                }
+                            },
+                            FilterChannelSignal::Kill => {
+                                break;
                             }
                         }
                     }
@@ -219,7 +398,8 @@ impl Ebpf {
         iface: String,
         notification_sender: kanal::Sender<Event>,
         data_sender: kanal::Sender<[u8; RawPacket::LEN]>,
-        filter_channel_receiver: kanal::Receiver<(Protocol, bool)>,
+        filter_channel_receiver: kanal::Receiver<FilterChannelSignal>,
+        firewall_egress_receiver: kanal::Receiver<FirewallSignal>,
         terminate: Arc<AtomicBool>,
     ) {
         thread::spawn({
@@ -296,6 +476,7 @@ impl Ebpf {
                 let mut poll = Poll::new().unwrap();
                 let mut events = Events::with_capacity(128);
 
+                //filter-ebpf interface
                 let mut transport_filters: Array<_, u32> =
                     Array::try_from(bpf.take_map("TRANSPORT_FILTERS").unwrap()).unwrap();
 
@@ -305,21 +486,59 @@ impl Ebpf {
                 let mut link_filters: Array<_, u32> =
                     Array::try_from(bpf.take_map("LINK_FILTERS").unwrap()).unwrap();
 
-                spawn(move || loop {
-                    if let Ok((filter, flag)) = filter_channel_receiver.recv() {
-                        match filter {
-                            Protocol::Transport(p) => {
-                                let _ = transport_filters.set(p as u32, flag as u32, 0);
-                            }
-                            Protocol::Network(p) => {
-                                let _ = network_filters.set(p as u32, flag as u32, 0);
-                            }
-                            Protocol::Link(p) => {
-                                let _ = link_filters.set(p as u32, flag as u32, 0);
+                // firewall-ebpf interface
+                let mut ipv4_firewall: HashMap<_, u32, [u16; MAX_RULES_PORT]> =
+                    HashMap::try_from(bpf.take_map("BLOCKLIST_IPV4").unwrap()).unwrap();
+
+                let mut ipv6_firewall: HashMap<_, u128, [u16; MAX_RULES_PORT]> =
+                    HashMap::try_from(bpf.take_map("BLOCKLIST_IPV6").unwrap()).unwrap();
+
+                thread::spawn(move || loop {
+                    if let Ok(signal) = firewall_egress_receiver.recv() {
+                        match signal {
+                            FirewallSignal::Rule(rule) => match rule.ip {
+                                IpAddr::V4(addr) => update_ipv4_blocklist(
+                                    &mut ipv4_firewall,
+                                    addr,
+                                    rule.port,
+                                    rule.enabled,
+                                ),
+
+                                IpAddr::V6(addr) => update_ipv6_blocklist(
+                                    &mut ipv6_firewall,
+                                    addr,
+                                    rule.port,
+                                    rule.enabled,
+                                ),
+                            },
+                            FirewallSignal::Kill => {
+                                break;
                             }
                         }
                     }
                 });
+
+                thread::spawn(move || loop {
+                    if let Ok(signal) = filter_channel_receiver.recv() {
+                        match signal {
+                            FilterChannelSignal::Update((filter, flag)) => match filter {
+                                Protocol::Transport(p) => {
+                                    let _ = transport_filters.set(p as u32, flag as u32, 0);
+                                }
+                                Protocol::Network(p) => {
+                                    let _ = network_filters.set(p as u32, flag as u32, 0);
+                                }
+                                Protocol::Link(p) => {
+                                    let _ = link_filters.set(p as u32, flag as u32, 0);
+                                }
+                            },
+                            FilterChannelSignal::Kill => {
+                                break;
+                            }
+                        }
+                    }
+                });
+
                 let mut ring_buf = RingBuffer::new(&mut bpf);
 
                 poll.registry()

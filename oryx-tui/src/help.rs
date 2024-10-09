@@ -25,35 +25,40 @@ impl Help {
             state,
             keys: vec![
                 (
-                    Cell::from("Esc").bold().yellow(),
+                    Cell::from("Esc").bold(),
                     "Dismiss different pop-ups and modes",
                 ),
                 (
-                    Cell::from("Tab or Shift+Tab").bold().yellow(),
+                    Cell::from("Tab or Shift+Tab").bold(),
                     "Switch between different sections",
                 ),
-                (Cell::from("j or Down").bold().yellow(), "Scroll down"),
-                (Cell::from("k or Up").bold().yellow(), "Scroll up"),
-                (Cell::from("?").bold().yellow(), "Show help"),
-                (Cell::from("q or ctrl+c").bold().yellow(), "Quit"),
-                (Cell::from("ctrl + r").bold().yellow(), "Reset the app"),
+                (Cell::from("j or Down").bold(), "Scroll down"),
+                (Cell::from("k or Up").bold(), "Scroll up"),
+                (Cell::from("?").bold(), "Show help"),
+                (Cell::from("q or ctrl+c").bold(), "Quit"),
                 (
-                    Cell::from("Space").bold().yellow(),
+                    Cell::from("Space").bold(),
                     "Select/Deselect interface or filter",
                 ),
-                (Cell::from("/").bold().yellow(), "Start fuzzy finding"),
+                (Cell::from("f").bold(), "Update the applied filters"),
+                (Cell::from("ctrl + r").bold(), "Reset the app"),
                 (
-                    Cell::from("f").bold().yellow(),
-                    "Update the applied filters",
-                ),
-                (
-                    Cell::from("i").bold().yellow(),
-                    "Show more infos about the selected packet",
-                ),
-                (
-                    Cell::from("ctrl + s").bold().yellow(),
+                    Cell::from("ctrl + s").bold(),
                     "Export the capture to ~/oryx/capture file",
                 ),
+                (Cell::from(""), ""),
+                (Cell::from("## Inspection").bold().yellow(), ""),
+                (
+                    Cell::from("i").bold(),
+                    "Show more infos about the selected packet",
+                ),
+                (Cell::from("/").bold(), "Start fuzzy finding"),
+                (Cell::from(""), ""),
+                (Cell::from("## Firewall").bold().yellow(), ""),
+                (Cell::from("n").bold(), "Add new firewall rule"),
+                (Cell::from("e").bold(), "Edit a firewall rule"),
+                (Cell::from("Space").bold(), "Toggle firewall rule status"),
+                (Cell::from("Enter").bold(), "Create or Save a firewall rule"),
             ],
         }
     }
@@ -92,7 +97,7 @@ impl Help {
             .direction(Direction::Vertical)
             .constraints([
                 Constraint::Fill(1),
-                Constraint::Length(18),
+                Constraint::Length(26),
                 Constraint::Fill(1),
             ])
             .flex(ratatui::layout::Flex::SpaceBetween)

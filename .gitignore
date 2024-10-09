@@ -1,3 +1,4 @@
+log-file
 debug/
 target/
 **/*.rs.bk

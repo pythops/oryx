@@ -10,6 +10,7 @@
 
 - Real-time traffic inspection and visualization.
 - Comprehensive Traffic Statistics.
+- Firewall functionalities.
 - Fuzzy search.
 
 ## 💡 Prerequisites
@@ -103,13 +104,25 @@ sudo oryx
 
 `f`: Update the applied filters.
 
-`i`: Show more infos about the selected packet.
-
 `ctrl + r`: Reset the app.
 
 `ctrl + s`: Export the capture to `~/oryx/capture` file.
 
+#### Inspection Section
+
+`i`: Show more infos about the selected packet.
+
 `/`: Start fuzzy search.
+
+#### Firewall Section
+
+`Space`: Toggle firewall rules status.
+
+`n` : Add new firewall rule.
+
+`e`: Edit a firewall rule.
+
+`Enter`: Create or Save a firewall rule.
 
 ## ⚖️ License
 

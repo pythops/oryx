@@ -2,9 +2,9 @@
 #![no_main]
 
 use aya_ebpf::{
-    bindings::TC_ACT_PIPE,
+    bindings::{TC_ACT_PIPE, TC_ACT_SHOT},
     macros::{classifier, map},
-    maps::{Array, RingBuf},
+    maps::{Array, HashMap, RingBuf},
     programs::TcContext,
 };
 use core::mem;
@@ -18,7 +18,7 @@ use network_types::{
 };
 use oryx_common::{
     protocols::{LinkProtocol, NetworkProtocol, Protocol, TransportProtocol},
-    ProtoHdr, RawPacket,
+    ProtoHdr, RawPacket, MAX_FIREWALL_RULES, MAX_RULES_PORT,
 };
 
 #[map]
@@ -32,6 +32,14 @@ static TRANSPORT_FILTERS: Array<u32> = Array::with_max_entries(8, 0);
 
 #[map]
 static LINK_FILTERS: Array<u32> = Array::with_max_entries(8, 0);
+
+#[map]
+static BLOCKLIST_IPV6: HashMap<u128, [u16; MAX_RULES_PORT]> =
+    HashMap::<u128, [u16; MAX_RULES_PORT]>::with_max_entries(MAX_FIREWALL_RULES, 0);
+
+#[map]
+static BLOCKLIST_IPV4: HashMap<u32, [u16; MAX_RULES_PORT]> =
+    HashMap::<u32, [u16; MAX_RULES_PORT]>::with_max_entries(MAX_FIREWALL_RULES, 0);
 
 #[classifier]
 pub fn oryx(ctx: TcContext) -> i32 {
@@ -62,6 +70,50 @@ fn ptr_at<T>(ctx: &TcContext, offset: usize) -> Result<*const T, ()> {
 }
 
 #[inline]
+fn filter_for_ipv4_address(
+    addr: u32,
+    port: u16,
+    blocked_ports_map: &HashMap<u32, [u16; 32]>,
+) -> bool {
+    if let Some(blocked_ports) = unsafe { blocked_ports_map.get(&addr) } {
+        for (idx, blocked_port) in blocked_ports.iter().enumerate() {
+            if *blocked_port == 0 {
+                if idx == 0 {
+                    return true;
+                } else {
+                    break;
+                }
+            } else if *blocked_port == port {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+#[inline]
+fn filter_for_ipv6_address(
+    addr: u128,
+    port: u16,
+    blocked_ports_map: &HashMap<u128, [u16; 32]>,
+) -> bool {
+    if let Some(blocked_ports) = unsafe { blocked_ports_map.get(&addr) } {
+        for (idx, blocked_port) in blocked_ports.iter().enumerate() {
+            if *blocked_port == 0 {
+                if idx == 0 {
+                    return true;
+                } else {
+                    break;
+                }
+            } else if *blocked_port == port {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+#[inline]
 fn filter_packet(protocol: Protocol) -> bool {
     match protocol {
         Protocol::Network(p) => {
@@ -89,26 +141,49 @@ fn process(ctx: TcContext) -> Result<i32, ()> {
 
     match ethhdr.ether_type {
         EtherType::Ipv4 => {
-            if filter_packet(Protocol::Network(NetworkProtocol::Ipv4)) {
-                return Ok(TC_ACT_PIPE);
-            }
             let header: Ipv4Hdr = ctx.load(EthHdr::LEN).map_err(|_| ())?;
+            let src_addr = u32::from_be(header.src_addr);
+            let dst_addr = u32::from_be(header.dst_addr);
+
             match header.proto {
                 IpProto::Tcp => {
-                    if filter_packet(Protocol::Transport(TransportProtocol::TCP)) {
-                        return Ok(TC_ACT_PIPE);
-                    }
                     let tcphdr: *const TcpHdr = ptr_at(&ctx, EthHdr::LEN + Ipv4Hdr::LEN)?;
+                    let src_port = u16::from_be(unsafe { (*tcphdr).source });
+                    let dst_port = u16::from_be(unsafe { (*tcphdr).dest });
+
+                    if filter_for_ipv4_address(src_addr, src_port, &BLOCKLIST_IPV4)
+                        || filter_for_ipv4_address(dst_addr, dst_port, &BLOCKLIST_IPV4)
+                    {
+                        return Ok(TC_ACT_SHOT);
+                    }
+
+                    if filter_packet(Protocol::Network(NetworkProtocol::Ipv4))
+                        || filter_packet(Protocol::Transport(TransportProtocol::TCP))
+                    {
+                        return Ok(TC_ACT_PIPE); //DONT FWD PACKET TO TUI
+                    }
                     submit(RawPacket::Ip(
                         IpHdr::V4(header),
                         ProtoHdr::Tcp(unsafe { *tcphdr }),
                     ));
                 }
                 IpProto::Udp => {
-                    if filter_packet(Protocol::Transport(TransportProtocol::UDP)) {
+                    let udphdr: *const UdpHdr = ptr_at(&ctx, EthHdr::LEN + Ipv4Hdr::LEN)?;
+                    let src_port = u16::from_be(unsafe { (*udphdr).source });
+                    let dst_port = u16::from_be(unsafe { (*udphdr).dest });
+
+                    if filter_for_ipv4_address(src_addr, src_port, &BLOCKLIST_IPV4)
+                        || filter_for_ipv4_address(dst_addr, dst_port, &BLOCKLIST_IPV4)
+                    {
+                        return Ok(TC_ACT_SHOT);
+                    }
+
+                    if filter_packet(Protocol::Network(NetworkProtocol::Ipv4))
+                        || filter_packet(Protocol::Transport(TransportProtocol::UDP))
+                    {
                         return Ok(TC_ACT_PIPE);
                     }
-                    let udphdr: *const UdpHdr = ptr_at(&ctx, EthHdr::LEN + Ipv4Hdr::LEN)?;
+
                     submit(RawPacket::Ip(
                         IpHdr::V4(header),
                         ProtoHdr::Udp(unsafe { *udphdr }),
@@ -128,26 +203,46 @@ fn process(ctx: TcContext) -> Result<i32, ()> {
             }
         }
         EtherType::Ipv6 => {
-            if filter_packet(Protocol::Network(NetworkProtocol::Ipv6)) {
-                return Ok(TC_ACT_PIPE);
-            }
             let header: Ipv6Hdr = ctx.load(EthHdr::LEN).map_err(|_| ())?;
+            let src_addr = header.src_addr().to_bits();
+            let dst_addr = header.dst_addr().to_bits();
+
             match header.next_hdr {
                 IpProto::Tcp => {
-                    if filter_packet(Protocol::Transport(TransportProtocol::TCP)) {
-                        return Ok(TC_ACT_PIPE);
-                    }
                     let tcphdr: *const TcpHdr = ptr_at(&ctx, EthHdr::LEN + Ipv6Hdr::LEN)?;
+                    let src_port = u16::from_be(unsafe { (*tcphdr).source });
+                    let dst_port = u16::from_be(unsafe { (*tcphdr).dest });
+
+                    if filter_for_ipv6_address(src_addr, src_port, &BLOCKLIST_IPV6)
+                        || filter_for_ipv6_address(dst_addr, dst_port, &BLOCKLIST_IPV6)
+                    {
+                        return Ok(TC_ACT_SHOT);
+                    }
+                    if filter_packet(Protocol::Network(NetworkProtocol::Ipv6))
+                        || filter_packet(Protocol::Transport(TransportProtocol::TCP))
+                    {
+                        return Ok(TC_ACT_PIPE); //DONT FWD PACKET TO TUI
+                    }
                     submit(RawPacket::Ip(
                         IpHdr::V6(header),
                         ProtoHdr::Tcp(unsafe { *tcphdr }),
                     ));
                 }
                 IpProto::Udp => {
-                    if filter_packet(Protocol::Transport(TransportProtocol::UDP)) {
-                        return Ok(TC_ACT_PIPE);
-                    }
                     let udphdr: *const UdpHdr = ptr_at(&ctx, EthHdr::LEN + Ipv6Hdr::LEN)?;
+                    let src_port = u16::from_be(unsafe { (*udphdr).source });
+                    let dst_port = u16::from_be(unsafe { (*udphdr).dest });
+
+                    if filter_for_ipv6_address(src_addr, src_port, &BLOCKLIST_IPV6)
+                        || filter_for_ipv6_address(dst_addr, dst_port, &BLOCKLIST_IPV6)
+                    {
+                        return Ok(TC_ACT_SHOT);
+                    }
+                    if filter_packet(Protocol::Network(NetworkProtocol::Ipv6))
+                        || filter_packet(Protocol::Transport(TransportProtocol::UDP))
+                    {
+                        return Ok(TC_ACT_PIPE); //DONT FWD PACKET TO TUI
+                    }
                     submit(RawPacket::Ip(
                         IpHdr::V6(header),
                         ProtoHdr::Udp(unsafe { *udphdr }),

@@ -22,6 +22,7 @@ pub enum ActivePopup {
     Help,
     UpdateFilters,
     PacketInfos,
+    NewFirewallRule,
 }
 
 #[derive(Debug)]
@@ -55,6 +56,10 @@ impl App {
         let packets = Arc::new(Mutex::new(Vec::with_capacity(AppPacket::LEN * 1024 * 1024)));
 
         let (sender, receiver) = kanal::unbounded();
+
+        let (firewall_ingress_sender, firewall_ingress_receiver) = kanal::unbounded();
+        let (firewall_egress_sender, firewall_egress_receiver) = kanal::unbounded();
+
         thread::spawn({
             let packets = packets.clone();
             move || loop {
@@ -72,11 +77,20 @@ impl App {
         Self {
             running: true,
             help: Help::new(),
-            filter: Filter::new(),
+            filter: Filter::new(
+                firewall_ingress_sender.clone(),
+                firewall_ingress_receiver,
+                firewall_egress_sender.clone(),
+                firewall_egress_receiver,
+            ),
             start_sniffing: false,
             packets: packets.clone(),
             notifications: Vec::new(),
-            section: Section::new(packets.clone()),
+            section: Section::new(
+                packets.clone(),
+                firewall_ingress_sender,
+                firewall_egress_sender,
+            ),
             data_channel_sender: sender,
             is_editing: false,
             active_popup: None,
@@ -92,9 +106,13 @@ impl App {
             let (settings_block, section_block) = {
                 let chunks = Layout::default()
                     .direction(Direction::Vertical)
-                    .constraints([Constraint::Length(8), Constraint::Fill(1)])
+                    .constraints([
+                        Constraint::Length(6),
+                        Constraint::Length(1),
+                        Constraint::Fill(1),
+                    ])
                     .split(frame.area());
-                (chunks[0], chunks[1])
+                (chunks[0], chunks[2])
             };
 
             self.section.render(

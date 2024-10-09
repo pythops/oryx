@@ -7,6 +7,9 @@ use network_types::{arp::ArpHdr, icmp::IcmpHdr, ip::IpHdr, tcp::TcpHdr, udp::Udp
 pub mod ip;
 pub mod protocols;
 
+pub const MAX_FIREWALL_RULES: u32 = 32;
+pub const MAX_RULES_PORT: usize = 32;
+
 #[repr(C)]
 pub enum RawPacket {
     Ip(IpHdr, ProtoHdr),

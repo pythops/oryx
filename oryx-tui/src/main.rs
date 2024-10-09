@@ -13,6 +13,7 @@ use oryx_tui::{
 use ratatui::{backend::CrosstermBackend, Terminal};
 
 fn main() -> AppResult<()> {
+    env_logger::init();
     Command::new("oryx")
         .about(crate_description!())
         .version(crate_version!())
