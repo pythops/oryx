@@ -1,3 +1,9 @@
+## v0.4 - TBA
+
+### Added
+
+- Firewall
+
 ## v0.3 - 2024-09-25
 
 ### Added
