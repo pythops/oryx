@@ -316,6 +316,7 @@ impl Firewall {
     fn validate_duplicate_rules(rules: &[FirewallRule], user_input: &UserInput) -> AppResult<()> {
         if let Some(exiting_rule_with_same_ip) = rules.iter().find(|rule| {
             rule.ip == IpAddr::from_str(user_input.ip.field.value()).unwrap()
+                && rule.direction == user_input.direction
                 && match user_input.id {
                     Some(uuid) => rule.id != uuid,
                     None => true,
