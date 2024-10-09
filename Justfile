@@ -39,7 +39,7 @@ show_active_maps:
     map_ids=$(bpftool map show | grep "$MAPTYPE" | cut -f1 -d":" ); \
     for map_id in $map_ids;do \
     echo "$MAPTYPE($map_id)";\
-    bpftool map dump id $map_id -j | jq "." | python3 showmaps.py  2>/dev/null || echo "\tempty";\
+    bpftool map dump id $map_id -j  | python3 showmaps.py  2>/dev/null || echo "\tempty";\
     done ;\
     done
 
