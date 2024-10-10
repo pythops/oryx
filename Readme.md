@@ -122,6 +122,8 @@ sudo oryx
 
 `e`: Edit a firewall rule.
 
+`s`: Save firewall rules to `~/oryx/firewall.json`
+
 `Enter`: Create or Save a firewall rule.
 
 ## ⚖️ License

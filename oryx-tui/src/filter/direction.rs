@@ -12,6 +12,7 @@ use ratatui::{
     widgets::{Block, BorderType, Borders, Row, Table, TableState},
     Frame,
 };
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug)]
 pub struct TrafficDirectionFilter {
@@ -22,7 +23,7 @@ pub struct TrafficDirectionFilter {
     pub terminate_egress: Arc<AtomicBool>,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize)]
 pub enum TrafficDirection {
     Ingress,
     Egress,

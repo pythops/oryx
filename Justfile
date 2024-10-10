@@ -17,7 +17,7 @@ show interface:
 # Run oryx debug
 run-debug:
     echo "" > log-file
-    RUST_LOG=info cargo xtask run 2> log-file
+    RUST_LOG=info RUST_BACKTRACE=1 cargo xtask run 2> log-file
 
 run:
     cargo xtask run

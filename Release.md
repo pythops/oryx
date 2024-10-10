@@ -3,6 +3,7 @@
 ### Added
 
 - Firewall
+- Save and Load firewall rules.
 
 ## v0.3 - 2024-09-25
 

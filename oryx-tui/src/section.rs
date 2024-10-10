@@ -151,6 +151,9 @@ impl Section {
                         Span::from("i").bold(),
                         Span::from(" Infos").bold(),
                         Span::from(" | ").bold(),
+                        Span::from("s").bold(),
+                        Span::from(" Save").bold(),
+                        Span::from(" | ").bold(),
                         Span::from("f").bold(),
                         Span::from(" Filters").bold(),
                         Span::from(" | ").bold(),
@@ -175,6 +178,9 @@ impl Section {
                         Span::from(" | ").bold(),
                         Span::from("e").bold(),
                         Span::from(" Edit").bold(),
+                        Span::from(" | ").bold(),
+                        Span::from("s").bold(),
+                        Span::from(" Save").bold(),
                         Span::from(" | ").bold(),
                         Span::from("󱁐 ").bold(),
                         Span::from(" Toggle").bold(),
@@ -275,7 +281,9 @@ impl Section {
             },
 
             _ => match self.focused_section {
-                FocusedSection::Inspection => self.inspection.handle_keys(key_event),
+                FocusedSection::Inspection => self
+                    .inspection
+                    .handle_keys(key_event, notification_sender.clone())?,
                 FocusedSection::Firewall => self
                     .firewall
                     .handle_keys(key_event, notification_sender.clone())?,

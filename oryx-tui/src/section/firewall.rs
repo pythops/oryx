@@ -1,5 +1,6 @@
 use core::fmt::Display;
 use crossterm::event::{Event, KeyCode, KeyEvent};
+use log::{error, info};
 use oryx_common::MAX_FIREWALL_RULES;
 use ratatui::{
     layout::{Constraint, Direction, Flex, Layout, Margin, Rect},
@@ -8,7 +9,9 @@ use ratatui::{
     widgets::{Block, Borders, Cell, Clear, HighlightSpacing, Padding, Row, Table, TableState},
     Frame,
 };
-use std::{net::IpAddr, num::ParseIntError, str::FromStr};
+use serde::{Deserialize, Serialize};
+use serde_json;
+use std::{fs, net::IpAddr, num::ParseIntError, os::unix::fs::chown, str::FromStr};
 use tui_input::{backend::crossterm::EventHandler, Input};
 use uuid;
 
@@ -20,7 +23,7 @@ pub enum FirewallSignal {
     Kill,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FirewallRule {
     id: uuid::Uuid,
     name: String,
@@ -30,7 +33,7 @@ pub struct FirewallRule {
     direction: TrafficDirection,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum BlockedPort {
     Single(u16),
     All,
@@ -302,8 +305,16 @@ impl Firewall {
         ingress_sender: kanal::Sender<FirewallSignal>,
         egress_sender: kanal::Sender<FirewallSignal>,
     ) -> Self {
+        let rules_list: Vec<FirewallRule> = match Self::load_saved_rules() {
+            Ok(saved_rules) => saved_rules,
+
+            Err(err) => {
+                error!("{}", err.to_string());
+                Vec::new()
+            }
+        };
         Self {
-            rules: Vec::new(),
+            rules: rules_list,
             state: TableState::default(),
             user_input: None,
             ingress_sender,
@@ -313,6 +324,49 @@ impl Firewall {
 
     pub fn add_rule(&mut self) {
         self.user_input = Some(UserInput::new());
+    }
+
+    pub fn save_rules(&self) -> AppResult<()> {
+        info!("Saving Firewall Rules");
+
+        let json = serde_json::to_string(&self.rules)?;
+
+        let user_uid = unsafe { libc::geteuid() };
+
+        let oryx_export_dir = dirs::home_dir().unwrap().join("oryx");
+
+        if !oryx_export_dir.exists() {
+            fs::create_dir(&oryx_export_dir)?;
+            chown(&oryx_export_dir, Some(user_uid), Some(user_uid))?;
+        }
+
+        let oryx_export_file = oryx_export_dir.join("firewall.json");
+        fs::write(oryx_export_file, json)?;
+        info!("Firewall Rules saved");
+
+        Ok(())
+    }
+
+    fn load_saved_rules() -> AppResult<Vec<FirewallRule>> {
+        let oryx_export_file = dirs::home_dir().unwrap().join("oryx").join("firewall.json");
+        if oryx_export_file.exists() {
+            info!("Loading Firewall Rules");
+
+            let json_string = fs::read_to_string(oryx_export_file)?;
+
+            let mut parsed_rules: Vec<FirewallRule> = serde_json::from_str(&json_string)?;
+
+            // as we don't know if ingress/egress programs are loaded we have to disable all rules
+            parsed_rules
+                .iter_mut()
+                .for_each(|rule| rule.enabled = false);
+
+            info!("Firewall Rules loaded");
+            Ok(parsed_rules)
+        } else {
+            info!("Firewall Rules file not found");
+            Ok(Vec::new())
+        }
     }
 
     fn validate_duplicate_rules(rules: &[FirewallRule], user_input: &UserInput) -> AppResult<()> {
@@ -499,6 +553,24 @@ impl Firewall {
                     }
                     self.add_rule();
                 }
+
+                KeyCode::Char('s') => match self.save_rules() {
+                    Ok(_) => {
+                        Notification::send(
+                            "Firewall rules saved to ~/oryx/firewall.json file",
+                            crate::notification::NotificationLevel::Info,
+                            sender.clone(),
+                        )?;
+                    }
+                    Err(e) => {
+                        Notification::send(
+                            "Error while saving firewall rules.",
+                            crate::notification::NotificationLevel::Error,
+                            sender.clone(),
+                        )?;
+                        error!("Error while saving firewall rules. {}", e);
+                    }
+                },
 
                 KeyCode::Char('e') => {
                     if let Some(index) = self.state.selected() {
