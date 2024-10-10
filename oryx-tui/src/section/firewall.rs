@@ -1,5 +1,6 @@
 use core::fmt::Display;
 use crossterm::event::{Event, KeyCode, KeyEvent};
+use log::info;
 use oryx_common::MAX_FIREWALL_RULES;
 use ratatui::{
     layout::{Constraint, Direction, Flex, Layout, Margin, Rect},
@@ -8,7 +9,9 @@ use ratatui::{
     widgets::{Block, Borders, Cell, Clear, HighlightSpacing, Padding, Row, Table, TableState},
     Frame,
 };
-use std::{net::IpAddr, num::ParseIntError, str::FromStr};
+use serde::{Deserialize, Serialize};
+use serde_json;
+use std::{fs, net::IpAddr, num::ParseIntError, os::unix::fs::chown, str::FromStr};
 use tui_input::{backend::crossterm::EventHandler, Input};
 use uuid;
 
@@ -20,7 +23,7 @@ pub enum FirewallSignal {
     Kill,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FirewallRule {
     id: uuid::Uuid,
     name: String,
@@ -30,7 +33,7 @@ pub struct FirewallRule {
     direction: TrafficDirection,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum BlockedPort {
     Single(u16),
     All,
@@ -315,6 +318,42 @@ impl Firewall {
         self.user_input = Some(UserInput::new());
     }
 
+    pub fn save_rules(&self) -> AppResult<()> {
+        info!("saving rules");
+        info!("{:#?}", self.rules);
+
+        let json = serde_json::to_string(&self.rules).unwrap();
+
+        let uid = unsafe { libc::geteuid() };
+
+        let oryx_export_dir = dirs::home_dir().unwrap().join("oryx");
+
+        if !oryx_export_dir.exists() {
+            fs::create_dir(&oryx_export_dir)?;
+            chown(&oryx_export_dir, Some(uid), Some(uid))?;
+        }
+
+        let oryx_export_file = oryx_export_dir.join("firewall.json");
+        fs::write(oryx_export_file, json).expect("Could not save Firewall Rules");
+        info!("rules saved");
+        Ok(())
+    }
+
+    pub fn load_rules(&mut self) -> AppResult<()> {
+        info!("loading rules");
+        let oryx_export_file = dirs::home_dir().unwrap().join("oryx").join("firewall.json");
+        if oryx_export_file.exists() {
+            info!("EXISTS");
+            let json_string =
+                fs::read_to_string(oryx_export_file).expect("Could not load Firewall Rules");
+            let parsed_rules: Vec<FirewallRule> =
+                serde_json::from_str(&json_string).expect("Could not load Firewall Rules");
+            info!("rules loaded");
+            self.rules = parsed_rules;
+        }
+
+        Ok(())
+    }
     fn validate_duplicate_rules(rules: &[FirewallRule], user_input: &UserInput) -> AppResult<()> {
         if let Some(exiting_rule_with_same_ip) = rules.iter().find(|rule| {
             rule.ip == IpAddr::from_str(user_input.ip.field.value()).unwrap()
@@ -411,6 +450,29 @@ impl Firewall {
         key_event: KeyEvent,
         sender: kanal::Sender<crate::event::Event>,
     ) -> AppResult<()> {
+        match key_event.code {
+            KeyCode::Char('s') => {
+                if let Err(e) = self.save_rules() {
+                    Notification::send(
+                        "Error saving rules",
+                        crate::notification::NotificationLevel::Warning,
+                        sender.clone(),
+                    )?;
+                    return Err(e);
+                }
+            }
+            KeyCode::Char('l') => {
+                if let Err(e) = self.load_rules() {
+                    Notification::send(
+                        "Error loading rules",
+                        crate::notification::NotificationLevel::Warning,
+                        sender.clone(),
+                    )?;
+                    return Err(e);
+                }
+            }
+            _ => {}
+        }
         if let Some(user_input) = &mut self.user_input {
             match key_event.code {
                 KeyCode::Esc => {

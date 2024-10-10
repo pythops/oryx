@@ -191,24 +191,34 @@ pub fn handle_key_events(
         }
 
         KeyCode::Char('s') => {
-            let app_packets = app.packets.lock().unwrap();
-            if app_packets.is_empty() {
-                Notification::send(
-                    "There is no packets".to_string(),
-                    NotificationLevel::Info,
-                    event_sender,
-                )?;
+            if app.section.focused_section == FocusedSection::Firewall {
+                app.section
+                    .firewall
+                    .handle_keys(key_event, event_sender.clone())?
             } else {
-                match export(&app_packets) {
-                    Ok(_) => {
-                        Notification::send(
-                            "Packets exported to ~/oryx/capture file".to_string(),
-                            NotificationLevel::Info,
-                            event_sender,
-                        )?;
-                    }
-                    Err(e) => {
-                        Notification::send(e.to_string(), NotificationLevel::Error, event_sender)?;
+                let app_packets = app.packets.lock().unwrap();
+                if app_packets.is_empty() {
+                    Notification::send(
+                        "There is no packets".to_string(),
+                        NotificationLevel::Info,
+                        event_sender,
+                    )?;
+                } else {
+                    match export(&app_packets) {
+                        Ok(_) => {
+                            Notification::send(
+                                "Packets exported to ~/oryx/capture file".to_string(),
+                                NotificationLevel::Info,
+                                event_sender,
+                            )?;
+                        }
+                        Err(e) => {
+                            Notification::send(
+                                e.to_string(),
+                                NotificationLevel::Error,
+                                event_sender,
+                            )?;
+                        }
                     }
                 }
             }
