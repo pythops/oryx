@@ -295,13 +295,18 @@ pub fn load_ingress(
             let mut link_filters: Array<_, u32> =
                 Array::try_from(bpf.take_map("LINK_FILTERS").unwrap()).unwrap();
 
-            // firewall-ebpf interface
+            let mut traffic_direction_filters: Array<_, u32> =
+                Array::try_from(bpf.take_map("TRAFFIC_DIRECTION_FILTERS").unwrap()).unwrap();
+            let _ = traffic_direction_filters.set(0, 0, 0);
+            let _ = traffic_direction_filters.set(1, 0, 0); //setup ingress flag
+                                                            // firewall-ebpf interface
             let mut ipv4_firewall: HashMap<_, u32, [u16; MAX_RULES_PORT]> =
                 HashMap::try_from(bpf.take_map("BLOCKLIST_IPV4").unwrap()).unwrap();
 
             let mut ipv6_firewall: HashMap<_, u128, [u16; MAX_RULES_PORT]> =
                 HashMap::try_from(bpf.take_map("BLOCKLIST_IPV6").unwrap()).unwrap();
 
+            // firewall thread
             thread::spawn(move || loop {
                 if let Ok(signal) = firewall_ingress_receiver.recv() {
                     match signal {
@@ -327,10 +332,11 @@ pub fn load_ingress(
                 }
             });
 
+            // packets filters thread
             thread::spawn(move || loop {
                 if let Ok(signal) = filter_channel_receiver.recv() {
                     match signal {
-                        FilterChannelSignal::Update((filter, flag)) => match filter {
+                        FilterChannelSignal::ProtoUpdate((filter, flag)) => match filter {
                             Protocol::Transport(p) => {
                                 let _ = transport_filters.set(p as u32, flag as u32, 0);
                             }
@@ -341,6 +347,9 @@ pub fn load_ingress(
                                 let _ = link_filters.set(p as u32, flag as u32, 0);
                             }
                         },
+                        FilterChannelSignal::DirectionUpdate(flag) => {
+                            let _ = traffic_direction_filters.set(0, flag as u32, 0);
+                        }
                         FilterChannelSignal::Kill => {
                             break;
                         }
@@ -482,6 +491,11 @@ pub fn load_egress(
             let mut link_filters: Array<_, u32> =
                 Array::try_from(bpf.take_map("LINK_FILTERS").unwrap()).unwrap();
 
+            let mut traffic_direction_filters: Array<_, u32> =
+                Array::try_from(bpf.take_map("TRAFFIC_DIRECTION_FILTERS").unwrap()).unwrap();
+            let _ = traffic_direction_filters.set(0, 0, 0);
+            let _ = traffic_direction_filters.set(1, 1, 0); //setup egress flag
+
             // firewall-ebpf interface
             let mut ipv4_firewall: HashMap<_, u32, [u16; MAX_RULES_PORT]> =
                 HashMap::try_from(bpf.take_map("BLOCKLIST_IPV4").unwrap()).unwrap();
@@ -489,6 +503,7 @@ pub fn load_egress(
             let mut ipv6_firewall: HashMap<_, u128, [u16; MAX_RULES_PORT]> =
                 HashMap::try_from(bpf.take_map("BLOCKLIST_IPV6").unwrap()).unwrap();
 
+            // firewall thread
             thread::spawn(move || loop {
                 if let Ok(signal) = firewall_egress_receiver.recv() {
                     match signal {
@@ -514,10 +529,11 @@ pub fn load_egress(
                 }
             });
 
+            // packets filters thread
             thread::spawn(move || loop {
                 if let Ok(signal) = filter_channel_receiver.recv() {
                     match signal {
-                        FilterChannelSignal::Update((filter, flag)) => match filter {
+                        FilterChannelSignal::ProtoUpdate((filter, flag)) => match filter {
                             Protocol::Transport(p) => {
                                 let _ = transport_filters.set(p as u32, flag as u32, 0);
                             }
@@ -528,6 +544,9 @@ pub fn load_egress(
                                 let _ = link_filters.set(p as u32, flag as u32, 0);
                             }
                         },
+                        FilterChannelSignal::DirectionUpdate(flag) => {
+                            let _ = traffic_direction_filters.set(0, flag as u32, 0);
+                        }
                         FilterChannelSignal::Kill => {
                             break;
                         }
