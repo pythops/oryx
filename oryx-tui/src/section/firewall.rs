@@ -577,6 +577,10 @@ impl Firewall {
                 }
 
                 KeyCode::Char('j') | KeyCode::Down => {
+                    if self.rules.is_empty() {
+                        return Ok(());
+                    }
+
                     let i = match self.state.selected() {
                         Some(i) => {
                             if i < self.rules.len() - 1 {
@@ -592,6 +596,9 @@ impl Firewall {
                 }
 
                 KeyCode::Char('k') | KeyCode::Up => {
+                    if self.rules.is_empty() {
+                        return Ok(());
+                    }
                     let i = match self.state.selected() {
                         Some(i) => {
                             if i > 1 {
