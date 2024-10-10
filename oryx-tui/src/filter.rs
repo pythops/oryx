@@ -28,7 +28,10 @@ use transport::TransportFilter;
 use tui_big_text::{BigText, PixelSize};
 
 use crate::{
-    app::AppResult, ebpf::Ebpf, event::Event, interface::Interface,
+    app::AppResult,
+    ebpf::{load_egress, load_ingress},
+    event::Event,
+    interface::Interface,
     section::firewall::FirewallSignal,
 };
 
@@ -146,7 +149,7 @@ impl Filter {
             .applied_direction
             .contains(&TrafficDirection::Ingress)
         {
-            Ebpf::load_ingress(
+            load_ingress(
                 iface.clone(),
                 notification_sender.clone(),
                 data_sender.clone(),
@@ -161,7 +164,7 @@ impl Filter {
             .applied_direction
             .contains(&TrafficDirection::Egress)
         {
-            Ebpf::load_egress(
+            load_egress(
                 iface,
                 notification_sender,
                 data_sender,
@@ -336,7 +339,7 @@ impl Filter {
 
             let iface = self.interface.selected_interface.name.clone();
 
-            Ebpf::load_egress(
+            load_egress(
                 iface,
                 notification_sender.clone(),
                 data_sender.clone(),
@@ -378,7 +381,7 @@ impl Filter {
             self.traffic_direction
                 .terminate_ingress
                 .store(false, std::sync::atomic::Ordering::Relaxed);
-            Ebpf::load_ingress(
+            load_ingress(
                 iface,
                 notification_sender.clone(),
                 data_sender.clone(),

@@ -14,7 +14,7 @@ ratatui = "0.28"
 tui-big-text = "0.6"
 tui-input = "0.10"
 libc = "0.2"
-aya = "0.12"
+aya = "0.13"
 oryx-common = { path = "../oryx-common" }
 mio = { version = "1", features = ["os-poll", "os-ext"] }
 itertools = "0.13"
