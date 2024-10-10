@@ -327,7 +327,7 @@ impl Firewall {
     }
 
     pub fn save_rules(&self) -> AppResult<()> {
-        if self.rules.len() > 0 {
+        if !self.rules.is_empty() {
             info!("Saving Firewall Rules");
 
             let json = serde_json::to_string(&self.rules).unwrap();
