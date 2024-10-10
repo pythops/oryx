@@ -14,7 +14,10 @@ use ratatui::{
 use tui_input::backend::crossterm::EventHandler;
 
 use crate::{
+    app::AppResult,
+    export,
     filter::fuzzy::{self, Fuzzy},
+    notification::{Notification, NotificationLevel},
     packet::{
         network::{IpPacket, IpProto},
         AppPacket,
@@ -56,7 +59,11 @@ impl Inspection {
         }
     }
 
-    pub fn handle_keys(&mut self, key_event: KeyEvent) {
+    pub fn handle_keys(
+        &mut self,
+        key_event: KeyEvent,
+        event_sender: kanal::Sender<crate::event::Event>,
+    ) -> AppResult<()> {
         let fuzzy_is_enabled = { self.fuzzy.lock().unwrap().is_enabled() };
 
         if fuzzy_is_enabled {
@@ -126,9 +133,38 @@ impl Inspection {
                     self.scroll_up();
                 }
 
+                KeyCode::Char('s') => {
+                    let app_packets = self.packets.lock().unwrap();
+                    if app_packets.is_empty() {
+                        Notification::send(
+                            "There is no packets".to_string(),
+                            NotificationLevel::Info,
+                            event_sender,
+                        )?;
+                    } else {
+                        match export::export(&app_packets) {
+                            Ok(_) => {
+                                Notification::send(
+                                    "Packets exported to ~/oryx/capture file".to_string(),
+                                    NotificationLevel::Info,
+                                    event_sender,
+                                )?;
+                            }
+                            Err(e) => {
+                                Notification::send(
+                                    e.to_string(),
+                                    NotificationLevel::Error,
+                                    event_sender,
+                                )?;
+                            }
+                        }
+                    }
+                }
+
                 _ => {}
             }
         }
+        Ok(())
     }
 
     pub fn scroll_up(&mut self) {

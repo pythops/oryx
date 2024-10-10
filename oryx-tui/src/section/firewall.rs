@@ -330,15 +330,15 @@ impl Firewall {
         if !self.rules.is_empty() {
             info!("Saving Firewall Rules");
 
-            let json = serde_json::to_string(&self.rules).unwrap();
+            let json = serde_json::to_string(&self.rules)?;
 
-            let uid = unsafe { libc::geteuid() };
+            let user_uid = unsafe { libc::geteuid() };
 
             let oryx_export_dir = dirs::home_dir().unwrap().join("oryx");
 
             if !oryx_export_dir.exists() {
                 fs::create_dir(&oryx_export_dir)?;
-                chown(&oryx_export_dir, Some(uid), Some(uid))?;
+                chown(&oryx_export_dir, Some(user_uid), Some(user_uid))?;
             }
 
             let oryx_export_file = oryx_export_dir.join("firewall.json");
@@ -349,24 +349,23 @@ impl Firewall {
     }
 
     fn load_saved_rules() -> AppResult<Vec<FirewallRule>> {
-        info!("Loading Firewall Rules");
         let oryx_export_file = dirs::home_dir().unwrap().join("oryx").join("firewall.json");
         if oryx_export_file.exists() {
-            info!("Found previously saved Firewall Rules");
+            info!("Loading Firewall Rules");
 
             let json_string = fs::read_to_string(oryx_export_file)?;
 
             let mut parsed_rules: Vec<FirewallRule> = serde_json::from_str(&json_string)?;
 
             // as we don't know if ingress/egress programs are loaded we have to disable all rules
-            for rule in &mut parsed_rules {
-                rule.enabled = false
-            }
+            parsed_rules
+                .iter_mut()
+                .for_each(|rule| rule.enabled = false);
 
             info!("Firewall Rules loaded");
             Ok(parsed_rules)
         } else {
-            info!("No saved Firewall Rules found");
+            info!("Firewall Rules file not found");
             Ok(Vec::new())
         }
     }
@@ -555,6 +554,24 @@ impl Firewall {
                     }
                     self.add_rule();
                 }
+
+                KeyCode::Char('s') => match self.save_rules() {
+                    Ok(_) => {
+                        Notification::send(
+                            "Firewall rules saved to ~/oryx/firewall.json file",
+                            crate::notification::NotificationLevel::Info,
+                            sender.clone(),
+                        )?;
+                    }
+                    Err(e) => {
+                        Notification::send(
+                            "Error while saving firewall rules.",
+                            crate::notification::NotificationLevel::Error,
+                            sender.clone(),
+                        )?;
+                        error!("Error while saving firewall rules. {}", e);
+                    }
+                },
 
                 KeyCode::Char('e') => {
                     if let Some(index) = self.state.selected() {

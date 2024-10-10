@@ -57,6 +57,10 @@ impl Help {
                 (Cell::from("## Firewall").bold().yellow(), ""),
                 (Cell::from("n").bold(), "Add new firewall rule"),
                 (Cell::from("e").bold(), "Edit a firewall rule"),
+                (
+                    Cell::from("s").bold(),
+                    "Save firewall rules to ~/oryx/firewall.json ",
+                ),
                 (Cell::from("Space").bold(), "Toggle firewall rule status"),
                 (Cell::from("Enter").bold(), "Create or Save a firewall rule"),
             ],

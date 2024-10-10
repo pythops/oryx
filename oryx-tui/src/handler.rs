@@ -3,9 +3,7 @@ use std::{thread, time::Duration};
 use crate::{
     app::{ActivePopup, App, AppResult},
     event::Event,
-    export::export,
     filter::FocusedBlock,
-    notification::{Notification, NotificationLevel},
     section::FocusedSection,
 };
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
@@ -190,29 +188,6 @@ pub fn handle_key_events(
             }
         }
 
-        KeyCode::Char('s') => {
-            let app_packets = app.packets.lock().unwrap();
-            if app_packets.is_empty() {
-                Notification::send(
-                    "There is no packets".to_string(),
-                    NotificationLevel::Info,
-                    event_sender,
-                )?;
-            } else {
-                match export(&app_packets) {
-                    Ok(_) => {
-                        Notification::send(
-                            "Packets exported to ~/oryx/capture file".to_string(),
-                            NotificationLevel::Info,
-                            event_sender,
-                        )?;
-                    }
-                    Err(e) => {
-                        Notification::send(e.to_string(), NotificationLevel::Error, event_sender)?;
-                    }
-                }
-            }
-        }
         _ => {
             app.section.handle_keys(key_event, event_sender.clone())?;
         }
