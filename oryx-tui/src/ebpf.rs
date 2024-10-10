@@ -11,7 +11,7 @@ use aya::{
     include_bytes_aligned,
     maps::{ring_buf::RingBufItem, Array, HashMap, MapData, RingBuf},
     programs::{tc, SchedClassifier, TcAttachType},
-    Bpf,
+    Ebpf,
 };
 use oryx_common::{protocols::Protocol, RawPacket, MAX_RULES_PORT};
 
@@ -23,15 +23,13 @@ use crate::{
 };
 use mio::{event::Source, unix::SourceFd, Events, Interest, Poll, Registry, Token};
 
-pub struct Ebpf;
-
 pub struct RingBuffer<'a> {
     buffer: RingBuf<&'a mut MapData>,
 }
 
 impl<'a> RingBuffer<'a> {
-    fn new(bpf: &'a mut Bpf) -> Self {
-        let buffer = RingBuf::try_from(bpf.map_mut("DATA").unwrap()).unwrap();
+    fn new(ebpf: &'a mut Ebpf) -> Self {
+        let buffer = RingBuf::try_from(ebpf.map_mut("DATA").unwrap()).unwrap();
         Self { buffer }
     }
 
@@ -201,384 +199,380 @@ fn update_ipv6_blocklist(
     }
 }
 
-impl Ebpf {
-    pub fn load_ingress(
-        iface: String,
-        notification_sender: kanal::Sender<Event>,
-        data_sender: kanal::Sender<[u8; RawPacket::LEN]>,
-        filter_channel_receiver: kanal::Receiver<FilterChannelSignal>,
-        firewall_ingress_receiver: kanal::Receiver<FirewallSignal>,
-        terminate: Arc<AtomicBool>,
-    ) {
-        thread::spawn({
-            let iface = iface.to_owned();
-            let notification_sender = notification_sender.clone();
+pub fn load_ingress(
+    iface: String,
+    notification_sender: kanal::Sender<Event>,
+    data_sender: kanal::Sender<[u8; RawPacket::LEN]>,
+    filter_channel_receiver: kanal::Receiver<FilterChannelSignal>,
+    firewall_ingress_receiver: kanal::Receiver<FirewallSignal>,
+    terminate: Arc<AtomicBool>,
+) {
+    thread::spawn({
+        let iface = iface.to_owned();
+        let notification_sender = notification_sender.clone();
 
-            move || {
-                let rlim = libc::rlimit {
-                    rlim_cur: libc::RLIM_INFINITY,
-                    rlim_max: libc::RLIM_INFINITY,
-                };
+        move || {
+            let rlim = libc::rlimit {
+                rlim_cur: libc::RLIM_INFINITY,
+                rlim_max: libc::RLIM_INFINITY,
+            };
 
-                unsafe { libc::setrlimit(libc::RLIMIT_MEMLOCK, &rlim) };
+            unsafe { libc::setrlimit(libc::RLIMIT_MEMLOCK, &rlim) };
 
-                #[cfg(debug_assertions)]
-                let mut bpf = match Bpf::load(include_bytes_aligned!(
-                    "../../target/bpfel-unknown-none/debug/oryx"
-                )) {
-                    Ok(v) => v,
-                    Err(e) => {
-                        Notification::send(
-                            format!("Failed to load the ingress eBPF bytecode\n {}", e),
-                            NotificationLevel::Error,
-                            notification_sender,
-                        )
-                        .unwrap();
-                        return;
-                    }
-                };
-
-                #[cfg(not(debug_assertions))]
-                let mut bpf = match Bpf::load(include_bytes_aligned!(
-                    "../../target/bpfel-unknown-none/release/oryx"
-                )) {
-                    Ok(v) => v,
-                    Err(e) => {
-                        Notification::send(
-                            format!("Failed to load the ingress eBPF bytecode\n {}", e),
-                            NotificationLevel::Error,
-                            notification_sender,
-                        )
-                        .unwrap();
-                        return;
-                    }
-                };
-
-                let _ = tc::qdisc_add_clsact(&iface);
-
-                let program: &mut SchedClassifier =
-                    bpf.program_mut("oryx").unwrap().try_into().unwrap();
-
-                if let Err(e) = program.load() {
+            #[cfg(debug_assertions)]
+            let mut bpf = match Ebpf::load(include_bytes_aligned!(
+                "../../target/bpfel-unknown-none/debug/oryx"
+            )) {
+                Ok(v) => v,
+                Err(e) => {
                     Notification::send(
-                        format!(
-                            "Failed to load the ingress eBPF program to the kernel\n{}",
-                            e
-                        ),
+                        format!("Failed to load the ingress eBPF bytecode\n {}", e),
                         NotificationLevel::Error,
                         notification_sender,
                     )
                     .unwrap();
                     return;
-                };
+                }
+            };
 
-                if let Err(e) = program.attach(&iface, TcAttachType::Ingress) {
+            #[cfg(not(debug_assertions))]
+            let mut bpf = match Bpf::load(include_bytes_aligned!(
+                "../../target/bpfel-unknown-none/release/oryx"
+            )) {
+                Ok(v) => v,
+                Err(e) => {
                     Notification::send(
-                        format!(
-                            "Failed to attach the ingress eBPF program to the interface\n{}",
-                            e
-                        ),
+                        format!("Failed to load the ingress eBPF bytecode\n {}", e),
                         NotificationLevel::Error,
                         notification_sender,
                     )
                     .unwrap();
                     return;
-                };
+                }
+            };
 
-                let mut poll = Poll::new().unwrap();
-                let mut events = Events::with_capacity(128);
+            let _ = tc::qdisc_add_clsact(&iface);
 
-                //filter-ebpf interface
-                let mut transport_filters: Array<_, u32> =
-                    Array::try_from(bpf.take_map("TRANSPORT_FILTERS").unwrap()).unwrap();
+            let program: &mut SchedClassifier =
+                bpf.program_mut("oryx").unwrap().try_into().unwrap();
 
-                let mut network_filters: Array<_, u32> =
-                    Array::try_from(bpf.take_map("NETWORK_FILTERS").unwrap()).unwrap();
+            if let Err(e) = program.load() {
+                Notification::send(
+                    format!(
+                        "Failed to load the ingress eBPF program to the kernel\n{}",
+                        e
+                    ),
+                    NotificationLevel::Error,
+                    notification_sender,
+                )
+                .unwrap();
+                return;
+            };
 
-                let mut link_filters: Array<_, u32> =
-                    Array::try_from(bpf.take_map("LINK_FILTERS").unwrap()).unwrap();
+            if let Err(e) = program.attach(&iface, TcAttachType::Ingress) {
+                Notification::send(
+                    format!(
+                        "Failed to attach the ingress eBPF program to the interface\n{}",
+                        e
+                    ),
+                    NotificationLevel::Error,
+                    notification_sender,
+                )
+                .unwrap();
+                return;
+            };
 
-                // firewall-ebpf interface
-                let mut ipv4_firewall: HashMap<_, u32, [u16; MAX_RULES_PORT]> =
-                    HashMap::try_from(bpf.take_map("BLOCKLIST_IPV4").unwrap()).unwrap();
+            let mut poll = Poll::new().unwrap();
+            let mut events = Events::with_capacity(128);
 
-                let mut ipv6_firewall: HashMap<_, u128, [u16; MAX_RULES_PORT]> =
-                    HashMap::try_from(bpf.take_map("BLOCKLIST_IPV6").unwrap()).unwrap();
+            //filter-ebpf interface
+            let mut transport_filters: Array<_, u32> =
+                Array::try_from(bpf.take_map("TRANSPORT_FILTERS").unwrap()).unwrap();
 
-                thread::spawn(move || loop {
-                    if let Ok(signal) = firewall_ingress_receiver.recv() {
-                        match signal {
-                            FirewallSignal::Rule(rule) => match rule.ip {
-                                IpAddr::V4(addr) => update_ipv4_blocklist(
-                                    &mut ipv4_firewall,
-                                    addr,
-                                    rule.port,
-                                    rule.enabled,
-                                ),
+            let mut network_filters: Array<_, u32> =
+                Array::try_from(bpf.take_map("NETWORK_FILTERS").unwrap()).unwrap();
 
-                                IpAddr::V6(addr) => update_ipv6_blocklist(
-                                    &mut ipv6_firewall,
-                                    addr,
-                                    rule.port,
-                                    rule.enabled,
-                                ),
-                            },
-                            FirewallSignal::Kill => {
-                                break;
-                            }
-                        }
-                    }
-                });
+            let mut link_filters: Array<_, u32> =
+                Array::try_from(bpf.take_map("LINK_FILTERS").unwrap()).unwrap();
 
-                thread::spawn(move || loop {
-                    if let Ok(signal) = filter_channel_receiver.recv() {
-                        match signal {
-                            FilterChannelSignal::Update((filter, flag)) => match filter {
-                                Protocol::Transport(p) => {
-                                    let _ = transport_filters.set(p as u32, flag as u32, 0);
-                                }
-                                Protocol::Network(p) => {
-                                    let _ = network_filters.set(p as u32, flag as u32, 0);
-                                }
-                                Protocol::Link(p) => {
-                                    let _ = link_filters.set(p as u32, flag as u32, 0);
-                                }
-                            },
-                            FilterChannelSignal::Kill => {
-                                break;
-                            }
-                        }
-                    }
-                });
+            // firewall-ebpf interface
+            let mut ipv4_firewall: HashMap<_, u32, [u16; MAX_RULES_PORT]> =
+                HashMap::try_from(bpf.take_map("BLOCKLIST_IPV4").unwrap()).unwrap();
 
-                let mut ring_buf = RingBuffer::new(&mut bpf);
+            let mut ipv6_firewall: HashMap<_, u128, [u16; MAX_RULES_PORT]> =
+                HashMap::try_from(bpf.take_map("BLOCKLIST_IPV6").unwrap()).unwrap();
 
-                poll.registry()
-                    .register(
-                        &mut SourceFd(&ring_buf.buffer.as_raw_fd()),
-                        Token(0),
-                        Interest::READABLE,
-                    )
-                    .unwrap();
+            thread::spawn(move || loop {
+                if let Ok(signal) = firewall_ingress_receiver.recv() {
+                    match signal {
+                        FirewallSignal::Rule(rule) => match rule.ip {
+                            IpAddr::V4(addr) => update_ipv4_blocklist(
+                                &mut ipv4_firewall,
+                                addr,
+                                rule.port,
+                                rule.enabled,
+                            ),
 
-                loop {
-                    poll.poll(&mut events, Some(Duration::from_millis(100)))
-                        .unwrap();
-                    if terminate.load(std::sync::atomic::Ordering::Relaxed) {
-                        break;
-                    }
-                    for event in &events {
-                        if terminate.load(std::sync::atomic::Ordering::Relaxed) {
+                            IpAddr::V6(addr) => update_ipv6_blocklist(
+                                &mut ipv6_firewall,
+                                addr,
+                                rule.port,
+                                rule.enabled,
+                            ),
+                        },
+                        FirewallSignal::Kill => {
                             break;
-                        }
-                        if event.token() == Token(0) && event.is_readable() {
-                            if terminate.load(std::sync::atomic::Ordering::Relaxed) {
-                                break;
-                            }
-                            while let Some(item) = ring_buf.next() {
-                                if terminate.load(std::sync::atomic::Ordering::Relaxed) {
-                                    break;
-                                }
-                                let packet: [u8; RawPacket::LEN] =
-                                    item.to_owned().try_into().unwrap();
-                                data_sender.send(packet).ok();
-                            }
                         }
                     }
                 }
+            });
 
-                let _ = poll
-                    .registry()
-                    .deregister(&mut SourceFd(&ring_buf.buffer.as_raw_fd()));
-            }
-        });
-    }
-
-    pub fn load_egress(
-        iface: String,
-        notification_sender: kanal::Sender<Event>,
-        data_sender: kanal::Sender<[u8; RawPacket::LEN]>,
-        filter_channel_receiver: kanal::Receiver<FilterChannelSignal>,
-        firewall_egress_receiver: kanal::Receiver<FirewallSignal>,
-        terminate: Arc<AtomicBool>,
-    ) {
-        thread::spawn({
-            let iface = iface.to_owned();
-            let notification_sender = notification_sender.clone();
-
-            move || {
-                let rlim = libc::rlimit {
-                    rlim_cur: libc::RLIM_INFINITY,
-                    rlim_max: libc::RLIM_INFINITY,
-                };
-
-                unsafe { libc::setrlimit(libc::RLIMIT_MEMLOCK, &rlim) };
-
-                #[cfg(debug_assertions)]
-                let mut bpf = match Bpf::load(include_bytes_aligned!(
-                    "../../target/bpfel-unknown-none/debug/oryx"
-                )) {
-                    Ok(v) => v,
-                    Err(e) => {
-                        Notification::send(
-                            format!("Fail to load the egress eBPF bytecode\n {}", e),
-                            NotificationLevel::Error,
-                            notification_sender,
-                        )
-                        .unwrap();
-                        return;
-                    }
-                };
-
-                #[cfg(not(debug_assertions))]
-                let mut bpf = match Bpf::load(include_bytes_aligned!(
-                    "../../target/bpfel-unknown-none/release/oryx"
-                )) {
-                    Ok(v) => v,
-                    Err(e) => {
-                        Notification::send(
-                            format!("Failed to load the egress eBPF bytecode\n {}", e),
-                            NotificationLevel::Error,
-                            notification_sender,
-                        )
-                        .unwrap();
-                        return;
-                    }
-                };
-
-                let _ = tc::qdisc_add_clsact(&iface);
-                let program: &mut SchedClassifier =
-                    bpf.program_mut("oryx").unwrap().try_into().unwrap();
-
-                if let Err(e) = program.load() {
-                    Notification::send(
-                        format!("Fail to load the egress eBPF program to the kernel\n{}", e),
-                        NotificationLevel::Error,
-                        notification_sender,
-                    )
-                    .unwrap();
-                    return;
-                };
-
-                if let Err(e) = program.attach(&iface, TcAttachType::Egress) {
-                    Notification::send(
-                        format!(
-                            "Failed to attach the egress eBPF program to the interface\n{}",
-                            e
-                        ),
-                        NotificationLevel::Error,
-                        notification_sender,
-                    )
-                    .unwrap();
-                    return;
-                };
-
-                let mut poll = Poll::new().unwrap();
-                let mut events = Events::with_capacity(128);
-
-                //filter-ebpf interface
-                let mut transport_filters: Array<_, u32> =
-                    Array::try_from(bpf.take_map("TRANSPORT_FILTERS").unwrap()).unwrap();
-
-                let mut network_filters: Array<_, u32> =
-                    Array::try_from(bpf.take_map("NETWORK_FILTERS").unwrap()).unwrap();
-
-                let mut link_filters: Array<_, u32> =
-                    Array::try_from(bpf.take_map("LINK_FILTERS").unwrap()).unwrap();
-
-                // firewall-ebpf interface
-                let mut ipv4_firewall: HashMap<_, u32, [u16; MAX_RULES_PORT]> =
-                    HashMap::try_from(bpf.take_map("BLOCKLIST_IPV4").unwrap()).unwrap();
-
-                let mut ipv6_firewall: HashMap<_, u128, [u16; MAX_RULES_PORT]> =
-                    HashMap::try_from(bpf.take_map("BLOCKLIST_IPV6").unwrap()).unwrap();
-
-                thread::spawn(move || loop {
-                    if let Ok(signal) = firewall_egress_receiver.recv() {
-                        match signal {
-                            FirewallSignal::Rule(rule) => match rule.ip {
-                                IpAddr::V4(addr) => update_ipv4_blocklist(
-                                    &mut ipv4_firewall,
-                                    addr,
-                                    rule.port,
-                                    rule.enabled,
-                                ),
-
-                                IpAddr::V6(addr) => update_ipv6_blocklist(
-                                    &mut ipv6_firewall,
-                                    addr,
-                                    rule.port,
-                                    rule.enabled,
-                                ),
-                            },
-                            FirewallSignal::Kill => {
-                                break;
+            thread::spawn(move || loop {
+                if let Ok(signal) = filter_channel_receiver.recv() {
+                    match signal {
+                        FilterChannelSignal::Update((filter, flag)) => match filter {
+                            Protocol::Transport(p) => {
+                                let _ = transport_filters.set(p as u32, flag as u32, 0);
                             }
-                        }
-                    }
-                });
-
-                thread::spawn(move || loop {
-                    if let Ok(signal) = filter_channel_receiver.recv() {
-                        match signal {
-                            FilterChannelSignal::Update((filter, flag)) => match filter {
-                                Protocol::Transport(p) => {
-                                    let _ = transport_filters.set(p as u32, flag as u32, 0);
-                                }
-                                Protocol::Network(p) => {
-                                    let _ = network_filters.set(p as u32, flag as u32, 0);
-                                }
-                                Protocol::Link(p) => {
-                                    let _ = link_filters.set(p as u32, flag as u32, 0);
-                                }
-                            },
-                            FilterChannelSignal::Kill => {
-                                break;
+                            Protocol::Network(p) => {
+                                let _ = network_filters.set(p as u32, flag as u32, 0);
                             }
-                        }
-                    }
-                });
-
-                let mut ring_buf = RingBuffer::new(&mut bpf);
-
-                poll.registry()
-                    .register(
-                        &mut SourceFd(&ring_buf.buffer.as_raw_fd()),
-                        Token(0),
-                        Interest::READABLE,
-                    )
-                    .unwrap();
-
-                loop {
-                    poll.poll(&mut events, Some(Duration::from_millis(100)))
-                        .unwrap();
-                    if terminate.load(std::sync::atomic::Ordering::Relaxed) {
-                        break;
-                    }
-                    for event in &events {
-                        if terminate.load(std::sync::atomic::Ordering::Relaxed) {
+                            Protocol::Link(p) => {
+                                let _ = link_filters.set(p as u32, flag as u32, 0);
+                            }
+                        },
+                        FilterChannelSignal::Kill => {
                             break;
-                        }
-                        if event.token() == Token(0) && event.is_readable() {
-                            if terminate.load(std::sync::atomic::Ordering::Relaxed) {
-                                break;
-                            }
-                            while let Some(item) = ring_buf.next() {
-                                if terminate.load(std::sync::atomic::Ordering::Relaxed) {
-                                    break;
-                                }
-                                let packet: [u8; RawPacket::LEN] =
-                                    item.to_owned().try_into().unwrap();
-                                data_sender.send(packet).ok();
-                            }
                         }
                     }
                 }
+            });
 
-                let _ = poll
-                    .registry()
-                    .deregister(&mut SourceFd(&ring_buf.buffer.as_raw_fd()));
+            let mut ring_buf = RingBuffer::new(&mut bpf);
+
+            poll.registry()
+                .register(
+                    &mut SourceFd(&ring_buf.buffer.as_raw_fd()),
+                    Token(0),
+                    Interest::READABLE,
+                )
+                .unwrap();
+
+            loop {
+                poll.poll(&mut events, Some(Duration::from_millis(100)))
+                    .unwrap();
+                if terminate.load(std::sync::atomic::Ordering::Relaxed) {
+                    break;
+                }
+                for event in &events {
+                    if terminate.load(std::sync::atomic::Ordering::Relaxed) {
+                        break;
+                    }
+                    if event.token() == Token(0) && event.is_readable() {
+                        if terminate.load(std::sync::atomic::Ordering::Relaxed) {
+                            break;
+                        }
+                        while let Some(item) = ring_buf.next() {
+                            if terminate.load(std::sync::atomic::Ordering::Relaxed) {
+                                break;
+                            }
+                            let packet: [u8; RawPacket::LEN] = item.to_owned().try_into().unwrap();
+                            data_sender.send(packet).ok();
+                        }
+                    }
+                }
             }
-        });
-    }
+
+            let _ = poll
+                .registry()
+                .deregister(&mut SourceFd(&ring_buf.buffer.as_raw_fd()));
+        }
+    });
+}
+
+pub fn load_egress(
+    iface: String,
+    notification_sender: kanal::Sender<Event>,
+    data_sender: kanal::Sender<[u8; RawPacket::LEN]>,
+    filter_channel_receiver: kanal::Receiver<FilterChannelSignal>,
+    firewall_egress_receiver: kanal::Receiver<FirewallSignal>,
+    terminate: Arc<AtomicBool>,
+) {
+    thread::spawn({
+        let iface = iface.to_owned();
+        let notification_sender = notification_sender.clone();
+
+        move || {
+            let rlim = libc::rlimit {
+                rlim_cur: libc::RLIM_INFINITY,
+                rlim_max: libc::RLIM_INFINITY,
+            };
+
+            unsafe { libc::setrlimit(libc::RLIMIT_MEMLOCK, &rlim) };
+
+            #[cfg(debug_assertions)]
+            let mut bpf = match Ebpf::load(include_bytes_aligned!(
+                "../../target/bpfel-unknown-none/debug/oryx"
+            )) {
+                Ok(v) => v,
+                Err(e) => {
+                    Notification::send(
+                        format!("Fail to load the egress eBPF bytecode\n {}", e),
+                        NotificationLevel::Error,
+                        notification_sender,
+                    )
+                    .unwrap();
+                    return;
+                }
+            };
+
+            #[cfg(not(debug_assertions))]
+            let mut bpf = match Bpf::load(include_bytes_aligned!(
+                "../../target/bpfel-unknown-none/release/oryx"
+            )) {
+                Ok(v) => v,
+                Err(e) => {
+                    Notification::send(
+                        format!("Failed to load the egress eBPF bytecode\n {}", e),
+                        NotificationLevel::Error,
+                        notification_sender,
+                    )
+                    .unwrap();
+                    return;
+                }
+            };
+
+            let _ = tc::qdisc_add_clsact(&iface);
+            let program: &mut SchedClassifier =
+                bpf.program_mut("oryx").unwrap().try_into().unwrap();
+
+            if let Err(e) = program.load() {
+                Notification::send(
+                    format!("Fail to load the egress eBPF program to the kernel\n{}", e),
+                    NotificationLevel::Error,
+                    notification_sender,
+                )
+                .unwrap();
+                return;
+            };
+
+            if let Err(e) = program.attach(&iface, TcAttachType::Egress) {
+                Notification::send(
+                    format!(
+                        "Failed to attach the egress eBPF program to the interface\n{}",
+                        e
+                    ),
+                    NotificationLevel::Error,
+                    notification_sender,
+                )
+                .unwrap();
+                return;
+            };
+
+            let mut poll = Poll::new().unwrap();
+            let mut events = Events::with_capacity(128);
+
+            //filter-ebpf interface
+            let mut transport_filters: Array<_, u32> =
+                Array::try_from(bpf.take_map("TRANSPORT_FILTERS").unwrap()).unwrap();
+
+            let mut network_filters: Array<_, u32> =
+                Array::try_from(bpf.take_map("NETWORK_FILTERS").unwrap()).unwrap();
+
+            let mut link_filters: Array<_, u32> =
+                Array::try_from(bpf.take_map("LINK_FILTERS").unwrap()).unwrap();
+
+            // firewall-ebpf interface
+            let mut ipv4_firewall: HashMap<_, u32, [u16; MAX_RULES_PORT]> =
+                HashMap::try_from(bpf.take_map("BLOCKLIST_IPV4").unwrap()).unwrap();
+
+            let mut ipv6_firewall: HashMap<_, u128, [u16; MAX_RULES_PORT]> =
+                HashMap::try_from(bpf.take_map("BLOCKLIST_IPV6").unwrap()).unwrap();
+
+            thread::spawn(move || loop {
+                if let Ok(signal) = firewall_egress_receiver.recv() {
+                    match signal {
+                        FirewallSignal::Rule(rule) => match rule.ip {
+                            IpAddr::V4(addr) => update_ipv4_blocklist(
+                                &mut ipv4_firewall,
+                                addr,
+                                rule.port,
+                                rule.enabled,
+                            ),
+
+                            IpAddr::V6(addr) => update_ipv6_blocklist(
+                                &mut ipv6_firewall,
+                                addr,
+                                rule.port,
+                                rule.enabled,
+                            ),
+                        },
+                        FirewallSignal::Kill => {
+                            break;
+                        }
+                    }
+                }
+            });
+
+            thread::spawn(move || loop {
+                if let Ok(signal) = filter_channel_receiver.recv() {
+                    match signal {
+                        FilterChannelSignal::Update((filter, flag)) => match filter {
+                            Protocol::Transport(p) => {
+                                let _ = transport_filters.set(p as u32, flag as u32, 0);
+                            }
+                            Protocol::Network(p) => {
+                                let _ = network_filters.set(p as u32, flag as u32, 0);
+                            }
+                            Protocol::Link(p) => {
+                                let _ = link_filters.set(p as u32, flag as u32, 0);
+                            }
+                        },
+                        FilterChannelSignal::Kill => {
+                            break;
+                        }
+                    }
+                }
+            });
+
+            let mut ring_buf = RingBuffer::new(&mut bpf);
+
+            poll.registry()
+                .register(
+                    &mut SourceFd(&ring_buf.buffer.as_raw_fd()),
+                    Token(0),
+                    Interest::READABLE,
+                )
+                .unwrap();
+
+            loop {
+                poll.poll(&mut events, Some(Duration::from_millis(100)))
+                    .unwrap();
+                if terminate.load(std::sync::atomic::Ordering::Relaxed) {
+                    break;
+                }
+                for event in &events {
+                    if terminate.load(std::sync::atomic::Ordering::Relaxed) {
+                        break;
+                    }
+                    if event.token() == Token(0) && event.is_readable() {
+                        if terminate.load(std::sync::atomic::Ordering::Relaxed) {
+                            break;
+                        }
+                        while let Some(item) = ring_buf.next() {
+                            if terminate.load(std::sync::atomic::Ordering::Relaxed) {
+                                break;
+                            }
+                            let packet: [u8; RawPacket::LEN] = item.to_owned().try_into().unwrap();
+                            data_sender.send(packet).ok();
+                        }
+                    }
+                }
+            }
+
+            let _ = poll
+                .registry()
+                .deregister(&mut SourceFd(&ring_buf.buffer.as_raw_fd()));
+        }
+    });
 }

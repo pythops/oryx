@@ -119,6 +119,7 @@ impl App {
                 frame,
                 section_block,
                 &self.filter.interface.selected_interface.name,
+                self.active_popup.as_ref(),
             );
 
             self.filter.render_on_sniffing(frame, settings_block);

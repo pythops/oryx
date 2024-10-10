@@ -18,9 +18,9 @@ use oryx_common::{
     RawPacket,
 };
 use ratatui::{
-    layout::{Alignment, Constraint, Direction, Flex, Layout, Rect},
+    layout::{Alignment, Constraint, Direction, Flex, Layout, Margin, Rect},
     style::{Style, Stylize},
-    text::{Line, Span},
+    text::{Line, Span, Text},
     widgets::{Block, BorderType, Borders, Clear, Padding, Row, Table, TableState},
     Frame,
 };
@@ -28,7 +28,10 @@ use transport::TransportFilter;
 use tui_big_text::{BigText, PixelSize};
 
 use crate::{
-    app::AppResult, ebpf::Ebpf, event::Event, interface::Interface,
+    app::AppResult,
+    ebpf::{load_egress, load_ingress},
+    event::Event,
+    interface::Interface,
     section::firewall::FirewallSignal,
 };
 
@@ -146,7 +149,7 @@ impl Filter {
             .applied_direction
             .contains(&TrafficDirection::Ingress)
         {
-            Ebpf::load_ingress(
+            load_ingress(
                 iface.clone(),
                 notification_sender.clone(),
                 data_sender.clone(),
@@ -161,7 +164,7 @@ impl Filter {
             .applied_direction
             .contains(&TrafficDirection::Egress)
         {
-            Ebpf::load_egress(
+            load_egress(
                 iface,
                 notification_sender,
                 data_sender,
@@ -336,7 +339,7 @@ impl Filter {
 
             let iface = self.interface.selected_interface.name.clone();
 
-            Ebpf::load_egress(
+            load_egress(
                 iface,
                 notification_sender.clone(),
                 data_sender.clone(),
@@ -378,7 +381,7 @@ impl Filter {
             self.traffic_direction
                 .terminate_ingress
                 .store(false, std::sync::atomic::Ordering::Relaxed);
-            Ebpf::load_ingress(
+            load_ingress(
                 iface,
                 notification_sender.clone(),
                 data_sender.clone(),
@@ -570,6 +573,16 @@ impl Filter {
     }
 
     pub fn render_on_setup(&mut self, frame: &mut Frame) {
+        let (filters_block, help_block) = {
+            let chunks = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([Constraint::Fill(1), Constraint::Length(3)])
+                .flex(ratatui::layout::Flex::SpaceBetween)
+                .split(frame.area());
+
+            (chunks[0], chunks[1])
+        };
+
         let (
             interface_block,
             transport_filter_block,
@@ -590,7 +603,7 @@ impl Filter {
                 ])
                 .margin(1)
                 .flex(Flex::SpaceAround)
-                .split(frame.area());
+                .split(filters_block);
             (
                 chunks[0], chunks[1], chunks[2], chunks[3], chunks[4], chunks[5],
             )
@@ -638,6 +651,36 @@ impl Filter {
             .build();
 
         frame.render_widget(start, start_block);
+
+        let help = Text::from(vec![
+            Line::from(""),
+            Line::from(vec![
+                Span::from("k,").bold(),
+                Span::from("  Up").bold(),
+                Span::from(" | ").bold(),
+                Span::from("j,").bold(),
+                Span::from("  Down").bold(),
+                Span::from(" | ").bold(),
+                Span::from("󱁐 ").bold(),
+                Span::from(" Toggle Select").bold(),
+                Span::from(" | ").bold(),
+                Span::from("󱞦 ").bold(),
+                Span::from(" Apply").bold(),
+                Span::from(" | ").bold(),
+                Span::from(" ").bold(),
+                Span::from(" Nav").bold(),
+            ]),
+        ])
+        .blue()
+        .centered();
+
+        frame.render_widget(
+            help,
+            help_block.inner(Margin {
+                horizontal: 1,
+                vertical: 0,
+            }),
+        );
     }
 
     pub fn render_on_sniffing(&mut self, frame: &mut Frame, block: Rect) {
@@ -762,7 +805,7 @@ impl Filter {
             .direction(Direction::Horizontal)
             .constraints([
                 Constraint::Fill(1),
-                Constraint::Length(60),
+                Constraint::Max(82),
                 Constraint::Fill(1),
             ])
             .flex(ratatui::layout::Flex::SpaceBetween)
@@ -778,6 +821,7 @@ impl Filter {
             let chunks = Layout::default()
                 .direction(Direction::Vertical)
                 .constraints([
+                    Constraint::Length(1),
                     Constraint::Length(NB_TRANSPORT_PROTOCOL + 4),
                     Constraint::Length(NB_NETWORK_PROTOCOL + 4),
                     Constraint::Length(NB_LINK_PROTOCOL + 4),
@@ -787,10 +831,11 @@ impl Filter {
                 .margin(1)
                 .flex(Flex::SpaceBetween)
                 .split(block);
-            (chunks[0], chunks[1], chunks[2], chunks[3], chunks[4])
+            (chunks[1], chunks[2], chunks[3], chunks[4], chunks[5])
         };
 
         frame.render_widget(Clear, block);
+
         frame.render_widget(
             Block::new()
                 .borders(Borders::all())
