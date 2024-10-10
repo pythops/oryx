@@ -419,41 +419,25 @@ impl Firewall {
         });
     }
 
-    pub fn load_rule(
+    pub fn submit_rule(
         &mut self,
-        sender: kanal::Sender<crate::event::Event>,
-        is_ingress_loaded: bool,
-        is_egress_loaded: bool,
+        // sender: kanal::Sender<crate::event::Event>,
+        // is_ingress_loaded: bool,
+        // is_egress_loaded: bool,
     ) -> AppResult<()> {
         if let Some(index) = self.state.selected() {
             let rule = &mut self.rules[index];
 
             match rule.direction {
                 TrafficDirection::Ingress => {
-                    if is_ingress_loaded {
-                        rule.enabled = !rule.enabled;
-                        self.ingress_sender
-                            .send(FirewallSignal::Rule(rule.clone()))?;
-                    } else {
-                        Notification::send(
-                            "Ingress is not loaded.",
-                            crate::notification::NotificationLevel::Warning,
-                            sender.clone(),
-                        )?;
-                    }
+                    rule.enabled = !rule.enabled;
+                    self.ingress_sender
+                        .send(FirewallSignal::Rule(rule.clone()))?;
                 }
                 TrafficDirection::Egress => {
-                    if is_egress_loaded {
-                        rule.enabled = !rule.enabled;
-                        self.egress_sender
-                            .send(FirewallSignal::Rule(rule.clone()))?;
-                    } else {
-                        Notification::send(
-                            "Egress is not loaded.",
-                            crate::notification::NotificationLevel::Warning,
-                            sender.clone(),
-                        )?;
-                    }
+                    rule.enabled = !rule.enabled;
+                    self.egress_sender
+                        .send(FirewallSignal::Rule(rule.clone()))?;
                 }
             }
         }

@@ -4,8 +4,6 @@ mod link;
 mod network;
 mod transport;
 
-use std::{thread, time::Duration};
-
 use crossterm::event::{KeyCode, KeyEvent};
 use direction::{TrafficDirection, TrafficDirectionFilter};
 use link::LinkFilter;
@@ -37,30 +35,31 @@ use crate::{
 
 #[derive(Debug, Clone)]
 pub enum FilterChannelSignal {
-    Update((Protocol, bool)),
+    ProtoUpdate((Protocol, bool)),
+    DirectionUpdate(bool),
     Kill,
 }
 
 #[derive(Debug, Clone)]
-pub struct Channels {
-    pub sender: kanal::Sender<FilterChannelSignal>,
-    pub receiver: kanal::Receiver<FilterChannelSignal>,
+pub struct Channels<T> {
+    pub sender: kanal::Sender<T>,
+    pub receiver: kanal::Receiver<T>,
 }
 
 #[derive(Debug, Clone)]
-pub struct IoChans {
-    pub ingress: Channels,
-    pub egress: Channels,
+pub struct IoChans<T> {
+    pub ingress: Channels<T>,
+    pub egress: Channels<T>,
 }
 
-impl Channels {
+impl<T> Channels<T> {
     pub fn new() -> Self {
         let (sender, receiver) = kanal::unbounded();
         Self { sender, receiver }
     }
 }
 
-impl IoChans {
+impl<T> IoChans<T> {
     pub fn new() -> Self {
         Self {
             ingress: Channels::new(),
@@ -69,13 +68,13 @@ impl IoChans {
     }
 }
 
-impl Default for Channels {
+impl<T> Default for Channels<T> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl Default for IoChans {
+impl<T> Default for IoChans<T> {
     fn default() -> Self {
         Self::new()
     }
@@ -98,22 +97,13 @@ pub struct Filter {
     pub transport: TransportFilter,
     pub link: LinkFilter,
     pub traffic_direction: TrafficDirectionFilter,
-    pub filter_chans: IoChans,
-    pub firewall_chans: IoChans,
+    pub filter_chans: IoChans<FilterChannelSignal>,
+    pub firewall_chans: IoChans<FirewallSignal>,
     pub focused_block: FocusedBlock,
-    pub firewall_ingress_sender: kanal::Sender<FirewallSignal>,
-    pub firewall_ingress_receiver: kanal::Receiver<FirewallSignal>,
-    pub firewall_egress_sender: kanal::Sender<FirewallSignal>,
-    pub firewall_egress_receiver: kanal::Receiver<FirewallSignal>,
 }
 
 impl Filter {
-    pub fn new(
-        firewall_ingress_sender: kanal::Sender<FirewallSignal>,
-        firewall_ingress_receiver: kanal::Receiver<FirewallSignal>,
-        firewall_egress_sender: kanal::Sender<FirewallSignal>,
-        firewall_egress_receiver: kanal::Receiver<FirewallSignal>,
-    ) -> Self {
+    pub fn new(firewall_chans: IoChans<FirewallSignal>) -> Self {
         Self {
             interface: Interface::new(),
             network: NetworkFilter::new(),
@@ -121,18 +111,35 @@ impl Filter {
             link: LinkFilter::new(),
             traffic_direction: TrafficDirectionFilter::new(),
             filter_chans: IoChans::new(),
-            firewall_chans: IoChans::new(),
+            firewall_chans,
             focused_block: FocusedBlock::Interface,
-            firewall_ingress_sender,
-            firewall_ingress_receiver,
-            firewall_egress_sender,
-            firewall_egress_receiver,
         }
     }
 
     pub fn terminate(&mut self) {
+        // terminate packets reader threads
         self.traffic_direction.terminate(TrafficDirection::Egress);
         self.traffic_direction.terminate(TrafficDirection::Ingress);
+
+        // terminate filter /packets sender threads
+        let _ = self
+            .filter_chans
+            .ingress
+            .sender
+            .send(FilterChannelSignal::Kill);
+        let _ = self
+            .filter_chans
+            .egress
+            .sender
+            .send(FilterChannelSignal::Kill);
+
+        // terminate firewall threads
+        let _ = self
+            .firewall_chans
+            .ingress
+            .sender
+            .send(FirewallSignal::Kill);
+        let _ = self.firewall_chans.egress.sender.send(FirewallSignal::Kill);
     }
 
     pub fn start(
@@ -144,35 +151,23 @@ impl Filter {
 
         self.apply();
 
-        if self
-            .traffic_direction
-            .applied_direction
-            .contains(&TrafficDirection::Ingress)
-        {
-            load_ingress(
-                iface.clone(),
-                notification_sender.clone(),
-                data_sender.clone(),
-                self.filter_chans.ingress.receiver.clone(),
-                self.firewall_ingress_receiver.clone(),
-                self.traffic_direction.terminate_ingress.clone(),
-            );
-        }
+        load_ingress(
+            iface.clone(),
+            notification_sender.clone(),
+            data_sender.clone(),
+            self.filter_chans.ingress.receiver.clone(),
+            self.firewall_chans.ingress.receiver.clone(),
+            self.traffic_direction.terminate_ingress.clone(),
+        );
 
-        if self
-            .traffic_direction
-            .applied_direction
-            .contains(&TrafficDirection::Egress)
-        {
-            load_egress(
-                iface,
-                notification_sender,
-                data_sender,
-                self.filter_chans.egress.receiver.clone(),
-                self.firewall_egress_receiver.clone(),
-                self.traffic_direction.terminate_egress.clone(),
-            );
-        }
+        load_egress(
+            iface,
+            notification_sender,
+            data_sender,
+            self.filter_chans.egress.receiver.clone(),
+            self.firewall_chans.egress.receiver.clone(),
+            self.traffic_direction.terminate_egress.clone(),
+        );
 
         self.sync()?;
 
@@ -200,14 +195,14 @@ impl Filter {
                 self.filter_chans
                     .ingress
                     .sender
-                    .send(FilterChannelSignal::Update((
+                    .send(FilterChannelSignal::ProtoUpdate((
                         Protocol::Transport(*protocol),
                         false,
                     )))?;
                 self.filter_chans
                     .egress
                     .sender
-                    .send(FilterChannelSignal::Update((
+                    .send(FilterChannelSignal::ProtoUpdate((
                         Protocol::Transport(*protocol),
                         false,
                     )))?;
@@ -215,14 +210,14 @@ impl Filter {
                 self.filter_chans
                     .ingress
                     .sender
-                    .send(FilterChannelSignal::Update((
+                    .send(FilterChannelSignal::ProtoUpdate((
                         Protocol::Transport(*protocol),
                         true,
                     )))?;
                 self.filter_chans
                     .egress
                     .sender
-                    .send(FilterChannelSignal::Update((
+                    .send(FilterChannelSignal::ProtoUpdate((
                         Protocol::Transport(*protocol),
                         true,
                     )))?;
@@ -234,14 +229,14 @@ impl Filter {
                 self.filter_chans
                     .ingress
                     .sender
-                    .send(FilterChannelSignal::Update((
+                    .send(FilterChannelSignal::ProtoUpdate((
                         Protocol::Network(*protocol),
                         false,
                     )))?;
                 self.filter_chans
                     .egress
                     .sender
-                    .send(FilterChannelSignal::Update((
+                    .send(FilterChannelSignal::ProtoUpdate((
                         Protocol::Network(*protocol),
                         false,
                     )))?;
@@ -249,14 +244,14 @@ impl Filter {
                 self.filter_chans
                     .ingress
                     .sender
-                    .send(FilterChannelSignal::Update((
+                    .send(FilterChannelSignal::ProtoUpdate((
                         Protocol::Network(*protocol),
                         true,
                     )))?;
                 self.filter_chans
                     .egress
                     .sender
-                    .send(FilterChannelSignal::Update((
+                    .send(FilterChannelSignal::ProtoUpdate((
                         Protocol::Network(*protocol),
                         true,
                     )))?;
@@ -268,14 +263,14 @@ impl Filter {
                 self.filter_chans
                     .ingress
                     .sender
-                    .send(FilterChannelSignal::Update((
+                    .send(FilterChannelSignal::ProtoUpdate((
                         Protocol::Link(*protocol),
                         false,
                     )))?;
                 self.filter_chans
                     .egress
                     .sender
-                    .send(FilterChannelSignal::Update((
+                    .send(FilterChannelSignal::ProtoUpdate((
                         Protocol::Link(*protocol),
                         false,
                     )))?;
@@ -283,129 +278,161 @@ impl Filter {
                 self.filter_chans
                     .ingress
                     .sender
-                    .send(FilterChannelSignal::Update((
+                    .send(FilterChannelSignal::ProtoUpdate((
                         Protocol::Link(*protocol),
                         true,
                     )))?;
                 self.filter_chans
                     .egress
                     .sender
-                    .send(FilterChannelSignal::Update((
+                    .send(FilterChannelSignal::ProtoUpdate((
                         Protocol::Link(*protocol),
                         true,
                     )))?;
             }
         }
 
-        Ok(())
-    }
-
-    pub fn update(
-        &mut self,
-        notification_sender: kanal::Sender<Event>,
-        data_sender: kanal::Sender<[u8; RawPacket::LEN]>,
-    ) -> AppResult<()> {
-        // Remove egress
-        if self
-            .traffic_direction
-            .applied_direction
-            .contains(&TrafficDirection::Egress)
-            && !self
-                .traffic_direction
-                .selected_direction
-                .contains(&TrafficDirection::Egress)
-        {
-            self.firewall_egress_sender.send(FirewallSignal::Kill)?;
-            self.filter_chans
-                .egress
-                .sender
-                .send(FilterChannelSignal::Kill)?;
-            self.traffic_direction.terminate(TrafficDirection::Egress);
-        }
-
-        // Add egress
-        if !self
-            .traffic_direction
-            .applied_direction
-            .contains(&TrafficDirection::Egress)
-            && self
-                .traffic_direction
-                .selected_direction
-                .contains(&TrafficDirection::Egress)
-        {
-            self.traffic_direction
-                .terminate_egress
-                .store(false, std::sync::atomic::Ordering::Relaxed);
-
-            let iface = self.interface.selected_interface.name.clone();
-
-            load_egress(
-                iface,
-                notification_sender.clone(),
-                data_sender.clone(),
-                self.filter_chans.egress.receiver.clone(),
-                self.firewall_egress_receiver.clone(),
-                self.traffic_direction.terminate_egress.clone(),
-            );
-        }
-
-        // Remove ingress
         if self
             .traffic_direction
             .applied_direction
             .contains(&TrafficDirection::Ingress)
-            && !self
-                .traffic_direction
-                .selected_direction
-                .contains(&TrafficDirection::Ingress)
         {
-            self.firewall_ingress_sender.send(FirewallSignal::Kill)?;
             self.filter_chans
                 .ingress
                 .sender
-                .send(FilterChannelSignal::Kill)?;
-            self.traffic_direction.terminate(TrafficDirection::Ingress);
+                .send(FilterChannelSignal::DirectionUpdate(false))?;
+        } else {
+            self.filter_chans
+                .ingress
+                .sender
+                .send(FilterChannelSignal::DirectionUpdate(true))?;
         }
 
-        // Add ingress
-        if !self
+        if self
             .traffic_direction
             .applied_direction
-            .contains(&TrafficDirection::Ingress)
-            && self
-                .traffic_direction
-                .selected_direction
-                .contains(&TrafficDirection::Ingress)
+            .contains(&TrafficDirection::Egress)
         {
-            let iface = self.interface.selected_interface.name.clone();
-            self.traffic_direction
-                .terminate_ingress
-                .store(false, std::sync::atomic::Ordering::Relaxed);
-            load_ingress(
-                iface,
-                notification_sender.clone(),
-                data_sender.clone(),
-                self.filter_chans.ingress.receiver.clone(),
-                self.firewall_ingress_receiver.clone(),
-                self.traffic_direction.terminate_ingress.clone(),
-            );
+            self.filter_chans
+                .egress
+                .sender
+                .send(FilterChannelSignal::DirectionUpdate(false))?;
+        } else {
+            self.filter_chans
+                .egress
+                .sender
+                .send(FilterChannelSignal::DirectionUpdate(true))?;
         }
-
-        self.apply();
-
-        thread::sleep(Duration::from_millis(150));
-
-        self.traffic_direction
-            .terminate_ingress
-            .store(false, std::sync::atomic::Ordering::Relaxed);
-        self.traffic_direction
-            .terminate_ingress
-            .store(false, std::sync::atomic::Ordering::Relaxed);
-
-        self.sync()?;
 
         Ok(())
     }
+
+    // pub fn update(
+    //     &mut self,
+    //     // notification_sender: kanal::Sender<Event>,
+    //     // data_sender: kanal::Sender<[u8; RawPacket::LEN]>,
+    // ) -> AppResult<()> {
+    //     // Remove egress
+    //     if self
+    //         .traffic_direction
+    //         .applied_direction
+    //         .contains(&TrafficDirection::Egress)
+    //         && !self
+    //             .traffic_direction
+    //             .selected_direction
+    //             .contains(&TrafficDirection::Egress)
+    //     {
+    //         //self.firewall_egress_sender.send(FirewallSignal::Kill)?;
+    //         self.filter_chans
+    //             .egress
+    //             .sender
+    //             .send(FilterChannelSignal::Kill)?;
+    //         self.traffic_direction.terminate(TrafficDirection::Egress);
+    //     }
+
+    // Add egress
+    // if !self
+    //     .traffic_direction
+    //     .applied_direction
+    //     .contains(&TrafficDirection::Egress)
+    //     && self
+    //         .traffic_direction
+    //         .selected_direction
+    //         .contains(&TrafficDirection::Egress)
+    // {
+    //     self.traffic_direction
+    //         .terminate_egress
+    //         .store(false, std::sync::atomic::Ordering::Relaxed);
+
+    //     let iface = self.interface.selected_interface.name.clone();
+
+    //     load_egress(
+    //         iface,
+    //         notification_sender.clone(),
+    //         data_sender.clone(),
+    //         self.filter_chans.egress.receiver.clone(),
+    //         self.firewall_egress_receiver.clone(),
+    //         self.traffic_direction.terminate_egress.clone(),
+    //     );
+    // }
+
+    // Remove ingress
+    // if self
+    //     .traffic_direction
+    //     .applied_direction
+    //     .contains(&TrafficDirection::Ingress)
+    //     && !self
+    //         .traffic_direction
+    //         .selected_direction
+    //         .contains(&TrafficDirection::Ingress)
+    // {
+    //     self.firewall_ingress_sender.send(FirewallSignal::Kill)?;
+    //     self.filter_chans
+    //         .ingress
+    //         .sender
+    //         .send(FilterChannelSignal::Kill)?;
+    //     self.traffic_direction.terminate(TrafficDirection::Ingress);
+    // }
+
+    // Add ingress
+    // if !self
+    //     .traffic_direction
+    //     .applied_direction
+    //     .contains(&TrafficDirection::Ingress)
+    //     && self
+    //         .traffic_direction
+    //         .selected_direction
+    //         .contains(&TrafficDirection::Ingress)
+    // {
+    //     let iface = self.interface.selected_interface.name.clone();
+    //     self.traffic_direction
+    //         .terminate_ingress
+    //         .store(false, std::sync::atomic::Ordering::Relaxed);
+    //     load_ingress(
+    //         iface,
+    //         notification_sender.clone(),
+    //         data_sender.clone(),
+    //         self.filter_chans.ingress.receiver.clone(),
+    //         self.firewall_ingress_receiver.clone(),
+    //         self.traffic_direction.terminate_ingress.clone(),
+    //     );
+    // }
+
+    //     self.apply();
+
+    //     thread::sleep(Duration::from_millis(150));
+
+    //     self.traffic_direction
+    //         .terminate_ingress
+    //         .store(false, std::sync::atomic::Ordering::Relaxed);
+    //     self.traffic_direction
+    //         .terminate_ingress
+    //         .store(false, std::sync::atomic::Ordering::Relaxed);
+
+    //     self.sync()?;
+
+    //     Ok(())
+    // }
 
     pub fn handle_key_events(&mut self, key_event: KeyEvent, is_update_popup_displayed: bool) {
         match key_event.code {

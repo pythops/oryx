@@ -7,10 +7,11 @@ use std::{
     error,
     sync::{Arc, Mutex},
     thread,
+    time::Duration,
 };
 
-use crate::notification::Notification;
 use crate::{filter::Filter, help::Help};
+use crate::{filter::IoChans, notification::Notification};
 use crate::{packet::AppPacket, section::Section};
 
 pub type AppResult<T> = std::result::Result<T, Box<dyn error::Error>>;
@@ -57,9 +58,7 @@ impl App {
 
         let (sender, receiver) = kanal::unbounded();
 
-        let (firewall_ingress_sender, firewall_ingress_receiver) = kanal::unbounded();
-        let (firewall_egress_sender, firewall_egress_receiver) = kanal::unbounded();
-
+        let firewall_chans = IoChans::new();
         thread::spawn({
             let packets = packets.clone();
             move || loop {
@@ -77,20 +76,11 @@ impl App {
         Self {
             running: true,
             help: Help::new(),
-            filter: Filter::new(
-                firewall_ingress_sender.clone(),
-                firewall_ingress_receiver,
-                firewall_egress_sender.clone(),
-                firewall_egress_receiver,
-            ),
+            filter: Filter::new(firewall_chans.clone()),
             start_sniffing: false,
             packets: packets.clone(),
             notifications: Vec::new(),
-            section: Section::new(
-                packets.clone(),
-                firewall_ingress_sender,
-                firewall_egress_sender,
-            ),
+            section: Section::new(packets.clone(), firewall_chans.clone()),
             data_channel_sender: sender,
             is_editing: false,
             active_popup: None,
@@ -133,6 +123,8 @@ impl App {
     }
 
     pub fn quit(&mut self) {
+        self.filter.terminate();
+        thread::sleep(Duration::from_millis(110));
         self.running = false;
     }
 }
