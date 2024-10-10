@@ -135,12 +135,10 @@ impl App {
     }
 
     pub fn quit(&mut self) {
-        match self.section.firewall.save_rules() {
-            Ok(()) => {}
-            Err(err) => {
-                error!("{}", err)
-            }
+        if let Err(e) = self.section.firewall.save_rules() {
+            error!("{}", e)
         }
+
         self.running = false;
     }
 }

@@ -24,11 +24,11 @@ kanal = "0.1.0-pre8"
 mimalloc = "0.1"
 clap = { version = "4", features = ["derive", "cargo"] }
 network-types = "0.0.7"
-uuid = { version = "1", default-features = false, features = ["v4","serde"] }
+uuid = { version = "1", default-features = false, features = ["v4", "serde"] }
 log = "0.4"
 env_logger = "0.11"
-serde_json = "1.0.128"
-serde = {version = "1.0", features = ["derive"] }
+serde_json = "1"
+serde = { version = "1", features = ["derive"] }
 
 [[bin]]
 name = "oryx"

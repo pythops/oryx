@@ -306,7 +306,7 @@ impl Firewall {
         egress_sender: kanal::Sender<FirewallSignal>,
     ) -> Self {
         let rules_list: Vec<FirewallRule> = match Self::load_saved_rules() {
-            Ok(maybe_saved_rules) => maybe_saved_rules.unwrap_or_default(),
+            Ok(saved_rules) => saved_rules,
 
             Err(err) => {
                 error!("{}", err.to_string());
@@ -342,31 +342,32 @@ impl Firewall {
             }
 
             let oryx_export_file = oryx_export_dir.join("firewall.json");
-            fs::write(oryx_export_file, json).expect("Could not save Firewall Rules");
+            fs::write(oryx_export_file, json)?;
             info!("Firewall Rules saved");
         }
         Ok(())
     }
 
-    fn load_saved_rules() -> AppResult<Option<Vec<FirewallRule>>> {
+    fn load_saved_rules() -> AppResult<Vec<FirewallRule>> {
         info!("Loading Firewall Rules");
         let oryx_export_file = dirs::home_dir().unwrap().join("oryx").join("firewall.json");
         if oryx_export_file.exists() {
             info!("Found previously saved Firewall Rules");
-            let json_string =
-                fs::read_to_string(oryx_export_file).expect("Could not load Firewall Rules");
-            let mut parsed_rules: Vec<FirewallRule> =
-                serde_json::from_str(&json_string).expect("Could not load Firewall Rules");
+
+            let json_string = fs::read_to_string(oryx_export_file)?;
+
+            let mut parsed_rules: Vec<FirewallRule> = serde_json::from_str(&json_string)?;
+
             // as we don't know if ingress/egress programs are loaded we have to disable all rules
             for rule in &mut parsed_rules {
                 rule.enabled = false
             }
 
             info!("Firewall Rules loaded");
-            Ok(Some(parsed_rules))
+            Ok(parsed_rules)
         } else {
             info!("No saved Firewall Rules found");
-            Ok(None)
+            Ok(Vec::new())
         }
     }
 
