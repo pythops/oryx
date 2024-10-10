@@ -327,24 +327,23 @@ impl Firewall {
     }
 
     pub fn save_rules(&self) -> AppResult<()> {
-        if !self.rules.is_empty() {
-            info!("Saving Firewall Rules");
+        info!("Saving Firewall Rules");
 
-            let json = serde_json::to_string(&self.rules)?;
+        let json = serde_json::to_string(&self.rules)?;
 
-            let user_uid = unsafe { libc::geteuid() };
+        let user_uid = unsafe { libc::geteuid() };
 
-            let oryx_export_dir = dirs::home_dir().unwrap().join("oryx");
+        let oryx_export_dir = dirs::home_dir().unwrap().join("oryx");
 
-            if !oryx_export_dir.exists() {
-                fs::create_dir(&oryx_export_dir)?;
-                chown(&oryx_export_dir, Some(user_uid), Some(user_uid))?;
-            }
-
-            let oryx_export_file = oryx_export_dir.join("firewall.json");
-            fs::write(oryx_export_file, json)?;
-            info!("Firewall Rules saved");
+        if !oryx_export_dir.exists() {
+            fs::create_dir(&oryx_export_dir)?;
+            chown(&oryx_export_dir, Some(user_uid), Some(user_uid))?;
         }
+
+        let oryx_export_file = oryx_export_dir.join("firewall.json");
+        fs::write(oryx_export_file, json)?;
+        info!("Firewall Rules saved");
+
         Ok(())
     }
 
