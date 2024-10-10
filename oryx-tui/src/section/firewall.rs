@@ -1,6 +1,6 @@
 use core::fmt::Display;
 use crossterm::event::{Event, KeyCode, KeyEvent};
-use log::info;
+use log::{error, info};
 use oryx_common::MAX_FIREWALL_RULES;
 use ratatui::{
     layout::{Constraint, Direction, Flex, Layout, Margin, Rect},
@@ -305,8 +305,16 @@ impl Firewall {
         ingress_sender: kanal::Sender<FirewallSignal>,
         egress_sender: kanal::Sender<FirewallSignal>,
     ) -> Self {
+        let rules_list: Vec<FirewallRule> = match Self::load_saved_rules() {
+            Ok(maybe_saved_rules) => maybe_saved_rules.unwrap_or_default(),
+
+            Err(err) => {
+                error!("{}", err.to_string());
+                Vec::new()
+            }
+        };
         Self {
-            rules: Vec::new(),
+            rules: rules_list,
             state: TableState::default(),
             user_input: None,
             ingress_sender,
@@ -319,41 +327,49 @@ impl Firewall {
     }
 
     pub fn save_rules(&self) -> AppResult<()> {
-        info!("saving rules");
-        info!("{:#?}", self.rules);
+        if self.rules.len() > 0 {
+            info!("Saving Firewall Rules");
 
-        let json = serde_json::to_string(&self.rules).unwrap();
+            let json = serde_json::to_string(&self.rules).unwrap();
 
-        let uid = unsafe { libc::geteuid() };
+            let uid = unsafe { libc::geteuid() };
 
-        let oryx_export_dir = dirs::home_dir().unwrap().join("oryx");
+            let oryx_export_dir = dirs::home_dir().unwrap().join("oryx");
 
-        if !oryx_export_dir.exists() {
-            fs::create_dir(&oryx_export_dir)?;
-            chown(&oryx_export_dir, Some(uid), Some(uid))?;
+            if !oryx_export_dir.exists() {
+                fs::create_dir(&oryx_export_dir)?;
+                chown(&oryx_export_dir, Some(uid), Some(uid))?;
+            }
+
+            let oryx_export_file = oryx_export_dir.join("firewall.json");
+            fs::write(oryx_export_file, json).expect("Could not save Firewall Rules");
+            info!("Firewall Rules saved");
         }
-
-        let oryx_export_file = oryx_export_dir.join("firewall.json");
-        fs::write(oryx_export_file, json).expect("Could not save Firewall Rules");
-        info!("rules saved");
         Ok(())
     }
 
-    pub fn load_rules(&mut self) -> AppResult<()> {
-        info!("loading rules");
+    fn load_saved_rules() -> AppResult<Option<Vec<FirewallRule>>> {
+        info!("Loading Firewall Rules");
         let oryx_export_file = dirs::home_dir().unwrap().join("oryx").join("firewall.json");
         if oryx_export_file.exists() {
-            info!("EXISTS");
+            info!("Found previously saved Firewall Rules");
             let json_string =
                 fs::read_to_string(oryx_export_file).expect("Could not load Firewall Rules");
-            let parsed_rules: Vec<FirewallRule> =
+            let mut parsed_rules: Vec<FirewallRule> =
                 serde_json::from_str(&json_string).expect("Could not load Firewall Rules");
-            info!("rules loaded");
-            self.rules = parsed_rules;
-        }
+            // as we don't know if ingress/egress programs are loaded we have to disable all rules
+            for rule in &mut parsed_rules {
+                rule.enabled = false
+            }
 
-        Ok(())
+            info!("Firewall Rules loaded");
+            Ok(Some(parsed_rules))
+        } else {
+            info!("No saved Firewall Rules found");
+            Ok(None)
+        }
     }
+
     fn validate_duplicate_rules(rules: &[FirewallRule], user_input: &UserInput) -> AppResult<()> {
         if let Some(exiting_rule_with_same_ip) = rules.iter().find(|rule| {
             rule.ip == IpAddr::from_str(user_input.ip.field.value()).unwrap()
@@ -450,29 +466,6 @@ impl Firewall {
         key_event: KeyEvent,
         sender: kanal::Sender<crate::event::Event>,
     ) -> AppResult<()> {
-        match key_event.code {
-            KeyCode::Char('s') => {
-                if let Err(e) = self.save_rules() {
-                    Notification::send(
-                        "Error saving rules",
-                        crate::notification::NotificationLevel::Warning,
-                        sender.clone(),
-                    )?;
-                    return Err(e);
-                }
-            }
-            KeyCode::Char('l') => {
-                if let Err(e) = self.load_rules() {
-                    Notification::send(
-                        "Error loading rules",
-                        crate::notification::NotificationLevel::Warning,
-                        sender.clone(),
-                    )?;
-                    return Err(e);
-                }
-            }
-            _ => {}
-        }
         if let Some(user_input) = &mut self.user_input {
             match key_event.code {
                 KeyCode::Esc => {

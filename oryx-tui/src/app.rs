@@ -1,3 +1,4 @@
+use log::error;
 use oryx_common::RawPacket;
 use ratatui::{
     layout::{Constraint, Direction, Layout},
@@ -134,6 +135,12 @@ impl App {
     }
 
     pub fn quit(&mut self) {
+        match self.section.firewall.save_rules() {
+            Ok(()) => {}
+            Err(err) => {
+                error!("{}", err)
+            }
+        }
         self.running = false;
     }
 }
