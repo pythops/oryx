@@ -4,10 +4,8 @@ use oryx_common::MAX_FIREWALL_RULES;
 use ratatui::{
     layout::{Constraint, Direction, Flex, Layout, Margin, Rect},
     style::{Color, Style, Stylize},
-    text::{Line, Span, Text},
-    widgets::{
-        Block, BorderType, Borders, Cell, Clear, HighlightSpacing, Padding, Row, Table, TableState,
-    },
+    text::{Line, Text},
+    widgets::{Block, Borders, Cell, Clear, HighlightSpacing, Padding, Row, Table, TableState},
     Frame,
 };
 use std::{net::IpAddr, num::ParseIntError, str::FromStr};
@@ -141,7 +139,7 @@ impl UserInput {
             .direction(Direction::Vertical)
             .constraints([
                 Constraint::Fill(1),
-                Constraint::Length(12),
+                Constraint::Length(9),
                 Constraint::Fill(1),
             ])
             .flex(ratatui::layout::Flex::SpaceBetween)
@@ -156,16 +154,6 @@ impl UserInput {
             ])
             .flex(ratatui::layout::Flex::SpaceBetween)
             .split(layout[1])[1];
-
-        let (user_input_block, help_block) = {
-            let chunks = Layout::default()
-                .direction(Direction::Vertical)
-                .constraints([Constraint::Fill(1), Constraint::Length(3)])
-                .flex(ratatui::layout::Flex::SpaceBetween)
-                .split(block);
-
-            (chunks[0], chunks[1])
-        };
 
         let rows = [
             Row::new(vec![
@@ -274,36 +262,7 @@ impl UserInput {
             );
 
         frame.render_widget(Clear, block);
-        frame.render_widget(table, user_input_block);
-
-        let help = Text::from(vec![
-            Line::from(""),
-            Line::from(vec![
-                Span::from("󱊷 ").bold(),
-                Span::from(": Discard").bold(),
-                Span::from(" | ").bold(),
-                Span::from("󱞦 ").bold(),
-                Span::from(": Save").bold(),
-                Span::from(" | ").bold(),
-                Span::from(" ").bold(),
-                Span::from(": Naviguate").bold(),
-            ]),
-        ])
-        .centered();
-        frame.render_widget(
-            Block::new()
-                .borders(Borders::ALL)
-                .blue()
-                .border_type(BorderType::Rounded),
-            help_block,
-        );
-        frame.render_widget(
-            help,
-            help_block.inner(Margin {
-                horizontal: 1,
-                vertical: 0,
-            }),
-        );
+        frame.render_widget(table, block);
     }
 }
 

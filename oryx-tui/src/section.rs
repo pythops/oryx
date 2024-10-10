@@ -19,7 +19,11 @@ use ratatui::{
 };
 use stats::Stats;
 
-use crate::{app::AppResult, event::Event, packet::AppPacket};
+use crate::{
+    app::{ActivePopup, AppResult},
+    event::Event,
+    packet::AppPacket,
+};
 
 #[derive(Debug, PartialEq)]
 pub enum FocusedSection {
@@ -89,63 +93,110 @@ impl Section {
         }
     }
 
-    fn render_footer_help(&self, frame: &mut Frame, block: Rect) {
-        let message = match self.focused_section {
-            FocusedSection::Inspection => Line::from(vec![
-                Span::from("k,⬆").bold(),
-                Span::from(": Move up").bold(),
-                Span::from(" | ").bold(),
-                Span::from("j,⬇").bold(),
-                Span::from(": Move down").bold(),
-                Span::from(" | ").bold(),
-                Span::from("/").bold(),
-                Span::from(": Search").bold(),
-                Span::from(" | ").bold(),
-                Span::from("i").bold(),
-                Span::from(": Infos").bold(),
-                Span::from(" | ").bold(),
-                Span::from("f").bold(),
-                Span::from(": Filters").bold(),
-                Span::from(" | ").bold(),
-                Span::from(" ").bold(),
-                Span::from(": Naviguate").bold(),
-            ]),
-            FocusedSection::Firewall => Line::from(vec![
-                Span::from("k,⬆").bold(),
-                Span::from(": Move up").bold(),
-                Span::from(" | ").bold(),
-                Span::from("j,⬇").bold(),
-                Span::from(": Move down").bold(),
-                Span::from(" | ").bold(),
-                Span::from("n").bold(),
-                Span::from(": New Rule").bold(),
-                Span::from(" | ").bold(),
-                Span::from("d").bold(),
-                Span::from(": Delete Rule").bold(),
-                Span::from(" | ").bold(),
-                Span::from("f").bold(),
-                Span::from(": Filters").bold(),
-                Span::from(" | ").bold(),
-                Span::from(" ").bold(),
-                Span::from(": Naviguate").bold(),
-            ]),
-            _ => Line::from(vec![
-                Span::from("f").bold(),
-                Span::from(": Filters").bold(),
-                Span::from(" | ").bold(),
-                Span::from(" ").bold(),
-                Span::from(": Naviguate").bold(),
-            ]),
+    fn render_footer_help(
+        &self,
+        frame: &mut Frame,
+        block: Rect,
+        active_popup: Option<&ActivePopup>,
+    ) {
+        let message = {
+            match active_popup {
+                Some(ActivePopup::UpdateFilters) => Line::from(vec![
+                    Span::from("k,").bold(),
+                    Span::from("  Up").bold(),
+                    Span::from(" | ").bold(),
+                    Span::from("j,").bold(),
+                    Span::from("  Down").bold(),
+                    Span::from(" | ").bold(),
+                    Span::from("󱁐 ").bold(),
+                    Span::from(" Toggle Select").bold(),
+                    Span::from(" | ").bold(),
+                    Span::from("󱊷 ").bold(),
+                    Span::from(": Discard").bold(),
+                    Span::from(" | ").bold(),
+                    Span::from("󱞦 ").bold(),
+                    Span::from(" Apply").bold(),
+                    Span::from(" | ").bold(),
+                    Span::from(" ").bold(),
+                    Span::from(" Nav").bold(),
+                ]),
+                Some(ActivePopup::NewFirewallRule) => Line::from(vec![
+                    Span::from("j,k,,").bold(),
+                    Span::from(": Toggle Direction").bold(),
+                    Span::from(" | ").bold(),
+                    Span::from("󱊷 ").bold(),
+                    Span::from(": Discard").bold(),
+                    Span::from(" | ").bold(),
+                    Span::from("󱞦 ").bold(),
+                    Span::from(": Save").bold(),
+                    Span::from(" | ").bold(),
+                    Span::from(" ").bold(),
+                    Span::from(": Naviguate").bold(),
+                ]),
+                Some(ActivePopup::PacketInfos) | Some(ActivePopup::Help) => Line::from(vec![
+                    Span::from("󱊷 ").bold(),
+                    Span::from(": Discard Popup").bold(),
+                ]),
+                _ => match self.focused_section {
+                    FocusedSection::Inspection => Line::from(vec![
+                        Span::from("k,").bold(),
+                        Span::from("  Up").bold(),
+                        Span::from(" | ").bold(),
+                        Span::from("j,").bold(),
+                        Span::from("  Down").bold(),
+                        Span::from(" | ").bold(),
+                        Span::from("/").bold(),
+                        Span::from(" Search").bold(),
+                        Span::from(" | ").bold(),
+                        Span::from("i").bold(),
+                        Span::from(" Infos").bold(),
+                        Span::from(" | ").bold(),
+                        Span::from("f").bold(),
+                        Span::from(" Filters").bold(),
+                        Span::from(" | ").bold(),
+                        Span::from("󱊷 ").bold(),
+                        Span::from(": Discard").bold(),
+                        Span::from(" | ").bold(),
+                        Span::from(" ").bold(),
+                        Span::from(" Nav").bold(),
+                    ]),
+                    FocusedSection::Firewall => Line::from(vec![
+                        Span::from("k,").bold(),
+                        Span::from("  Up").bold(),
+                        Span::from(" | ").bold(),
+                        Span::from("j,").bold(),
+                        Span::from("  Down").bold(),
+                        Span::from(" | ").bold(),
+                        Span::from("n").bold(),
+                        Span::from(" New").bold(),
+                        Span::from(" | ").bold(),
+                        Span::from("d").bold(),
+                        Span::from(" Delete").bold(),
+                        Span::from(" | ").bold(),
+                        Span::from("e").bold(),
+                        Span::from(" Edit").bold(),
+                        Span::from(" | ").bold(),
+                        Span::from("󱁐 ").bold(),
+                        Span::from(" Toggle").bold(),
+                        Span::from(" | ").bold(),
+                        Span::from("f").bold(),
+                        Span::from(" Filters").bold(),
+                        Span::from(" | ").bold(),
+                        Span::from(" ").bold(),
+                        Span::from(" Nav").bold(),
+                    ]),
+                    _ => Line::from(vec![
+                        Span::from("f").bold(),
+                        Span::from(" Filters").bold(),
+                        Span::from(" | ").bold(),
+                        Span::from(" ").bold(),
+                        Span::from(" Nav").bold(),
+                    ]),
+                },
+            }
         };
 
-        let help = Text::from(vec![Line::from(""), message]).centered();
-        frame.render_widget(
-            Block::new()
-                .borders(Borders::ALL)
-                .blue()
-                .border_type(BorderType::Rounded),
-            block,
-        );
+        let help = Text::from(vec![Line::from(""), message]).blue().centered();
         frame.render_widget(
             help,
             block.inner(Margin {
@@ -175,7 +226,13 @@ impl Section {
             block,
         );
     }
-    pub fn render(&mut self, frame: &mut Frame, block: Rect, network_interace: &str) {
+    pub fn render(
+        &mut self,
+        frame: &mut Frame,
+        block: Rect,
+        network_interace: &str,
+        active_popup: Option<&ActivePopup>,
+    ) {
         let (section_block, help_block) = {
             let chunks = Layout::default()
                 .direction(Direction::Vertical)
@@ -187,7 +244,7 @@ impl Section {
         };
 
         self.render_header(frame, section_block);
-        self.render_footer_help(frame, help_block);
+        self.render_footer_help(frame, help_block, active_popup);
 
         match self.focused_section {
             FocusedSection::Inspection => self.inspection.render(frame, section_block),

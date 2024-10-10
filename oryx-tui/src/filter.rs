@@ -652,27 +652,25 @@ impl Filter {
         let help = Text::from(vec![
             Line::from(""),
             Line::from(vec![
-                Span::from("k,⬆").bold(),
-                Span::from(": Scroll up").bold(),
+                Span::from("k,").bold(),
+                Span::from("  Up").bold(),
                 Span::from(" | ").bold(),
-                Span::from("j,⬇").bold(),
-                Span::from(": Scroll down").bold(),
+                Span::from("j,").bold(),
+                Span::from("  Down").bold(),
+                Span::from(" | ").bold(),
+                Span::from("󱁐 ").bold(),
+                Span::from(" Toggle Select").bold(),
                 Span::from(" | ").bold(),
                 Span::from("󱞦 ").bold(),
-                Span::from(": Apply").bold(),
+                Span::from(" Apply").bold(),
                 Span::from(" | ").bold(),
                 Span::from(" ").bold(),
-                Span::from(": Naviguate").bold(),
+                Span::from(" Nav").bold(),
             ]),
         ])
+        .blue()
         .centered();
-        frame.render_widget(
-            Block::new()
-                .borders(Borders::ALL)
-                .blue()
-                .border_type(BorderType::Rounded),
-            help_block,
-        );
+
         frame.render_widget(
             help,
             help_block.inner(Margin {
@@ -810,16 +808,6 @@ impl Filter {
             .flex(ratatui::layout::Flex::SpaceBetween)
             .split(layout[1])[1];
 
-        let (filters_block, help_block) = {
-            let chunks = Layout::default()
-                .direction(Direction::Vertical)
-                .constraints([Constraint::Fill(1), Constraint::Length(3)])
-                .flex(ratatui::layout::Flex::SpaceBetween)
-                .split(block);
-
-            (chunks[0], chunks[1])
-        };
-
         let (
             transport_filter_block,
             network_filter_block,
@@ -839,7 +827,7 @@ impl Filter {
                 ])
                 .margin(1)
                 .flex(Flex::SpaceBetween)
-                .split(filters_block);
+                .split(block);
             (chunks[1], chunks[2], chunks[3], chunks[4], chunks[5])
         };
 
@@ -850,7 +838,7 @@ impl Filter {
                 .borders(Borders::all())
                 .border_type(BorderType::Thick)
                 .border_style(Style::default().green()),
-            filters_block,
+            block,
         );
 
         self.network.render(
@@ -888,40 +876,5 @@ impl Filter {
             .centered()
             .build();
         frame.render_widget(apply, apply_block);
-
-        let help = Text::from(vec![
-            Line::from(""),
-            Line::from(vec![
-                Span::from("k,⬆").bold(),
-                Span::from(": Move up").bold(),
-                Span::from(" | ").bold(),
-                Span::from("j,⬇").bold(),
-                Span::from(": Move down").bold(),
-                Span::from(" | ").bold(),
-                Span::from("󱊷 ").bold(),
-                Span::from(": Discard").bold(),
-                Span::from(" | ").bold(),
-                Span::from("󱞦 ").bold(),
-                Span::from(": Apply").bold(),
-                Span::from(" | ").bold(),
-                Span::from(" ").bold(),
-                Span::from(": Naviguate").bold(),
-            ]),
-        ])
-        .centered();
-        frame.render_widget(
-            Block::new()
-                .borders(Borders::ALL)
-                .blue()
-                .border_type(BorderType::Rounded),
-            help_block,
-        );
-        frame.render_widget(
-            help,
-            help_block.inner(Margin {
-                horizontal: 1,
-                vertical: 0,
-            }),
-        );
     }
 }
