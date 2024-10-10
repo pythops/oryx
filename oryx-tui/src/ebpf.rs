@@ -236,7 +236,7 @@ pub fn load_ingress(
             };
 
             #[cfg(not(debug_assertions))]
-            let mut bpf = match Bpf::load(include_bytes_aligned!(
+            let mut bpf = match Ebpf::load(include_bytes_aligned!(
                 "../../target/bpfel-unknown-none/release/oryx"
             )) {
                 Ok(v) => v,
@@ -427,7 +427,7 @@ pub fn load_egress(
             };
 
             #[cfg(not(debug_assertions))]
-            let mut bpf = match Bpf::load(include_bytes_aligned!(
+            let mut bpf = match Ebpf::load(include_bytes_aligned!(
                 "../../target/bpfel-unknown-none/release/oryx"
             )) {
                 Ok(v) => v,
