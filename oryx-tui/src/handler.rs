@@ -174,12 +174,6 @@ pub fn handle_key_events(
             }
         }
 
-        KeyCode::Char(' ') => {
-            if app.section.focused_section == FocusedSection::Firewall {
-                app.section.firewall.submit_rule()?;
-            }
-        }
-
         _ => {
             app.section.handle_keys(key_event, event_sender.clone())?;
         }

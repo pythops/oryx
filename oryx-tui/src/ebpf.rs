@@ -11,7 +11,7 @@ use aya::{
     include_bytes_aligned,
     maps::{ring_buf::RingBufItem, Array, HashMap, MapData, RingBuf},
     programs::{tc, SchedClassifier, TcAttachType},
-    Ebpf,
+    Ebpf, EbpfLoader,
 };
 use oryx_common::{protocols::Protocol, RawPacket, MAX_RULES_PORT};
 
@@ -220,9 +220,11 @@ pub fn load_ingress(
             unsafe { libc::setrlimit(libc::RLIMIT_MEMLOCK, &rlim) };
 
             #[cfg(debug_assertions)]
-            let mut bpf = match Ebpf::load(include_bytes_aligned!(
-                "../../target/bpfel-unknown-none/debug/oryx"
-            )) {
+            let mut bpf = match EbpfLoader::new()
+                .set_global("TRAFFIC_DIRECTION", &-1i32, true)
+                .load(include_bytes_aligned!(
+                    "../../target/bpfel-unknown-none/debug/oryx"
+                )) {
                 Ok(v) => v,
                 Err(e) => {
                     Notification::send(
@@ -236,9 +238,11 @@ pub fn load_ingress(
             };
 
             #[cfg(not(debug_assertions))]
-            let mut bpf = match Ebpf::load(include_bytes_aligned!(
-                "../../target/bpfel-unknown-none/release/oryx"
-            )) {
+            let mut bpf = match EbpfLoader::new()
+                .set_global("TRAFFIC_DIRECTION", &(-1 as i32), true)
+                .load(include_bytes_aligned!(
+                    "../../target/bpfel-unknown-none/release/oryx"
+                )) {
                 Ok(v) => v,
                 Err(e) => {
                     Notification::send(
@@ -295,11 +299,10 @@ pub fn load_ingress(
             let mut link_filters: Array<_, u32> =
                 Array::try_from(bpf.take_map("LINK_FILTERS").unwrap()).unwrap();
 
-            let mut traffic_direction_filters: Array<_, u32> =
-                Array::try_from(bpf.take_map("TRAFFIC_DIRECTION_FILTERS").unwrap()).unwrap();
-            let _ = traffic_direction_filters.set(0, 0, 0);
-            let _ = traffic_direction_filters.set(1, 0, 0); //setup ingress flag
-                                                            // firewall-ebpf interface
+            let mut traffic_direction_filter: Array<_, u8> =
+                Array::try_from(bpf.take_map("TRAFFIC_DIRECTION_FILTER").unwrap()).unwrap();
+
+            // firewall-ebpf interface
             let mut ipv4_firewall: HashMap<_, u32, [u16; MAX_RULES_PORT]> =
                 HashMap::try_from(bpf.take_map("BLOCKLIST_IPV4").unwrap()).unwrap();
 
@@ -348,7 +351,7 @@ pub fn load_ingress(
                             }
                         },
                         FilterChannelSignal::DirectionUpdate(flag) => {
-                            let _ = traffic_direction_filters.set(0, flag as u32, 0);
+                            let _ = traffic_direction_filter.set(0, flag as u8, 0);
                         }
                         FilterChannelSignal::Kill => {
                             break;
@@ -357,6 +360,7 @@ pub fn load_ingress(
                 }
             });
 
+            // packets reader
             let mut ring_buf = RingBuffer::new(&mut bpf);
 
             poll.registry()
@@ -420,9 +424,11 @@ pub fn load_egress(
             unsafe { libc::setrlimit(libc::RLIMIT_MEMLOCK, &rlim) };
 
             #[cfg(debug_assertions)]
-            let mut bpf = match Ebpf::load(include_bytes_aligned!(
-                "../../target/bpfel-unknown-none/debug/oryx"
-            )) {
+            let mut bpf = match EbpfLoader::new()
+                .set_global("TRAFFIC_DIRECTION", &1i32, true)
+                .load(include_bytes_aligned!(
+                    "../../target/bpfel-unknown-none/debug/oryx"
+                )) {
                 Ok(v) => v,
                 Err(e) => {
                     Notification::send(
@@ -436,9 +442,11 @@ pub fn load_egress(
             };
 
             #[cfg(not(debug_assertions))]
-            let mut bpf = match Ebpf::load(include_bytes_aligned!(
-                "../../target/bpfel-unknown-none/release/oryx"
-            )) {
+            let mut bpf = match EbpfLoader::new()
+                .set_global("TRAFFIC_DIRECTION", &(1 as i32), true)
+                .load(include_bytes_aligned!(
+                    "../../target/bpfel-unknown-none/release/oryx"
+                )) {
                 Ok(v) => v,
                 Err(e) => {
                     Notification::send(
@@ -491,10 +499,8 @@ pub fn load_egress(
             let mut link_filters: Array<_, u32> =
                 Array::try_from(bpf.take_map("LINK_FILTERS").unwrap()).unwrap();
 
-            let mut traffic_direction_filters: Array<_, u32> =
-                Array::try_from(bpf.take_map("TRAFFIC_DIRECTION_FILTERS").unwrap()).unwrap();
-            let _ = traffic_direction_filters.set(0, 0, 0);
-            let _ = traffic_direction_filters.set(1, 1, 0); //setup egress flag
+            let mut traffic_direction_filter: Array<_, u8> =
+                Array::try_from(bpf.take_map("TRAFFIC_DIRECTION_FILTER").unwrap()).unwrap();
 
             // firewall-ebpf interface
             let mut ipv4_firewall: HashMap<_, u32, [u16; MAX_RULES_PORT]> =
@@ -545,7 +551,7 @@ pub fn load_egress(
                             }
                         },
                         FilterChannelSignal::DirectionUpdate(flag) => {
-                            let _ = traffic_direction_filters.set(0, flag as u32, 0);
+                            let _ = traffic_direction_filter.set(0, flag as u8, 0);
                         }
                         FilterChannelSignal::Kill => {
                             break;
@@ -554,6 +560,7 @@ pub fn load_egress(
                 }
             });
 
+            // packets reading
             let mut ring_buf = RingBuffer::new(&mut bpf);
 
             poll.registry()

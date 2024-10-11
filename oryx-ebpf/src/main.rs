@@ -34,7 +34,7 @@ static TRANSPORT_FILTERS: Array<u32> = Array::with_max_entries(8, 0);
 static LINK_FILTERS: Array<u32> = Array::with_max_entries(8, 0);
 
 #[map]
-static TRAFFIC_DIRECTION_FILTERS: Array<u32> = Array::with_max_entries(2, 0);
+static TRAFFIC_DIRECTION_FILTER: Array<u8> = Array::with_max_entries(1, 0);
 
 #[map]
 static BLOCKLIST_IPV6: HashMap<u128, [u16; MAX_RULES_PORT]> =
@@ -43,6 +43,9 @@ static BLOCKLIST_IPV6: HashMap<u128, [u16; MAX_RULES_PORT]> =
 #[map]
 static BLOCKLIST_IPV4: HashMap<u32, [u16; MAX_RULES_PORT]> =
     HashMap::<u32, [u16; MAX_RULES_PORT]>::with_max_entries(MAX_FIREWALL_RULES, 0);
+
+#[no_mangle]
+static TRAFFIC_DIRECTION: i32 = 0;
 
 #[classifier]
 pub fn oryx(ctx: TcContext) -> i32 {
@@ -76,7 +79,7 @@ fn ptr_at<T>(ctx: &TcContext, offset: usize) -> Result<*const T, ()> {
 #[inline]
 fn filter_direction() -> bool {
     // 0(default) -> false(send to tui), 1 -> true(filter)
-    if let Some(v) = TRAFFIC_DIRECTION_FILTERS.get(0) {
+    if let Some(v) = TRAFFIC_DIRECTION_FILTER.get(0) {
         return *v != 0;
     }
     false
@@ -84,11 +87,8 @@ fn filter_direction() -> bool {
 
 #[inline]
 fn is_ingress() -> bool {
-    // 0(default) -> true(is ingress),  1 -> false (is egress)
-    if let Some(v) = TRAFFIC_DIRECTION_FILTERS.get(1) {
-        return *v == 0;
-    }
-    true
+    let traffic_direction = unsafe { core::ptr::read_volatile(&TRAFFIC_DIRECTION) };
+    traffic_direction == -1
 }
 
 #[inline]
@@ -173,14 +173,14 @@ fn process(ctx: TcContext) -> Result<i32, ()> {
                     };
 
                     if block_ipv4(addr, port) {
-                        return Ok(TC_ACT_SHOT);
+                        return Ok(TC_ACT_SHOT); //block packet
                     }
 
                     if filter_packet(Protocol::Network(NetworkProtocol::Ipv4))
                         || filter_packet(Protocol::Transport(TransportProtocol::TCP))
                         || filter_direction()
                     {
-                        return Ok(TC_ACT_PIPE); //DONT FWD PACKET TO TUI
+                        return Ok(TC_ACT_PIPE);
                     }
 
                     submit(RawPacket::Ip(
@@ -197,7 +197,7 @@ fn process(ctx: TcContext) -> Result<i32, ()> {
                     };
 
                     if block_ipv4(addr, port) {
-                        return Ok(TC_ACT_SHOT);
+                        return Ok(TC_ACT_SHOT); //block packet
                     }
 
                     if filter_packet(Protocol::Network(NetworkProtocol::Ipv4))
@@ -243,14 +243,14 @@ fn process(ctx: TcContext) -> Result<i32, ()> {
                     };
 
                     if block_ipv6(addr, port) {
-                        return Ok(TC_ACT_SHOT);
+                        return Ok(TC_ACT_SHOT); //block packet
                     }
 
                     if filter_packet(Protocol::Network(NetworkProtocol::Ipv6))
                         || filter_packet(Protocol::Transport(TransportProtocol::TCP))
                         || filter_direction()
                     {
-                        return Ok(TC_ACT_PIPE); //DONT FWD PACKET TO TUI
+                        return Ok(TC_ACT_PIPE);
                     }
                     submit(RawPacket::Ip(
                         IpHdr::V6(header),
@@ -266,14 +266,14 @@ fn process(ctx: TcContext) -> Result<i32, ()> {
                     };
 
                     if block_ipv6(addr, port) {
-                        return Ok(TC_ACT_SHOT);
+                        return Ok(TC_ACT_SHOT); //block packet
                     }
 
                     if filter_packet(Protocol::Network(NetworkProtocol::Ipv6))
                         || filter_packet(Protocol::Transport(TransportProtocol::UDP))
                         || filter_direction()
                     {
-                        return Ok(TC_ACT_PIPE); //DONT FWD PACKET TO TUI
+                        return Ok(TC_ACT_PIPE);
                     }
                     submit(RawPacket::Ip(
                         IpHdr::V6(header),
