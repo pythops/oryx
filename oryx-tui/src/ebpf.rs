@@ -239,7 +239,7 @@ pub fn load_ingress(
 
             #[cfg(not(debug_assertions))]
             let mut bpf = match EbpfLoader::new()
-                .set_global("TRAFFIC_DIRECTION", &(-1 as i32), true)
+                .set_global("TRAFFIC_DIRECTION", &-1i32, true)
                 .load(include_bytes_aligned!(
                     "../../target/bpfel-unknown-none/release/oryx"
                 )) {
@@ -443,7 +443,7 @@ pub fn load_egress(
 
             #[cfg(not(debug_assertions))]
             let mut bpf = match EbpfLoader::new()
-                .set_global("TRAFFIC_DIRECTION", &(1 as i32), true)
+                .set_global("TRAFFIC_DIRECTION", &1i32, true)
                 .load(include_bytes_aligned!(
                     "../../target/bpfel-unknown-none/release/oryx"
                 )) {
