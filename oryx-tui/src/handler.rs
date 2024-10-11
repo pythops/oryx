@@ -73,14 +73,6 @@ pub fn handle_key_events(
                     if app.filter.focused_block == FocusedBlock::Apply {
                         app.filter.apply();
                         app.filter.sync()?;
-                        // if !app.filter.traffic_direction.is_ingress_loaded() {
-                        //     app.section.firewall.disable_ingress_rules();
-                        // }
-
-                        // if !app.filter.traffic_direction.is_egress_loaded() {
-                        //     app.section.firewall.disable_egress_rules();
-                        // }
-
                         app.active_popup = None;
                     }
                 }
