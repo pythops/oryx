@@ -1,9 +1,10 @@
-## v0.4 - TBA
+## v0.4 - 2024-10-13
 
 ### Added
 
 - Firewall
 - Save and Load firewall rules.
+- Add logging
 
 ## v0.3 - 2024-09-25
 
