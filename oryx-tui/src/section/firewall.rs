@@ -557,18 +557,18 @@ impl Firewall {
                 KeyCode::Char('s') => match self.save_rules() {
                     Ok(_) => {
                         Notification::send(
-                            "Firewall rules saved to ~/oryx/firewall.json file",
+                            "Sync firewall rules to ~/oryx/firewall.json",
                             crate::notification::NotificationLevel::Info,
                             sender.clone(),
                         )?;
                     }
                     Err(e) => {
                         Notification::send(
-                            "Error while saving firewall rules.",
+                            "Error while syncing firewall rules",
                             crate::notification::NotificationLevel::Error,
                             sender.clone(),
                         )?;
-                        error!("Error while saving firewall rules. {}", e);
+                        error!("Error while syncing firewall rules. {}", e);
                     }
                 },
 

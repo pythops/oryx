@@ -1,4 +1,3 @@
-use log::error;
 use oryx_common::RawPacket;
 use ratatui::{
     layout::{Constraint, Direction, Layout},
@@ -130,15 +129,10 @@ impl App {
     pub fn tick(&mut self) {
         self.notifications.iter_mut().for_each(|n| n.ttl -= 1);
         self.notifications.retain(|n| n.ttl > 0);
-
         self.section.alert.check();
     }
 
     pub fn quit(&mut self) {
-        if let Err(e) = self.section.firewall.save_rules() {
-            error!("{}", e)
-        }
-
         self.running = false;
     }
 }
