@@ -27,7 +27,7 @@ use tui_big_text::{BigText, PixelSize};
 
 use crate::{
     app::AppResult,
-    ebpf::{load_egress, load_ingress},
+    ebpf::{egress::load_egress, ingress::load_ingress},
     event::Event,
     interface::Interface,
     section::firewall::FirewallSignal,
