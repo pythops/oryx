@@ -71,16 +71,8 @@ pub fn handle_key_events(
             KeyCode::Enter => match popup {
                 ActivePopup::UpdateFilters => {
                     if app.filter.focused_block == FocusedBlock::Apply {
-                        app.filter
-                            .update(event_sender.clone(), app.data_channel_sender.clone())?;
-                        if !app.filter.traffic_direction.is_ingress_loaded() {
-                            app.section.firewall.disable_ingress_rules();
-                        }
-
-                        if !app.filter.traffic_direction.is_egress_loaded() {
-                            app.section.firewall.disable_egress_rules();
-                        }
-
+                        app.filter.apply();
+                        app.filter.sync()?;
                         app.active_popup = None;
                     }
                 }
@@ -143,15 +135,11 @@ pub fn handle_key_events(
         }
 
         KeyCode::Char('q') => {
-            app.filter.terminate();
-            thread::sleep(Duration::from_millis(110));
             app.quit();
         }
 
         KeyCode::Char('c') | KeyCode::Char('C') => {
             if key_event.modifiers == KeyModifiers::CONTROL {
-                app.filter.terminate();
-                thread::sleep(Duration::from_millis(110));
                 app.quit();
             }
         }
@@ -175,16 +163,6 @@ pub fn handle_key_events(
         KeyCode::Char('i') => {
             if app.section.inspection.can_show_popup() {
                 app.active_popup = Some(ActivePopup::PacketInfos);
-            }
-        }
-
-        KeyCode::Char(' ') => {
-            if app.section.focused_section == FocusedSection::Firewall {
-                app.section.firewall.load_rule(
-                    event_sender.clone(),
-                    app.filter.traffic_direction.is_ingress_loaded(),
-                    app.filter.traffic_direction.is_egress_loaded(),
-                )?;
             }
         }
 

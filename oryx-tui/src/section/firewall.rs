@@ -59,7 +59,6 @@ impl FromStr for BlockedPort {
     }
 }
 
-// TODO: Add direction
 impl Display for FirewallRule {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{} {}", self.ip, self.port)
@@ -326,7 +325,7 @@ impl Firewall {
         self.user_input = Some(UserInput::new());
     }
 
-    pub fn save_rules(&self) -> AppResult<()> {
+    pub fn save_rules(&mut self) -> AppResult<()> {
         info!("Saving Firewall Rules");
 
         let json = serde_json::to_string(&self.rules)?;
@@ -356,7 +355,6 @@ impl Firewall {
 
             let mut parsed_rules: Vec<FirewallRule> = serde_json::from_str(&json_string)?;
 
-            // as we don't know if ingress/egress programs are loaded we have to disable all rules
             parsed_rules
                 .iter_mut()
                 .for_each(|rule| rule.enabled = false);
@@ -417,47 +415,6 @@ impl Firewall {
                 rule.enabled = false;
             }
         });
-    }
-
-    pub fn load_rule(
-        &mut self,
-        sender: kanal::Sender<crate::event::Event>,
-        is_ingress_loaded: bool,
-        is_egress_loaded: bool,
-    ) -> AppResult<()> {
-        if let Some(index) = self.state.selected() {
-            let rule = &mut self.rules[index];
-
-            match rule.direction {
-                TrafficDirection::Ingress => {
-                    if is_ingress_loaded {
-                        rule.enabled = !rule.enabled;
-                        self.ingress_sender
-                            .send(FirewallSignal::Rule(rule.clone()))?;
-                    } else {
-                        Notification::send(
-                            "Ingress is not loaded.",
-                            crate::notification::NotificationLevel::Warning,
-                            sender.clone(),
-                        )?;
-                    }
-                }
-                TrafficDirection::Egress => {
-                    if is_egress_loaded {
-                        rule.enabled = !rule.enabled;
-                        self.egress_sender
-                            .send(FirewallSignal::Rule(rule.clone()))?;
-                    } else {
-                        Notification::send(
-                            "Egress is not loaded.",
-                            crate::notification::NotificationLevel::Warning,
-                            sender.clone(),
-                        )?;
-                    }
-                }
-            }
-        }
-        Ok(())
     }
 
     pub fn handle_keys(
@@ -552,6 +509,23 @@ impl Firewall {
                         return Err("Can not edit enabled rule".into());
                     }
                     self.add_rule();
+                }
+
+                KeyCode::Char(' ') => {
+                    if let Some(index) = self.state.selected() {
+                        let rule = &mut self.rules[index];
+                        rule.enabled = !rule.enabled;
+                        match rule.direction {
+                            TrafficDirection::Ingress => {
+                                self.ingress_sender
+                                    .send(FirewallSignal::Rule(rule.clone()))?;
+                            }
+                            TrafficDirection::Egress => {
+                                self.egress_sender
+                                    .send(FirewallSignal::Rule(rule.clone()))?;
+                            }
+                        }
+                    }
                 }
 
                 KeyCode::Char('s') => match self.save_rules() {
