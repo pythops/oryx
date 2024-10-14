@@ -4,7 +4,7 @@ import yaml
 from functools import partial
 
 def hex2int(hex):
-    return int(hex.replace("0x", ""), 16)
+    return int(hex, 16)
 
 
 def parse_ipv4(rule):
@@ -31,8 +31,6 @@ def parse_ipv6(rule):
         else "*"
     )
     return {k: v}
-
-
 
 
 filter_idx_map = dict(

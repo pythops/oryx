@@ -23,7 +23,7 @@ use crate::{
     app::{ActivePopup, AppResult},
     event::Event,
     filter::IoChannels,
-    packet::AppPacket,
+    packet::NetworkPacket,
 };
 
 #[derive(Debug, PartialEq)]
@@ -45,11 +45,13 @@ pub struct Section {
 
 impl Section {
     pub fn new(
-        packets: Arc<Mutex<Vec<AppPacket>>>,
+        packets: Arc<Mutex<Vec<NetworkPacket>>>,
+
         firewall_chans: IoChannels<FirewallSignal>,
     ) -> Self {
         Self {
             focused_section: FocusedSection::Inspection,
+
             inspection: Inspection::new(packets.clone()),
             stats: None,
             alert: Alert::new(packets.clone()),

@@ -10,17 +10,78 @@ use network_types::ip::IpHdr;
 use oryx_common::{ProtoHdr, RawPacket};
 use transport::{TcpPacket, UdpPacket};
 
+use crate::pid::IpMap;
+
 #[derive(Debug, Copy, Clone)]
-pub enum AppPacket {
+pub enum NetworkPacket {
     Ip(IpPacket),
     Arp(ArpPacket),
 }
 
-impl AppPacket {
+impl NetworkPacket {
     pub const LEN: usize = mem::size_of::<Self>();
 }
 
-impl Display for AppPacket {
+#[derive(Debug, Copy, Clone)]
+pub struct AppPacket {
+    pub packet: NetworkPacket,
+    pub pid: Option<u32>,
+}
+
+impl AppPacket {
+    pub fn from_network_packet(
+        netpacket: &NetworkPacket,
+        tcp_map: &IpMap,
+        udp_map: &IpMap,
+    ) -> Self {
+        let pid = match netpacket {
+            NetworkPacket::Ip(IpPacket::V4(ipv4packet)) => match ipv4packet.proto {
+                IpProto::Tcp(_) => netpacket.try_get_pid(tcp_map),
+                IpProto::Udp(_) => netpacket.try_get_pid(udp_map),
+                _ => None,
+            },
+            _ => None,
+        };
+        Self {
+            packet: *netpacket,
+            pid,
+        }
+    }
+}
+
+impl NetworkPacket {
+    fn get_possible_keys(&self) -> Option<[String; 2]> {
+        match self {
+            NetworkPacket::Ip(IpPacket::V4(ipv4packet)) => {
+                let src_ip = ipv4packet.src_ip;
+                let dst_ip = ipv4packet.dst_ip;
+                match ipv4packet.proto {
+                    IpProto::Tcp(tcp) => Some([
+                        format!("{}:{}_{}:{}", src_ip, tcp.src_port, dst_ip, tcp.dst_port),
+                        format!("{}:{}_{}:{}", dst_ip, tcp.dst_port, src_ip, tcp.src_port),
+                    ]),
+                    IpProto::Udp(udp) => Some([
+                        format!("{}:{}_{}:{}", src_ip, udp.src_port, dst_ip, udp.dst_port),
+                        format!("{}:{}_{}:{}", dst_ip, udp.dst_port, src_ip, udp.src_port),
+                    ]),
+                    _ => None,
+                }
+            }
+            _ => None,
+        }
+    }
+    pub fn try_get_pid(&self, ipmap: &IpMap) -> Option<u32> {
+        if let Some(keys) = self.get_possible_keys() {
+            for k in keys {
+                if let Some(conn) = ipmap.map.get(&k) {
+                    return conn.pid;
+                }
+            }
+        }
+        None
+    }
+}
+impl Display for NetworkPacket {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             Self::Arp(packet) => write!(f, "{}", packet),
@@ -29,7 +90,7 @@ impl Display for AppPacket {
     }
 }
 
-impl From<[u8; RawPacket::LEN]> for AppPacket {
+impl From<[u8; RawPacket::LEN]> for NetworkPacket {
     fn from(value: [u8; RawPacket::LEN]) -> Self {
         let raw_packet = value.as_ptr() as *const RawPacket;
         match unsafe { &*raw_packet } {
@@ -87,7 +148,7 @@ impl From<[u8; RawPacket::LEN]> for AppPacket {
                         }
                     };
 
-                    AppPacket::Ip(IpPacket::V4(Ipv4Packet {
+                    NetworkPacket::Ip(IpPacket::V4(Ipv4Packet {
                         src_ip,
                         dst_ip,
                         ihl: u8::from_be(ipv4_packet.ihl()),
@@ -153,7 +214,7 @@ impl From<[u8; RawPacket::LEN]> for AppPacket {
                         }
                     };
 
-                    AppPacket::Ip(IpPacket::V6(Ipv6Packet {
+                    NetworkPacket::Ip(IpPacket::V6(Ipv6Packet {
                         traffic_class: ipv6_packet.priority(),
                         flow_label: ipv6_packet.flow_label,
                         payload_length: u16::from_be(ipv6_packet.payload_len),
