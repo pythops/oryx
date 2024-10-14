@@ -206,7 +206,7 @@ impl Inspection {
                 } else if i == self.packet_window_size - 1
                     && app_packets.len() > self.packet_end_index
                 {
-                    // shit the window by one
+                    // shift the window by one
                     self.packet_end_index += 1;
                     i + 1
                 } else {
