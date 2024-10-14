@@ -10,7 +10,7 @@ use std::{
     time::Duration,
 };
 
-use crate::{filter::Filter, help::Help};
+use crate::{filter::Filter, help::Help, pid};
 use crate::{filter::IoChannels, notification::Notification};
 use crate::{packet::AppPacket, section::Section};
 
@@ -54,6 +54,7 @@ impl Default for App {
 
 impl App {
     pub fn new() -> Self {
+        let pids = pid::ConnectionsInfo::new();
         let packets = Arc::new(Mutex::new(Vec::with_capacity(AppPacket::LEN * 1024 * 1024)));
 
         let (sender, receiver) = kanal::unbounded();
