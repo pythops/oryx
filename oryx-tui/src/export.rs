@@ -8,11 +8,11 @@ use crate::{
     app::AppResult,
     packet::{
         network::{IpPacket, IpProto},
-        AppPacket,
+        NetworkPacket,
     },
 };
 
-pub fn export(packets: &[AppPacket]) -> AppResult<()> {
+pub fn export(packets: &[NetworkPacket]) -> AppResult<()> {
     let uid = unsafe { libc::geteuid() };
 
     let oryx_export_dir = dirs::home_dir().unwrap().join("oryx");
@@ -40,7 +40,7 @@ pub fn export(packets: &[AppPacket]) -> AppResult<()> {
     )?;
     for packet in packets {
         match packet {
-            AppPacket::Arp(p) => {
+            NetworkPacket::Arp(p) => {
                 writeln!(
                     file,
                     "{:39}  {:^11}  {:39}  {:^11}  ARP",
@@ -50,7 +50,7 @@ pub fn export(packets: &[AppPacket]) -> AppResult<()> {
                     "-"
                 )?;
             }
-            AppPacket::Ip(packet) => match packet {
+            NetworkPacket::Ip(packet) => match packet {
                 IpPacket::V4(ipv4_packet) => match ipv4_packet.proto {
                     IpProto::Tcp(p) => {
                         writeln!(

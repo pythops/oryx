@@ -9,7 +9,7 @@ use ratatui::{
 use std::sync::{atomic::Ordering, Arc, Mutex};
 use syn_flood::SynFlood;
 
-use crate::packet::AppPacket;
+use crate::packet::NetworkPacket;
 
 #[derive(Debug)]
 pub struct Alert {
@@ -19,7 +19,7 @@ pub struct Alert {
 }
 
 impl Alert {
-    pub fn new(packets: Arc<Mutex<Vec<AppPacket>>>) -> Self {
+    pub fn new(packets: Arc<Mutex<Vec<NetworkPacket>>>) -> Self {
         Self {
             syn_flood: SynFlood::new(packets),
             flash_count: 1,
