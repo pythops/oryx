@@ -13,6 +13,7 @@ use aya::{
     programs::{tc, SchedClassifier, TcAttachType},
     Ebpf, EbpfLoader,
 };
+use log::error;
 use oryx_common::{protocols::Protocol, RawPacket, MAX_RULES_PORT};
 
 use crate::{
@@ -150,7 +151,6 @@ fn update_ipv6_blocklist(
                             .insert(addr.to_bits(), blocked_ports, 0)
                             .unwrap();
                     } else {
-                        //TODO:
                         unreachable!(); // list is full
                     }
                 } else {
@@ -199,6 +199,11 @@ fn update_ipv6_blocklist(
     }
 }
 
+enum EbpfTrafficDirection {
+    Ingress = -1,
+    Egress = 1,
+}
+
 pub fn load_ingress(
     iface: String,
     notification_sender: kanal::Sender<Event>,
@@ -219,16 +224,19 @@ pub fn load_ingress(
 
             unsafe { libc::setrlimit(libc::RLIMIT_MEMLOCK, &rlim) };
 
+            let traffic_direction = EbpfTrafficDirection::Ingress as i32;
+
             #[cfg(debug_assertions)]
             let mut bpf = match EbpfLoader::new()
-                .set_global("TRAFFIC_DIRECTION", &-1i32, true)
+                .set_global("TRAFFIC_DIRECTION", &traffic_direction, true)
                 .load(include_bytes_aligned!(
                     "../../target/bpfel-unknown-none/debug/oryx"
                 )) {
                 Ok(v) => v,
                 Err(e) => {
+                    error!("Failed to load the ingress eBPF bytecode. {}", e);
                     Notification::send(
-                        format!("Failed to load the ingress eBPF bytecode\n {}", e),
+                        "Failed to load the ingress eBPF bytecode",
                         NotificationLevel::Error,
                         notification_sender,
                     )
@@ -239,14 +247,15 @@ pub fn load_ingress(
 
             #[cfg(not(debug_assertions))]
             let mut bpf = match EbpfLoader::new()
-                .set_global("TRAFFIC_DIRECTION", &-1i32, true)
+                .set_global("TRAFFIC_DIRECTION", &traffic_direction, true)
                 .load(include_bytes_aligned!(
-                    "../../target/bpfel-unknown-none/release/oryx"
+                    "../../target/bpfel-unknown-none/debug/oryx"
                 )) {
                 Ok(v) => v,
                 Err(e) => {
+                    error!("Failed to load the ingress eBPF bytecode. {}", e);
                     Notification::send(
-                        format!("Failed to load the ingress eBPF bytecode\n {}", e),
+                        "Failed to load the ingress eBPF bytecode",
                         NotificationLevel::Error,
                         notification_sender,
                     )
@@ -261,11 +270,12 @@ pub fn load_ingress(
                 bpf.program_mut("oryx").unwrap().try_into().unwrap();
 
             if let Err(e) = program.load() {
+                error!(
+                    "Failed to load the ingress eBPF program to the kernel. {}",
+                    e
+                );
                 Notification::send(
-                    format!(
-                        "Failed to load the ingress eBPF program to the kernel\n{}",
-                        e
-                    ),
+                    "Failed to load the ingress eBPF program to the kernel",
                     NotificationLevel::Error,
                     notification_sender,
                 )
@@ -274,11 +284,12 @@ pub fn load_ingress(
             };
 
             if let Err(e) = program.attach(&iface, TcAttachType::Ingress) {
+                error!(
+                    "Failed to attach the ingress eBPF program to the interface. {}",
+                    e
+                );
                 Notification::send(
-                    format!(
-                        "Failed to attach the ingress eBPF program to the interface\n{}",
-                        e
-                    ),
+                    "Failed to attach the ingress eBPF program to the interface",
                     NotificationLevel::Error,
                     notification_sender,
                 )
@@ -423,16 +434,19 @@ pub fn load_egress(
 
             unsafe { libc::setrlimit(libc::RLIMIT_MEMLOCK, &rlim) };
 
+            let traffic_direction = EbpfTrafficDirection::Egress as i32;
+
             #[cfg(debug_assertions)]
             let mut bpf = match EbpfLoader::new()
-                .set_global("TRAFFIC_DIRECTION", &1i32, true)
+                .set_global("TRAFFIC_DIRECTION", &traffic_direction, true)
                 .load(include_bytes_aligned!(
                     "../../target/bpfel-unknown-none/debug/oryx"
                 )) {
                 Ok(v) => v,
                 Err(e) => {
+                    error!("Fail to load the egress eBPF bytecode. {}", e);
                     Notification::send(
-                        format!("Fail to load the egress eBPF bytecode\n {}", e),
+                        "Fail to load the egress eBPF bytecode",
                         NotificationLevel::Error,
                         notification_sender,
                     )
@@ -443,14 +457,15 @@ pub fn load_egress(
 
             #[cfg(not(debug_assertions))]
             let mut bpf = match EbpfLoader::new()
-                .set_global("TRAFFIC_DIRECTION", &1i32, true)
+                .set_global("TRAFFIC_DIRECTION", &traffic_direction, true)
                 .load(include_bytes_aligned!(
-                    "../../target/bpfel-unknown-none/release/oryx"
+                    "../../target/bpfel-unknown-none/debug/oryx"
                 )) {
                 Ok(v) => v,
                 Err(e) => {
+                    error!("Fail to load the egress eBPF bytecode. {}", e);
                     Notification::send(
-                        format!("Failed to load the egress eBPF bytecode\n {}", e),
+                        "Fail to load the egress eBPF bytecode",
                         NotificationLevel::Error,
                         notification_sender,
                     )
@@ -464,8 +479,9 @@ pub fn load_egress(
                 bpf.program_mut("oryx").unwrap().try_into().unwrap();
 
             if let Err(e) = program.load() {
+                error!("Fail to load the egress eBPF program to the kernel. {}", e);
                 Notification::send(
-                    format!("Fail to load the egress eBPF program to the kernel\n{}", e),
+                    "Fail to load the egress eBPF program to the kernel",
                     NotificationLevel::Error,
                     notification_sender,
                 )
@@ -474,11 +490,12 @@ pub fn load_egress(
             };
 
             if let Err(e) = program.attach(&iface, TcAttachType::Egress) {
+                error!(
+                    "Failed to attach the egress eBPF program to the interface.{}",
+                    e
+                );
                 Notification::send(
-                    format!(
-                        "Failed to attach the egress eBPF program to the interface\n{}",
-                        e
-                    ),
+                    "Failed to attach the egress eBPF program to the interface",
                     NotificationLevel::Error,
                     notification_sender,
                 )

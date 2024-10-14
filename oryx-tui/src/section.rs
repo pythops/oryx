@@ -22,7 +22,7 @@ use stats::Stats;
 use crate::{
     app::{ActivePopup, AppResult},
     event::Event,
-    filter::IoChans,
+    filter::IoChannels,
     packet::AppPacket,
 };
 
@@ -46,7 +46,7 @@ pub struct Section {
 impl Section {
     pub fn new(
         packets: Arc<Mutex<Vec<AppPacket>>>,
-        firewall_chans: IoChans<FirewallSignal>,
+        firewall_chans: IoChannels<FirewallSignal>,
     ) -> Self {
         Self {
             focused_section: FocusedSection::Inspection,

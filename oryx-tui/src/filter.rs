@@ -47,7 +47,7 @@ pub struct Channels<T> {
 }
 
 #[derive(Debug, Clone)]
-pub struct IoChans<T> {
+pub struct IoChannels<T> {
     pub ingress: Channels<T>,
     pub egress: Channels<T>,
 }
@@ -59,7 +59,7 @@ impl<T> Channels<T> {
     }
 }
 
-impl<T> IoChans<T> {
+impl<T> IoChannels<T> {
     pub fn new() -> Self {
         Self {
             ingress: Channels::new(),
@@ -74,7 +74,7 @@ impl<T> Default for Channels<T> {
     }
 }
 
-impl<T> Default for IoChans<T> {
+impl<T> Default for IoChannels<T> {
     fn default() -> Self {
         Self::new()
     }
@@ -97,20 +97,20 @@ pub struct Filter {
     pub transport: TransportFilter,
     pub link: LinkFilter,
     pub traffic_direction: TrafficDirectionFilter,
-    pub filter_chans: IoChans<FilterChannelSignal>,
-    pub firewall_chans: IoChans<FirewallSignal>,
+    pub filter_chans: IoChannels<FilterChannelSignal>,
+    pub firewall_chans: IoChannels<FirewallSignal>,
     pub focused_block: FocusedBlock,
 }
 
 impl Filter {
-    pub fn new(firewall_chans: IoChans<FirewallSignal>) -> Self {
+    pub fn new(firewall_chans: IoChannels<FirewallSignal>) -> Self {
         Self {
             interface: Interface::new(),
             network: NetworkFilter::new(),
             transport: TransportFilter::new(),
             link: LinkFilter::new(),
             traffic_direction: TrafficDirectionFilter::new(),
-            filter_chans: IoChans::new(),
+            filter_chans: IoChannels::new(),
             firewall_chans,
             focused_block: FocusedBlock::Interface,
         }

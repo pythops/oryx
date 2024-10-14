@@ -11,7 +11,7 @@ use std::{
 };
 
 use crate::{filter::Filter, help::Help};
-use crate::{filter::IoChans, notification::Notification};
+use crate::{filter::IoChannels, notification::Notification};
 use crate::{packet::AppPacket, section::Section};
 
 pub type AppResult<T> = std::result::Result<T, Box<dyn error::Error>>;
@@ -58,7 +58,7 @@ impl App {
 
         let (sender, receiver) = kanal::unbounded();
 
-        let firewall_chans = IoChans::new();
+        let firewall_channels = IoChannels::new();
         thread::spawn({
             let packets = packets.clone();
             move || loop {
@@ -76,11 +76,11 @@ impl App {
         Self {
             running: true,
             help: Help::new(),
-            filter: Filter::new(firewall_chans.clone()),
+            filter: Filter::new(firewall_channels.clone()),
             start_sniffing: false,
             packets: packets.clone(),
             notifications: Vec::new(),
-            section: Section::new(packets.clone(), firewall_chans.clone()),
+            section: Section::new(packets.clone(), firewall_channels.clone()),
             data_channel_sender: sender,
             is_editing: false,
             active_popup: None,
