@@ -16,7 +16,7 @@ use ratatui::{
 
 use crate::packet::{
     network::{IpPacket, IpProto},
-    AppPacket,
+    NetworkPacket, AppPacket,
 };
 
 const WIN_SIZE: usize = 100_000;
@@ -60,7 +60,7 @@ impl SynFlood {
                 app_packets[start_index..app_packets.len().saturating_sub(1)]
                     .iter()
                     .for_each(|packet| {
-                        if let AppPacket::Ip(ip_packet) = packet {
+                        if let NetworkPacket::Ip(ip_packet) = packet.packet {
                             if let IpPacket::V4(ipv4_packet) = ip_packet {
                                 if let IpProto::Tcp(tcp_packet) = ipv4_packet.proto {
                                     if tcp_packet.syn == 1 {

@@ -1,0 +1,29 @@
+thread 'rustc' panicked at /rustc/27861c429af736ea3a6bb015956c7286071b286d/compiler/rustc_query_system/src/dep_graph/serialized.rs:60:1:
+assertion failed: value <= 0x7FFF_FFFF
+stack backtrace:
+   0:     0x77143901f465 - std::backtrace::Backtrace::create::hb760273f5f3b504d
+   1:     0x7714375b9fc5 - std::backtrace::Backtrace::force_capture::h67c24c5300a4c6c1
+   2:     0x771436629a74 - std[962534ec99956c9e]::panicking::update_hook::<alloc[aa8de118345f95f2]::boxed::Box<rustc_driver_impl[bf073f71269e57b]::install_ice_hook::{closure#0}>>::{closure#0}
+   3:     0x7714375d1af8 - std::panicking::rust_panic_with_hook::hc78f159b6cd62717
+   4:     0x7714375d1896 - std::panicking::begin_panic_handler::{{closure}}::h429b75e7cc3fa34f
+   5:     0x7714375cf569 - std::sys::backtrace::__rust_end_short_backtrace::h770cd9fe71a3f33d
+   6:     0x7714375d158c - rust_begin_unwind
+   7:     0x771434a956d0 - core::panicking::panic_fmt::h948b536db9ba3b6a
+   8:     0x771434a52ebc - core::panicking::panic::he8b63f3141e566e6
+   9:     0x77143901641a - <alloc[aa8de118345f95f2]::vec::Vec<(rustc_query_system[67e7971369a9c7a5]::dep_graph::serialized::SerializedDepNodeIndex, rustc_middle[549ab3a526e5c11f]::query::on_disk_cache::AbsoluteBytePos)> as rustc_serialize[4b4e18bbc2176db7]::serialize::Decodable<rustc_serialize[4b4e18bbc2176db7]::opaque::MemDecoder>>::decode
+  10:     0x7714390152f4 - <rustc_middle[549ab3a526e5c11f]::query::on_disk_cache::OnDiskCache>::new
+  11:     0x771438ea9af2 - rustc_incremental[ee60b5741032e330]::persist::load::load_query_result_cache
+  12:     0x771438eaa9c9 - <rustc_interface[14ca2b959be606e]::queries::Queries>::global_ctxt
+  13:     0x771438b85077 - rustc_interface[14ca2b959be606e]::interface::run_compiler::<core[1232f381cd9098f6]::result::Result<(), rustc_span[64fbc44ccd4e75a0]::ErrorGuaranteed>, rustc_driver_impl[bf073f71269e57b]::run_compiler::{closure#0}>::{closure#1}
+  14:     0x771438c88d54 - std[962534ec99956c9e]::sys::backtrace::__rust_begin_short_backtrace::<rustc_interface[14ca2b959be606e]::util::run_in_thread_with_globals<rustc_interface[14ca2b959be606e]::util::run_in_thread_pool_with_globals<rustc_interface[14ca2b959be606e]::interface::run_compiler<core[1232f381cd9098f6]::result::Result<(), rustc_span[64fbc44ccd4e75a0]::ErrorGuaranteed>, rustc_driver_impl[bf073f71269e57b]::run_compiler::{closure#0}>::{closure#1}, core[1232f381cd9098f6]::result::Result<(), rustc_span[64fbc44ccd4e75a0]::ErrorGuaranteed>>::{closure#0}, core[1232f381cd9098f6]::result::Result<(), rustc_span[64fbc44ccd4e75a0]::ErrorGuaranteed>>::{closure#0}::{closure#0}, core[1232f381cd9098f6]::result::Result<(), rustc_span[64fbc44ccd4e75a0]::ErrorGuaranteed>>
+  15:     0x771438c89168 - <<std[962534ec99956c9e]::thread::Builder>::spawn_unchecked_<rustc_interface[14ca2b959be606e]::util::run_in_thread_with_globals<rustc_interface[14ca2b959be606e]::util::run_in_thread_pool_with_globals<rustc_interface[14ca2b959be606e]::interface::run_compiler<core[1232f381cd9098f6]::result::Result<(), rustc_span[64fbc44ccd4e75a0]::ErrorGuaranteed>, rustc_driver_impl[bf073f71269e57b]::run_compiler::{closure#0}>::{closure#1}, core[1232f381cd9098f6]::result::Result<(), rustc_span[64fbc44ccd4e75a0]::ErrorGuaranteed>>::{closure#0}, core[1232f381cd9098f6]::result::Result<(), rustc_span[64fbc44ccd4e75a0]::ErrorGuaranteed>>::{closure#0}::{closure#0}, core[1232f381cd9098f6]::result::Result<(), rustc_span[64fbc44ccd4e75a0]::ErrorGuaranteed>>::{closure#1} as core[1232f381cd9098f6]::ops::function::FnOnce<()>>::call_once::{shim:vtable#0}
+  16:     0x771438c89c2b - std::sys::pal::unix::thread::Thread::new::thread_start::hd20cc0e4b23d97ef
+  17:     0x771432c9ca94 - start_thread
+                               at ./nptl/pthread_create.c:447:8
+  18:     0x771432d29c3c - clone3
+                               at ./misc/../sysdeps/unix/sysv/linux/x86_64/clone3.S:78
+  19:                0x0 - <unknown>
+
+
+rustc version: 1.84.0-nightly (27861c429 2024-10-13)
+platform: x86_64-unknown-linux-gnu

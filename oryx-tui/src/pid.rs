@@ -1,4 +1,4 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::{Read, Seek};
 use std::net::IpAddr;
@@ -7,28 +7,32 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
-use log::{error, info};
+use log::error;
 
 use crate::app::AppResult;
 
 #[derive(Clone, Debug)]
-pub struct ConnectionInfo {
+pub struct Connection {
     ip_local: IpAddr,
     port_local: u16,
     ip_remote: IpAddr,
     port_remote: u16,
-    uid: u32,
     inode: u32,
+    pub pid: Option<u32>,
 }
-impl ConnectionInfo {
+impl Connection {
     pub fn key(&self) -> String {
         format!(
             "{}:{}_{}:{}",
             self.ip_local, self.port_local, self.ip_remote, self.port_remote
         )
     }
+    fn try_get_pid(&mut self, inode_pid_map_map: &HashMap<u32, u32>) {
+        self.pid = inode_pid_map_map.get(&self.inode).copied();
+    }
 }
-impl TryFrom<&Vec<&str>> for ConnectionInfo {
+
+impl TryFrom<&Vec<&str>> for Connection {
     type Error = Box<dyn std::error::Error>;
     fn try_from(splits: &Vec<&str>) -> Result<Self, Self::Error> {
         let ip_local: &str = splits[1];
@@ -47,7 +51,6 @@ impl TryFrom<&Vec<&str>> for ConnectionInfo {
         let ip_remote = IpAddr::try_from(decode_hex_ipv4(&ip_remote)?)?;
         let port_remote = decode_hex_port(&port_remote)?;
 
-        let uid = splits[7].parse::<u32>().unwrap();
         let inode = splits[9].parse::<u32>().unwrap();
 
         Ok(Self {
@@ -55,19 +58,20 @@ impl TryFrom<&Vec<&str>> for ConnectionInfo {
             port_local,
             ip_remote,
             port_remote,
-            uid,
+
             inode,
+            pid: None,
         })
     }
 }
 
 #[derive(Clone, Debug)]
 pub struct IpMap {
-    map: HashMap<String, ConnectionInfo>,
+    pub map: HashMap<String, Connection>,
 }
 
 impl IpMap {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             map: HashMap::new(),
         }
@@ -114,14 +118,6 @@ fn build_inode_map(target_inodes: Vec<u32>) -> HashMap<u32, u32> {
 
     res
 }
-
-#[derive(Debug)]
-pub struct ConnectionsInfo {
-    tcp_map: Arc<Mutex<IpMap>>,
-    udp_map: Arc<Mutex<IpMap>>,
-    inode_pid_map: Arc<Mutex<HashMap<u32, u32>>>,
-}
-
 fn decode_hex_port(hex_str: &str) -> Result<u16, ParseIntError> {
     Ok(u16::from_be_bytes([
         u8::from_str_radix(&hex_str[..2], 16)?,
@@ -145,8 +141,11 @@ fn decode_hex_ipv4(hex_str: &str) -> AppResult<[u8; 4]> {
     Ok(res)
 }
 
+#[derive(Debug)]
+pub struct ConnectionsInfo {}
+
 impl ConnectionsInfo {
-    pub fn inodes(tcp_map: &Arc<Mutex<IpMap>>, udp_map: &Arc<Mutex<IpMap>>) -> Vec<u32> {
+    pub fn get_used_inodes(tcp_map: &Arc<Mutex<IpMap>>, udp_map: &Arc<Mutex<IpMap>>) -> Vec<u32> {
         let mut res = Vec::new();
 
         let tcp_map = tcp_map.lock().unwrap();
@@ -160,11 +159,7 @@ impl ConnectionsInfo {
         res
     }
 
-    pub fn new() -> Self {
-        let tcp_map: Arc<Mutex<IpMap>> = Arc::new(Mutex::new(IpMap::new()));
-        let udp_map: Arc<Mutex<IpMap>> = Arc::new(Mutex::new(IpMap::new()));
-        let inode_pid_map: Arc<Mutex<HashMap<u32, u32>>> = Arc::new(Mutex::new(HashMap::new()));
-
+    pub fn new(tcp_map: Arc<Mutex<IpMap>>, udp_map: Arc<Mutex<IpMap>>) -> Self {
         thread::spawn({
             let tcp_map = tcp_map.clone();
 
@@ -183,7 +178,7 @@ impl ConnectionsInfo {
                     for line in lines {
                         let splits: Vec<&str> = line.split_whitespace().collect();
 
-                        match ConnectionInfo::try_from(&splits) {
+                        match Connection::try_from(&splits) {
                             Ok(conn) => {
                                 map.map.insert(conn.key(), conn);
                             }
@@ -214,7 +209,7 @@ impl ConnectionsInfo {
                     for line in lines {
                         let splits: Vec<&str> = line.split_whitespace().collect();
 
-                        match ConnectionInfo::try_from(&splits) {
+                        match Connection::try_from(&splits) {
                             Ok(conn) => {
                                 map.map.insert(conn.key(), conn);
                             }
@@ -227,22 +222,27 @@ impl ConnectionsInfo {
         });
 
         thread::spawn({
-            let inode_pid_map = inode_pid_map.clone();
             let tcp_map = tcp_map.clone();
             let udp_map = udp_map.clone();
             move || loop {
-                let inodes = Self::inodes(&tcp_map, &udp_map);
-                let mut map = inode_pid_map.lock().unwrap();
-                *map = build_inode_map(inodes);
-                info!("{:#?}", map);
+                let inodes = Self::get_used_inodes(&tcp_map, &udp_map);
+
+                let inode_pid_map_map = build_inode_map(inodes);
+                //info!("{:#?}", map);
+                let mut udp_map_copy = udp_map.lock().unwrap().clone();
+                let mut tcp_map_copy = tcp_map.lock().unwrap().clone();
+
+                for (_, conn) in udp_map_copy.map.iter_mut() {
+                    conn.try_get_pid(&inode_pid_map_map);
+                }
+                for (_, conn) in tcp_map_copy.map.iter_mut() {
+                    conn.try_get_pid(&inode_pid_map_map);
+                }
+
                 thread::sleep(Duration::from_secs(1));
             }
         });
 
-        Self {
-            tcp_map,
-            udp_map,
-            inode_pid_map,
-        }
+        Self {}
     }
 }

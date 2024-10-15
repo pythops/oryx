@@ -19,7 +19,7 @@ use crate::{
     bandwidth::Bandwidth,
     packet::{
         network::{IpPacket, IpProto},
-        AppPacket,
+        NetworkPacket, AppPacket,
     },
 };
 
@@ -56,11 +56,11 @@ impl Stats {
                     }
                     let mut packet_stats = packet_stats.lock().unwrap();
                     for packet in packets[last_index..].iter() {
-                        match packet {
-                            AppPacket::Arp(_) => {
+                        match packet.packet {
+                            NetworkPacket::Arp(_) => {
                                 packet_stats.link.arp += 1;
                             }
-                            AppPacket::Ip(packet) => match packet {
+                            NetworkPacket::Ip(packet) => match packet {
                                 IpPacket::V4(ipv4_packet) => {
                                     packet_stats.network.ipv4 += 1;
 
