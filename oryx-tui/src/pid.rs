@@ -145,14 +145,13 @@ fn decode_hex_ipv4(hex_str: &str) -> AppResult<[u8; 4]> {
 pub struct ConnectionsInfo {}
 
 impl ConnectionsInfo {
-    pub fn get_used_inodes(tcp_map: &Arc<Mutex<IpMap>>, udp_map: &Arc<Mutex<IpMap>>) -> Vec<u32> {
+    pub fn get_used_inodes(tcp_map: &IpMap, udp_map: &IpMap) -> Vec<u32> {
         let mut res = Vec::new();
 
-        let tcp_map = tcp_map.lock().unwrap();
         for (_, conn) in tcp_map.map.iter() {
             res.push(conn.inode);
         }
-        let udp_map = udp_map.lock().unwrap();
+
         for (_, conn) in udp_map.map.iter() {
             res.push(conn.inode);
         }
@@ -185,8 +184,8 @@ impl ConnectionsInfo {
                             _ => error!("error parsing tcp conn{:#?}", splits),
                         }
                     }
-
-                    thread::sleep(Duration::from_secs(1));
+                    std::mem::drop(map);
+                    thread::sleep(Duration::from_millis(250));
                 }
             }
         });
@@ -216,7 +215,8 @@ impl ConnectionsInfo {
                             _ => error!("error parsing  udp conn {:#?}", splits),
                         }
                     }
-                    thread::sleep(Duration::from_secs(1));
+                    std::mem::drop(map);
+                    thread::sleep(Duration::from_millis(250));
                 }
             }
         });
@@ -225,12 +225,13 @@ impl ConnectionsInfo {
             let tcp_map = tcp_map.clone();
             let udp_map = udp_map.clone();
             move || loop {
-                let inodes = Self::get_used_inodes(&tcp_map, &udp_map);
+                //info!("{:#?}", map);
+                let mut udp_map_copy = udp_map.lock().unwrap();
+                let mut tcp_map_copy = tcp_map.lock().unwrap();
+
+                let inodes = Self::get_used_inodes(&tcp_map_copy, &udp_map_copy);
 
                 let inode_pid_map_map = build_inode_map(inodes);
-                //info!("{:#?}", map);
-                let mut udp_map_copy = udp_map.lock().unwrap().clone();
-                let mut tcp_map_copy = tcp_map.lock().unwrap().clone();
 
                 for (_, conn) in udp_map_copy.map.iter_mut() {
                     conn.try_get_pid(&inode_pid_map_map);
@@ -238,8 +239,9 @@ impl ConnectionsInfo {
                 for (_, conn) in tcp_map_copy.map.iter_mut() {
                     conn.try_get_pid(&inode_pid_map_map);
                 }
-
-                thread::sleep(Duration::from_secs(1));
+                std::mem::drop(udp_map_copy);
+                std::mem::drop(tcp_map_copy);
+                thread::sleep(Duration::from_millis(250));
             }
         });
 
