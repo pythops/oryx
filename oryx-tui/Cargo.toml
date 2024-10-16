@@ -19,7 +19,6 @@ oryx-common = { path = "../oryx-common" }
 mio = { version = "1", features = ["os-poll", "os-ext"] }
 itertools = "0.13"
 dirs = "5"
-dns-lookup = "2"
 kanal = "0.1.0-pre8"
 mimalloc = "0.1"
 clap = { version = "4", features = ["derive", "cargo"] }

@@ -1,7 +1,6 @@
-use dns_lookup::lookup_addr;
 use std::{
     collections::HashMap,
-    net::{IpAddr, Ipv4Addr},
+    net::IpAddr,
     sync::{Arc, Mutex},
     thread,
     time::Duration,
@@ -17,6 +16,8 @@ use ratatui::{
 
 use crate::{
     bandwidth::Bandwidth,
+    dns::get_hostname,
+    interface::NetworkInterface,
     packet::{
         network::{IpPacket, IpProto},
         AppPacket,
@@ -30,7 +31,7 @@ pub struct PacketStats {
     pub network: NetworkStats,
     pub transport: TransportStats,
     pub link: LinkStats,
-    pub addresses: HashMap<Ipv4Addr, (Option<String>, usize)>,
+    pub addresses: HashMap<IpAddr, (Option<String>, usize)>,
 }
 
 #[derive(Debug)]
@@ -40,7 +41,7 @@ pub struct Stats {
 }
 
 impl Stats {
-    pub fn new(packets: Arc<Mutex<Vec<AppPacket>>>) -> Self {
+    pub fn new(packets: Arc<Mutex<Vec<AppPacket>>>, selected_interface: NetworkInterface) -> Self {
         let packet_stats: Arc<Mutex<PacketStats>> = Arc::new(Mutex::new(PacketStats::default()));
 
         thread::spawn({
@@ -67,20 +68,22 @@ impl Stats {
                                     if !ipv4_packet.dst_ip.is_private()
                                         && !ipv4_packet.dst_ip.is_loopback()
                                     {
-                                        if let Some((_, counts)) =
-                                            packet_stats.addresses.get_mut(&ipv4_packet.dst_ip)
+                                        if let Some((_, counts)) = packet_stats
+                                            .addresses
+                                            .get_mut(&IpAddr::V4(ipv4_packet.dst_ip))
                                         {
                                             *counts += 1;
                                         } else if let Ok(host) =
-                                            lookup_addr(&IpAddr::V4(ipv4_packet.dst_ip))
+                                            get_hostname(&IpAddr::V4(ipv4_packet.dst_ip))
                                         {
-                                            packet_stats
-                                                .addresses
-                                                .insert(ipv4_packet.dst_ip, (Some(host), 1));
+                                            packet_stats.addresses.insert(
+                                                IpAddr::V4(ipv4_packet.dst_ip),
+                                                (Some(host), 1),
+                                            );
                                         } else {
                                             packet_stats
                                                 .addresses
-                                                .insert(ipv4_packet.dst_ip, (None, 1));
+                                                .insert(IpAddr::V4(ipv4_packet.dst_ip), (None, 1));
                                         }
                                     }
 
@@ -98,6 +101,30 @@ impl Stats {
                                 }
                                 IpPacket::V6(ipv6_packet) => {
                                     packet_stats.network.ipv6 += 1;
+
+                                    if !selected_interface
+                                        .addresses
+                                        .contains(&IpAddr::V6(ipv6_packet.dst_ip))
+                                    {
+                                        if let Some((_, counts)) = packet_stats
+                                            .addresses
+                                            .get_mut(&IpAddr::V6(ipv6_packet.dst_ip))
+                                        {
+                                            *counts += 1;
+                                        } else if let Ok(host) =
+                                            get_hostname(&IpAddr::V6(ipv6_packet.dst_ip))
+                                        {
+                                            packet_stats.addresses.insert(
+                                                IpAddr::V6(ipv6_packet.dst_ip),
+                                                (Some(host), 1),
+                                            );
+                                        } else {
+                                            packet_stats
+                                                .addresses
+                                                .insert(IpAddr::V6(ipv6_packet.dst_ip), (None, 1));
+                                        }
+                                    }
+
                                     match ipv6_packet.proto {
                                         IpProto::Tcp(_) => {
                                             packet_stats.transport.tcp += 1;
@@ -128,9 +155,9 @@ impl Stats {
     }
     pub fn get_top_10(
         &self,
-        addresses: HashMap<Ipv4Addr, (Option<String>, usize)>,
-    ) -> Vec<(Ipv4Addr, (Option<String>, usize))> {
-        let mut items: Vec<(Ipv4Addr, (Option<String>, usize))> = addresses.into_iter().collect();
+        addresses: HashMap<IpAddr, (Option<String>, usize)>,
+    ) -> Vec<(IpAddr, (Option<String>, usize))> {
+        let mut items: Vec<(IpAddr, (Option<String>, usize))> = addresses.into_iter().collect();
         items.sort_by(|a, b| b.1 .1.cmp(&a.1 .1));
         items.into_iter().take(10).collect()
     }
@@ -302,7 +329,7 @@ impl Stats {
                     .title_alignment(Alignment::Center)
                     .padding(Padding::horizontal(1))
                     .padding(Padding::right(3))
-                    .title_bottom("Top visited websites (Ipv4 only)"),
+                    .title_bottom("Top visited websites"),
             );
 
         frame.render_widget(addresses_chart, address_block);
