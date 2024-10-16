@@ -10,15 +10,7 @@ use std::{
     time::Duration,
 };
 
-use crate::{
-    filter::Filter,
-    help::Help,
-    packet::{
-        network::{IpPacket, IpProto},
-        AppPacket,
-    },
-    pid::{self, ConnectionsInfo, IpMap},
-};
+use crate::{filter::Filter, help::Help};
 use crate::{filter::IoChannels, notification::Notification};
 use crate::{packet::NetworkPacket, section::Section};
 
@@ -57,8 +49,7 @@ pub struct App {
     pub help: Help,
     pub filter: Filter,
     pub start_sniffing: bool,
-    pub packets: Arc<Mutex<Vec<AppPacket>>>,
-    pub connections_info: ConnectionsInfo,
+    pub packets: Arc<Mutex<Vec<NetworkPacket>>>,
     pub notifications: Vec<Notification>,
     pub section: Section,
     pub data_channel_sender: kanal::Sender<[u8; RawPacket::LEN]>,
@@ -74,71 +65,36 @@ impl Default for App {
 
 impl App {
     pub fn new() -> Self {
-        let app_packets: Arc<Mutex<Vec<AppPacket>>> = Arc::new(Mutex::new(Vec::with_capacity(
+        let net_packets: Arc<Mutex<Vec<NetworkPacket>>> = Arc::new(Mutex::new(Vec::with_capacity(
             NetworkPacket::LEN * 1024 * 1024,
         )));
         let data_channels = Channels::new();
 
-        let tcp_map: Arc<Mutex<IpMap>> = Arc::new(Mutex::new(IpMap::new()));
-        let udp_map: Arc<Mutex<IpMap>> = Arc::new(Mutex::new(IpMap::new()));
-
         thread::spawn({
-            let app_packets = app_packets.clone();
-            let tcp_map = tcp_map.clone();
-            let udp_map = udp_map.clone();
+            let net_packets = net_packets.clone();
             move || loop {
                 if let Ok(raw_packet) = data_channels.receiver.recv() {
                     let network_packet = NetworkPacket::from(raw_packet);
-                    let mut app_packets = app_packets.lock().unwrap();
-                    if app_packets.len() == app_packets.capacity() {
-                        app_packets.reserve(1024 * 1024);
+                    let mut net_packets = net_packets.lock().unwrap();
+                    if net_packets.len() == net_packets.capacity() {
+                        net_packets.reserve(1024 * 1024);
                     }
-                    let mut app_packet = AppPacket {
-                        packet: network_packet,
-                        pid: None,
-                    };
-                    let pid = match &app_packet.packet {
-                        NetworkPacket::Ip(IpPacket::V4(ipv4packet)) => match ipv4packet.proto {
-                            IpProto::Tcp(_) => {
-                                let ipmap = tcp_map.lock().unwrap().clone();
-                                app_packet.try_get_pid(ipmap)
-                            }
 
-                            IpProto::Udp(_) => {
-                                let ipmap = udp_map.lock().unwrap().clone();
-
-                                app_packet.try_get_pid(ipmap)
-                            }
-
-                            _ => None,
-                        },
-                        _ => None,
-                    };
-                    app_packet.pid = pid;
-                    app_packets.push(app_packet);
+                    net_packets.push(network_packet);
                 }
             }
         });
 
         let firewall_channels = IoChannels::new();
 
-        let udp_map: Arc<Mutex<IpMap>> = Arc::new(Mutex::new(IpMap::new()));
-        let conn_info = pid::ConnectionsInfo::new(tcp_map.clone(), udp_map.clone());
-
         Self {
             running: true,
             help: Help::new(),
             filter: Filter::new(firewall_channels.clone()),
-            connections_info: conn_info,
             start_sniffing: false,
-            packets: app_packets.clone(),
+            packets: net_packets.clone(),
             notifications: Vec::new(),
-            section: Section::new(
-                app_packets.clone(),
-                tcp_map.clone(),
-                udp_map.clone(),
-                firewall_channels.clone(),
-            ),
+            section: Section::new(net_packets.clone(), firewall_channels.clone()),
             data_channel_sender: data_channels.sender,
             is_editing: false,
             active_popup: None,

@@ -5,7 +5,6 @@ pub mod transport;
 use std::{fmt::Display, mem, net::Ipv4Addr};
 
 use link::{ArpPacket, ArpType, MacAddr};
-use log::info;
 use network::{IcmpPacket, IcmpType, IpPacket, IpProto, Ipv4Packet, Ipv6Packet};
 use network_types::ip::IpHdr;
 use oryx_common::{ProtoHdr, RawPacket};
@@ -30,8 +29,29 @@ pub struct AppPacket {
 }
 
 impl AppPacket {
+    pub fn from_network_packet(
+        netpacket: &NetworkPacket,
+        tcp_map: &IpMap,
+        udp_map: &IpMap,
+    ) -> Self {
+        let pid = match netpacket {
+            NetworkPacket::Ip(IpPacket::V4(ipv4packet)) => match ipv4packet.proto {
+                IpProto::Tcp(_) => netpacket.try_get_pid(tcp_map),
+                IpProto::Udp(_) => netpacket.try_get_pid(udp_map),
+                _ => None,
+            },
+            _ => None,
+        };
+        Self {
+            packet: *netpacket,
+            pid,
+        }
+    }
+}
+
+impl NetworkPacket {
     fn get_possible_keys(&self) -> Option<[String; 2]> {
-        match self.packet {
+        match self {
             NetworkPacket::Ip(IpPacket::V4(ipv4packet)) => {
                 let src_ip = ipv4packet.src_ip;
                 let dst_ip = ipv4packet.dst_ip;
@@ -50,11 +70,10 @@ impl AppPacket {
             _ => None,
         }
     }
-    pub fn try_get_pid(&self, ipmap: IpMap) -> Option<u32> {
+    pub fn try_get_pid(&self, ipmap: &IpMap) -> Option<u32> {
         if let Some(keys) = self.get_possible_keys() {
             for k in keys {
                 if let Some(conn) = ipmap.map.get(&k) {
-                    info!("found pid for {}", k);
                     return conn.pid;
                 }
             }
@@ -62,7 +81,6 @@ impl AppPacket {
         None
     }
 }
-
 impl Display for NetworkPacket {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {

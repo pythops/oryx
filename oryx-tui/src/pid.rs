@@ -40,16 +40,16 @@ impl TryFrom<&Vec<&str>> for Connection {
         let ip_local = ip_local_port.next().unwrap();
         let port_local = ip_local_port.next().unwrap();
 
-        let ip_local = IpAddr::try_from(decode_hex_ipv4(&ip_local)?)?;
-        let port_local = decode_hex_port(&port_local)?;
+        let ip_local = IpAddr::try_from(decode_hex_ipv4(ip_local)?)?;
+        let port_local = decode_hex_port(port_local)?;
 
         let ip_remote = splits[2];
         let mut ip_remote_port = ip_remote.split(":");
         let ip_remote = ip_remote_port.next().unwrap();
         let port_remote = ip_remote_port.next().unwrap();
 
-        let ip_remote = IpAddr::try_from(decode_hex_ipv4(&ip_remote)?)?;
-        let port_remote = decode_hex_port(&port_remote)?;
+        let ip_remote = IpAddr::try_from(decode_hex_ipv4(ip_remote)?)?;
+        let port_remote = decode_hex_port(port_remote)?;
 
         let inode = splits[9].parse::<u32>().unwrap();
 
@@ -82,30 +82,24 @@ fn build_inode_map(target_inodes: Vec<u32>) -> HashMap<u32, u32> {
     let mut res = HashMap::<u32, u32>::new();
     // Iterate over all directories in /proc (these represent PIDs)
     if let Ok(entries) = fs::read_dir("/proc") {
-        for entry in entries {
-            if let Ok(entry) = entry {
-                let pid_str = entry.file_name().to_str().unwrap().to_string();
-                if !pid_str.chars().all(char::is_numeric) {
-                    continue;
-                }
-                let fd_dir = format!("/proc/{}/fd", pid_str);
-                if let Ok(fds) = fs::read_dir(&fd_dir) {
-                    for fd in fds {
-                        if let Ok(fd) = fd {
-                            let link_path = fd.path();
+        for entry in entries.flatten() {
+            let pid_str = entry.file_name().to_str().unwrap().to_string();
+            if !pid_str.chars().all(char::is_numeric) {
+                continue;
+            }
+            let fd_dir = format!("/proc/{}/fd", pid_str);
+            if let Ok(fds) = fs::read_dir(&fd_dir) {
+                for fd in fds.flatten() {
+                    let link_path = fd.path();
 
-                            if let Ok(link_target) = fs::read_link(&link_path) {
-                                // Socket inodes are typically shown as "socket:[inode]"
-                                if let Some(inode_str) = link_target.to_str() {
-                                    if inode_str.starts_with("socket:[") && inode_str.ends_with(']')
-                                    {
-                                        if let Ok(inode) =
-                                            inode_str[8..inode_str.len() - 1].parse::<u32>()
-                                        {
-                                            if target_inodes.contains(&inode) {
-                                                res.insert(inode, pid_str.parse::<u32>().unwrap());
-                                            }
-                                        }
+                    if let Ok(link_target) = fs::read_link(&link_path) {
+                        // Socket inodes are typically shown as "socket:[inode]"
+                        if let Some(inode_str) = link_target.to_str() {
+                            if inode_str.starts_with("socket:[") && inode_str.ends_with(']') {
+                                if let Ok(inode) = inode_str[8..inode_str.len() - 1].parse::<u32>()
+                                {
+                                    if target_inodes.contains(&inode) {
+                                        res.insert(inode, pid_str.parse::<u32>().unwrap());
                                     }
                                 }
                             }
@@ -142,7 +136,9 @@ fn decode_hex_ipv4(hex_str: &str) -> AppResult<[u8; 4]> {
 }
 
 #[derive(Debug)]
-pub struct ConnectionsInfo {}
+pub struct ConnectionsInfo {
+    sender: kanal::Sender<(IpMap, IpMap)>,
+}
 
 impl ConnectionsInfo {
     pub fn get_used_inodes(tcp_map: &IpMap, udp_map: &IpMap) -> Vec<u32> {
@@ -157,8 +153,13 @@ impl ConnectionsInfo {
         }
         res
     }
+    pub fn new(sender: kanal::Sender<(IpMap, IpMap)>) -> Self {
+        Self { sender }
+    }
 
-    pub fn new(tcp_map: Arc<Mutex<IpMap>>, udp_map: Arc<Mutex<IpMap>>) -> Self {
+    pub fn spawn(&self) {
+        let tcp_map: Arc<Mutex<IpMap>> = Arc::new(Mutex::new(IpMap::new()));
+        let udp_map: Arc<Mutex<IpMap>> = Arc::new(Mutex::new(IpMap::new()));
         thread::spawn({
             let tcp_map = tcp_map.clone();
 
@@ -184,7 +185,7 @@ impl ConnectionsInfo {
                             _ => error!("error parsing tcp conn{:#?}", splits),
                         }
                     }
-                    std::mem::drop(map);
+                    drop(map);
                     thread::sleep(Duration::from_millis(250));
                 }
             }
@@ -215,7 +216,7 @@ impl ConnectionsInfo {
                             _ => error!("error parsing  udp conn {:#?}", splits),
                         }
                     }
-                    std::mem::drop(map);
+                    drop(map);
                     thread::sleep(Duration::from_millis(250));
                 }
             }
@@ -224,27 +225,28 @@ impl ConnectionsInfo {
         thread::spawn({
             let tcp_map = tcp_map.clone();
             let udp_map = udp_map.clone();
+            let sender = self.sender.clone();
             move || loop {
                 //info!("{:#?}", map);
-                let mut udp_map_copy = udp_map.lock().unwrap();
-                let mut tcp_map_copy = tcp_map.lock().unwrap();
+                let mut _udp_map = udp_map.lock().unwrap();
+                let mut _tcp_map = tcp_map.lock().unwrap();
 
-                let inodes = Self::get_used_inodes(&tcp_map_copy, &udp_map_copy);
+                let inodes = Self::get_used_inodes(&_tcp_map, &_udp_map);
 
                 let inode_pid_map_map = build_inode_map(inodes);
 
-                for (_, conn) in udp_map_copy.map.iter_mut() {
+                for (_, conn) in _udp_map.map.iter_mut() {
                     conn.try_get_pid(&inode_pid_map_map);
                 }
-                for (_, conn) in tcp_map_copy.map.iter_mut() {
+                for (_, conn) in _tcp_map.map.iter_mut() {
                     conn.try_get_pid(&inode_pid_map_map);
                 }
-                std::mem::drop(udp_map_copy);
-                std::mem::drop(tcp_map_copy);
-                thread::sleep(Duration::from_millis(250));
+                let _ = sender.send((_tcp_map.clone(), _udp_map.clone()));
+                drop(_tcp_map);
+                drop(_udp_map);
+
+                thread::sleep(Duration::from_millis(1000));
             }
         });
-
-        Self {}
     }
 }

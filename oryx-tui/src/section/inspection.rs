@@ -1,6 +1,10 @@
-use std::sync::{Arc, Mutex};
+use std::{
+    sync::{Arc, Mutex},
+    thread,
+};
 
 use crossterm::event::{KeyCode, KeyEvent};
+
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Flex, Layout, Margin, Rect},
     style::{Style, Stylize},
@@ -14,7 +18,7 @@ use ratatui::{
 use tui_input::backend::crossterm::EventHandler;
 
 use crate::{
-    app::AppResult,
+    app::{AppResult, Channels},
     export,
     filter::fuzzy::{self, Fuzzy},
     notification::{Notification, NotificationLevel},
@@ -22,38 +26,58 @@ use crate::{
         network::{IpPacket, IpProto},
         AppPacket, NetworkPacket,
     },
-    pid::IpMap,
+    pid::{self, IpMap},
 };
 
 #[derive(Debug)]
 pub struct Inspection {
-    pub packets: Arc<Mutex<Vec<AppPacket>>>,
-    pub tcp_map: Arc<Mutex<IpMap>>,
-    pub udp_map: Arc<Mutex<IpMap>>,
+    pub packets: Arc<Mutex<Vec<NetworkPacket>>>,
+
     pub state: TableState,
     pub fuzzy: Arc<Mutex<Fuzzy>>,
     pub manuall_scroll: bool,
     pub packet_end_index: usize,
     pub packet_window_size: usize,
     pub packet_index: Option<usize>,
+    tcp_map: Arc<Mutex<IpMap>>,
+    udp_map: Arc<Mutex<IpMap>>,
 }
 
 impl Inspection {
-    pub fn new(
-        packets: Arc<Mutex<Vec<AppPacket>>>,
-        tcp_map: Arc<Mutex<IpMap>>,
-        udp_map: Arc<Mutex<IpMap>>,
-    ) -> Self {
+    pub fn new(packets: Arc<Mutex<Vec<NetworkPacket>>>) -> Self {
+        let tcp_map = Arc::new(Mutex::new(IpMap::new()));
+        let udp_map = Arc::new(Mutex::new(IpMap::new()));
+        let conn_channels = Channels::new();
+        let conn_info = pid::ConnectionsInfo::new(conn_channels.sender.clone());
+        conn_info.spawn();
+
+        thread::spawn({
+            let tcp_map = tcp_map.clone();
+            let udp_map = udp_map.clone();
+            let connection_info_receiver = conn_channels.receiver.clone();
+            move || loop {
+                if let Ok((rcv_tcp_map, rcv_udp_map)) = connection_info_receiver.recv() {
+                    let mut _tcp_map = tcp_map.lock().unwrap();
+
+                    *_tcp_map = rcv_tcp_map;
+                    drop(_tcp_map);
+                    let mut _udp_map = udp_map.lock().unwrap();
+                    *_udp_map = rcv_udp_map;
+                    drop(_udp_map);
+                }
+            }
+        });
+
         Self {
             packets: packets.clone(),
-            tcp_map: tcp_map,
-            udp_map: udp_map,
             state: TableState::default(),
             fuzzy: Fuzzy::new(packets.clone()),
             manuall_scroll: false,
             packet_end_index: 0,
             packet_window_size: 0,
             packet_index: None,
+            tcp_map,
+            udp_map,
         }
     }
 
@@ -143,20 +167,15 @@ impl Inspection {
                 }
 
                 KeyCode::Char('s') => {
-                    let app_packets = self.packets.lock().unwrap();
-                    if app_packets.is_empty() {
+                    let net_packets = self.packets.lock().unwrap();
+                    if net_packets.is_empty() {
                         Notification::send(
                             "There is no packets".to_string(),
                             NotificationLevel::Info,
                             event_sender,
                         )?;
                     } else {
-                        match export::export(
-                            &app_packets
-                                .iter()
-                                .map(|app_packet| app_packet.packet)
-                                .collect::<Vec<_>>(),
-                        ) {
+                        match export::export(&net_packets) {
                             Ok(_) => {
                                 Notification::send(
                                     "Packets exported to ~/oryx/capture file".to_string(),
@@ -193,7 +212,7 @@ impl Inspection {
                 if i > 1 {
                     i - 1
                 } else if i == 0 && self.packet_end_index > self.packet_window_size {
-                    // shit the window by one
+                    // shift the window by one
                     self.packet_end_index -= 1;
                     0
                 } else {
@@ -235,6 +254,8 @@ impl Inspection {
 
     pub fn render(&mut self, frame: &mut Frame, block: Rect) {
         let app_packets = self.packets.lock().unwrap();
+        let tcp_map = self.tcp_map.lock().unwrap().clone();
+        let udp_map = self.udp_map.lock().unwrap().clone();
         let mut fuzzy = self.fuzzy.lock().unwrap();
 
         let fuzzy_packets = fuzzy.clone().packets.clone();
@@ -269,13 +290,13 @@ impl Inspection {
         };
 
         let widths = [
-            Constraint::Min(19),   // Source Address
-            Constraint::Length(5), // Source Port
-            Constraint::Min(19),   // Destination Address
-            Constraint::Length(5), // Destination Port
-            Constraint::Length(3), // Pid
-            Constraint::Length(8), // Protocol
-            Constraint::Length(3), // manual scroll sign
+            Constraint::Min(15),    // Source Address
+            Constraint::Length(12), // Source Port
+            Constraint::Min(20),    // Destination Address
+            Constraint::Length(17), // Destination Port
+            Constraint::Length(5),  // Pid
+            Constraint::Length(8),  // Protocol
+            Constraint::Length(3),  // manual scroll sign
         ];
 
         // The size of the window where to display packets
@@ -343,6 +364,11 @@ impl Inspection {
                 }
             }
         };
+        //
+        let packets_to_display = packets_to_display
+            .iter()
+            .map(|p| AppPacket::from_network_packet(p, &tcp_map, &udp_map))
+            .collect::<Vec<AppPacket>>();
 
         // Style the packets
         let packets: Vec<Row> = if fuzzy.is_enabled() & !fuzzy.filter.value().is_empty() {
@@ -694,7 +720,7 @@ impl Inspection {
         let fuzzy = self.fuzzy.lock().unwrap();
         let packets = self.packets.lock().unwrap();
 
-        let packet = if fuzzy.is_enabled() {
+        let net_packet = if fuzzy.is_enabled() {
             fuzzy.packets[self.packet_index.unwrap()]
         } else {
             packets[self.packet_index.unwrap()]
@@ -711,7 +737,7 @@ impl Inspection {
                 .border_type(BorderType::Thick),
             block,
         );
-        match packet.packet {
+        match net_packet {
             NetworkPacket::Ip(ip_packet) => ip_packet.render(block, frame),
             NetworkPacket::Arp(arp_packet) => arp_packet.render(block, frame),
         };

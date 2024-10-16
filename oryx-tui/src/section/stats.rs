@@ -19,7 +19,7 @@ use crate::{
     bandwidth::Bandwidth,
     packet::{
         network::{IpPacket, IpProto},
-        NetworkPacket, AppPacket,
+        NetworkPacket,
     },
 };
 
@@ -40,7 +40,7 @@ pub struct Stats {
 }
 
 impl Stats {
-    pub fn new(packets: Arc<Mutex<Vec<AppPacket>>>) -> Self {
+    pub fn new(packets: Arc<Mutex<Vec<NetworkPacket>>>) -> Self {
         let packet_stats: Arc<Mutex<PacketStats>> = Arc::new(Mutex::new(PacketStats::default()));
 
         thread::spawn({
@@ -56,7 +56,7 @@ impl Stats {
                     }
                     let mut packet_stats = packet_stats.lock().unwrap();
                     for packet in packets[last_index..].iter() {
-                        match packet.packet {
+                        match packet {
                             NetworkPacket::Arp(_) => {
                                 packet_stats.link.arp += 1;
                             }
