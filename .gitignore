@@ -1,3 +1,5 @@
+perf.data
+flamegraph.svg
 log-file
 debug/
 target/
