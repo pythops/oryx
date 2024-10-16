@@ -26,7 +26,7 @@ use transport::TransportFilter;
 use tui_big_text::{BigText, PixelSize};
 
 use crate::{
-    app::AppResult,
+    app::{AppResult, Channels},
     ebpf::{egress::load_egress, ingress::load_ingress},
     event::Event,
     interface::Interface,
@@ -41,22 +41,9 @@ pub enum FilterChannelSignal {
 }
 
 #[derive(Debug, Clone)]
-pub struct Channels<T> {
-    pub sender: kanal::Sender<T>,
-    pub receiver: kanal::Receiver<T>,
-}
-
-#[derive(Debug, Clone)]
 pub struct IoChannels<T> {
     pub ingress: Channels<T>,
     pub egress: Channels<T>,
-}
-
-impl<T> Channels<T> {
-    pub fn new() -> Self {
-        let (sender, receiver) = kanal::unbounded();
-        Self { sender, receiver }
-    }
 }
 
 impl<T> IoChannels<T> {
@@ -65,12 +52,6 @@ impl<T> IoChannels<T> {
             ingress: Channels::new(),
             egress: Channels::new(),
         }
-    }
-}
-
-impl<T> Default for Channels<T> {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
