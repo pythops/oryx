@@ -1,7 +1,4 @@
-use libc::{
-    c_char, getnameinfo, sockaddr_in, sockaddr_in6, socklen_t, NI_MAXHOST, NI_NAMEREQD,
-    NI_NUMERICSERV,
-};
+use libc::{c_char, getnameinfo, sockaddr_in, sockaddr_in6, socklen_t, NI_MAXHOST, NI_NAMEREQD};
 use std::ffi::CStr;
 use std::mem;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
@@ -35,7 +32,7 @@ fn get_hostname_v4(ip: &Ipv4Addr) -> AppResult<String> {
             NI_MAXHOST,
             std::ptr::null_mut(),
             0,
-            NI_NUMERICSERV | NI_NAMEREQD,
+            NI_NAMEREQD,
         )
     };
 
@@ -69,7 +66,7 @@ fn get_hostname_v6(ip: &Ipv6Addr) -> AppResult<String> {
             NI_MAXHOST,
             std::ptr::null_mut(),
             0,
-            NI_NUMERICSERV | NI_NAMEREQD,
+            NI_NAMEREQD,
         )
     };
 
