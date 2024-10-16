@@ -38,7 +38,7 @@ pub enum FocusedSection {
 pub struct Section {
     pub focused_section: FocusedSection,
     pub inspection: Inspection,
-    pub stats: Stats,
+    pub stats: Option<Stats>,
     pub alert: Alert,
     pub firewall: Firewall,
 }
@@ -51,7 +51,7 @@ impl Section {
         Self {
             focused_section: FocusedSection::Inspection,
             inspection: Inspection::new(packets.clone()),
-            stats: Stats::new(packets.clone()),
+            stats: None,
             alert: Alert::new(packets.clone()),
             firewall: Firewall::new(firewall_chans.ingress.sender, firewall_chans.egress.sender),
         }
@@ -254,7 +254,11 @@ impl Section {
 
         match self.focused_section {
             FocusedSection::Inspection => self.inspection.render(frame, section_block),
-            FocusedSection::Stats => self.stats.render(frame, section_block, network_interace),
+            FocusedSection::Stats => {
+                if let Some(stats) = &self.stats {
+                    stats.render(frame, section_block, network_interace)
+                }
+            }
             FocusedSection::Alerts => self.alert.render(frame, section_block),
             FocusedSection::Firewall => self.firewall.render(frame, section_block),
         }

@@ -4,7 +4,7 @@ use crate::{
     app::{ActivePopup, App, AppResult},
     event::Event,
     filter::FocusedBlock,
-    section::FocusedSection,
+    section::{stats::Stats, FocusedSection},
 };
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
@@ -18,6 +18,10 @@ pub fn handle_key_events(
         match key_event.code {
             KeyCode::Enter => {
                 if app.filter.focused_block == FocusedBlock::Apply {
+                    app.section.stats = Some(Stats::new(
+                        app.packets.clone(),
+                        app.filter.interface.selected_interface.clone(),
+                    ));
                     app.filter
                         .start(event_sender.clone(), app.data_channel_sender.clone())?;
 

@@ -1,3 +1,9 @@
+## v0.5 - TBA
+
+### Added
+
+- stats: top 10 websites support ipv6
+
 ## v0.4 - 2024-10-13
 
 ### Added
