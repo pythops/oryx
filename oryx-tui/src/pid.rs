@@ -1,13 +1,15 @@
 use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::{Read, Seek};
+
 use std::net::IpAddr;
 use std::num::ParseIntError;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
-use log::error;
+use itertools::chain;
+use log::info;
 
 use crate::app::AppResult;
 
@@ -40,7 +42,11 @@ impl TryFrom<&Vec<&str>> for Connection {
         let ip_local = ip_local_port.next().unwrap();
         let port_local = ip_local_port.next().unwrap();
 
-        let ip_local = IpAddr::try_from(decode_hex_ipv4(ip_local)?)?;
+        let ip_local = match decode_hex_ipv4(ip_local) {
+            Ok(ip) => IpAddr::try_from(ip)?,
+            _ => IpAddr::try_from(decode_hex_ipv6(ip_local)?)?,
+        };
+
         let port_local = decode_hex_port(port_local)?;
 
         let ip_remote = splits[2];
@@ -48,7 +54,10 @@ impl TryFrom<&Vec<&str>> for Connection {
         let ip_remote = ip_remote_port.next().unwrap();
         let port_remote = ip_remote_port.next().unwrap();
 
-        let ip_remote = IpAddr::try_from(decode_hex_ipv4(ip_remote)?)?;
+        let ip_remote = match decode_hex_ipv4(ip_remote) {
+            Ok(ip) => IpAddr::try_from(ip)?,
+            _ => IpAddr::try_from(decode_hex_ipv6(ip_remote)?)?,
+        };
         let port_remote = decode_hex_port(port_remote)?;
 
         let inode = splits[9].parse::<u32>().unwrap();
@@ -121,11 +130,25 @@ fn decode_hex_port(hex_str: &str) -> Result<u16, ParseIntError> {
 
 fn decode_hex_ipv4(hex_str: &str) -> AppResult<[u8; 4]> {
     let mut bytes = Vec::new();
-
     // Iterate over the string in chunks of 2 characters
     for i in (0..hex_str.len()).step_by(2) {
         // Get the current 2-character chunk
         let byte_str = &hex_str[i..i + 2];
+
+        let byte = u8::from_str_radix(byte_str, 16)?;
+        bytes.push(byte);
+    }
+    let mut res: [u8; 4] = bytes.as_slice().try_into()?;
+    res.reverse();
+    Ok(res)
+}
+
+fn decode_hex_ipv6(hex_str: &str) -> AppResult<[u8; 4]> {
+    let mut bytes = Vec::new();
+    // Iterate over the string in chunks of 2 characters
+    for i in (0..hex_str.len()).step_by(4) {
+        // Get the current 2-character chunk
+        let byte_str = &hex_str[i..i + 4];
 
         let byte = u8::from_str_radix(byte_str, 16)?;
         bytes.push(byte);
@@ -164,29 +187,36 @@ impl ConnectionsInfo {
             let tcp_map = tcp_map.clone();
 
             move || {
+                thread::sleep(Duration::from_millis(250));
                 let mut fd_tcp = File::open("/proc/net/tcp").unwrap();
+                let mut fd_tcp6 = File::open("/proc/net/tcp6").unwrap();
 
                 loop {
                     fd_tcp.seek(std::io::SeekFrom::Start(0)).unwrap();
-                    let mut buffer = String::new();
-                    fd_tcp.read_to_string(&mut buffer).unwrap();
+                    fd_tcp6.seek(std::io::SeekFrom::Start(0)).unwrap();
 
-                    let mut lines = buffer.lines();
+                    let mut buffer_tcp = String::new();
+                    let mut buffer_tcp6 = String::new();
+                    fd_tcp.read_to_string(&mut buffer_tcp).unwrap();
+                    fd_tcp6.read_to_string(&mut buffer_tcp6).unwrap();
 
-                    lines.next(); //header
+                    let mut lines_tcp = buffer_tcp.lines();
+                    let mut lines_tcp6 = buffer_tcp6.lines();
+                    lines_tcp.next(); //header
+                    lines_tcp6.next(); //header
+
                     let mut map = tcp_map.lock().unwrap();
-                    for line in lines {
+                    for line in chain(lines_tcp, lines_tcp6) {
                         let splits: Vec<&str> = line.split_whitespace().collect();
 
                         match Connection::try_from(&splits) {
                             Ok(conn) => {
                                 map.map.insert(conn.key(), conn);
                             }
-                            _ => error!("error parsing tcp conn{:#?}", splits),
+                            _ => {} //error!("error parsing tcp conn{:#?}", splits)},
                         }
                     }
-                    drop(map);
-                    thread::sleep(Duration::from_millis(250));
+                    info!("{:#?}", map);
                 }
             }
         });
@@ -198,6 +228,7 @@ impl ConnectionsInfo {
                 let mut fd_udp = File::open("/proc/net/udp").unwrap();
 
                 loop {
+                    thread::sleep(Duration::from_millis(250));
                     fd_udp.seek(std::io::SeekFrom::Start(0)).unwrap();
                     let mut buffer = String::new();
                     fd_udp.read_to_string(&mut buffer).unwrap();
@@ -213,11 +244,9 @@ impl ConnectionsInfo {
                             Ok(conn) => {
                                 map.map.insert(conn.key(), conn);
                             }
-                            _ => error!("error parsing  udp conn {:#?}", splits),
+                            _ => {} //error!("error parsing  udp conn {:#?}", splits),
                         }
                     }
-                    drop(map);
-                    thread::sleep(Duration::from_millis(250));
                 }
             }
         });
@@ -227,7 +256,8 @@ impl ConnectionsInfo {
             let udp_map = udp_map.clone();
             let sender = self.sender.clone();
             move || loop {
-                //info!("{:#?}", map);
+                thread::sleep(Duration::from_millis(500));
+
                 let mut _udp_map = udp_map.lock().unwrap();
                 let mut _tcp_map = tcp_map.lock().unwrap();
 
@@ -241,11 +271,8 @@ impl ConnectionsInfo {
                 for (_, conn) in _tcp_map.map.iter_mut() {
                     conn.try_get_pid(&inode_pid_map_map);
                 }
-                let _ = sender.send((_tcp_map.clone(), _udp_map.clone()));
-                drop(_tcp_map);
-                drop(_udp_map);
 
-                thread::sleep(Duration::from_millis(1000));
+                sender.send((_tcp_map.clone(), _udp_map.clone())).ok();
             }
         });
     }

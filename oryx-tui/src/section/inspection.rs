@@ -5,6 +5,7 @@ use std::{
 
 use crossterm::event::{KeyCode, KeyEvent};
 
+use log::info;
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Flex, Layout, Margin, Rect},
     style::{Style, Stylize},
@@ -58,7 +59,6 @@ impl Inspection {
             move || loop {
                 if let Ok((rcv_tcp_map, rcv_udp_map)) = connection_info_receiver.recv() {
                     let mut _tcp_map = tcp_map.lock().unwrap();
-
                     *_tcp_map = rcv_tcp_map;
                     drop(_tcp_map);
                     let mut _udp_map = udp_map.lock().unwrap();
@@ -411,7 +411,8 @@ impl Inspection {
                                         None => "-".to_string(),
                                     })
                                     .centered(),
-                                ),
+                                )
+                                .yellow(),
                                 fuzzy::highlight(pattern, "UDP".to_string()).cyan(),
                             ]),
                             IpProto::Icmp(_) => Row::new(vec![
