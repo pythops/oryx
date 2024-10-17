@@ -49,8 +49,9 @@ impl Stats {
             move || {
                 let mut last_index = 0;
                 loop {
-                    thread::sleep(Duration::from_millis(160));
-                    let packets = packets.lock().unwrap();
+                    thread::sleep(Duration::from_millis(500));
+
+                    let packets = { packets.lock().unwrap().clone() };
 
                     if packets.is_empty() {
                         continue;

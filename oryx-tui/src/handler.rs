@@ -1,4 +1,7 @@
-use std::{thread, time::Duration};
+use std::{
+    thread::{self, sleep},
+    time::Duration,
+};
 
 use crate::{
     app::{ActivePopup, App, AppResult},
@@ -25,6 +28,7 @@ pub fn handle_key_events(
                     app.filter
                         .start(event_sender.clone(), app.data_channel_sender.clone())?;
 
+                    sleep(Duration::from_millis(100));
                     app.start_sniffing = true;
                 }
             }
