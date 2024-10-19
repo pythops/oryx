@@ -11,20 +11,20 @@ use ratatui::{
 };
 use tui_input::Input;
 
-use crate::{app::TICK_RATE, packet::AppPacket};
+use crate::{app::TICK_RATE, packet::NetworkPacket};
 
 #[derive(Debug, Clone, Default)]
 pub struct Fuzzy {
     enabled: bool,
     paused: bool,
     pub filter: Input,
-    pub packets: Vec<AppPacket>,
+    pub packets: Vec<NetworkPacket>,
     pub scroll_state: TableState,
     pub packet_end_index: usize,
 }
 
 impl Fuzzy {
-    pub fn new(packets: Arc<Mutex<Vec<AppPacket>>>) -> Arc<Mutex<Self>> {
+    pub fn new(packets: Arc<Mutex<Vec<NetworkPacket>>>) -> Arc<Mutex<Self>> {
         let fuzzy = Arc::new(Mutex::new(Self::default()));
 
         thread::spawn({
@@ -94,21 +94,21 @@ impl Fuzzy {
         self.scroll_state.select(Some(i));
     }
 
-    pub fn find(&mut self, packets: &[AppPacket]) {
+    pub fn find(&mut self, packets: &[NetworkPacket]) {
         self.packets = packets
             .iter()
             .copied()
             .filter(|p| p.to_string().contains(self.filter.value()))
-            .collect::<Vec<AppPacket>>();
+            .collect::<Vec<NetworkPacket>>();
     }
 
-    pub fn append(&mut self, packets: &[AppPacket]) {
+    pub fn append(&mut self, packets: &[NetworkPacket]) {
         self.packets.append(
             &mut packets
                 .iter()
                 .copied()
                 .filter(|p| p.to_string().contains(self.filter.value()))
-                .collect::<Vec<AppPacket>>(),
+                .collect::<Vec<NetworkPacket>>(),
         );
     }
 

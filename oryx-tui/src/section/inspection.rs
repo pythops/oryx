@@ -1,6 +1,11 @@
-use std::sync::{Arc, Mutex};
+use std::{
+    sync::{Arc, Mutex},
+    thread,
+};
 
 use crossterm::event::{KeyCode, KeyEvent};
+
+use log::info;
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Flex, Layout, Margin, Rect},
     style::{Style, Stylize},
@@ -14,29 +19,55 @@ use ratatui::{
 use tui_input::backend::crossterm::EventHandler;
 
 use crate::{
-    app::AppResult,
+    app::{AppResult, Channels},
     export,
     filter::fuzzy::{self, Fuzzy},
     notification::{Notification, NotificationLevel},
     packet::{
         network::{IpPacket, IpProto},
-        AppPacket,
+        AppPacket, NetworkPacket,
     },
+    pid::{self, IpMap},
 };
 
 #[derive(Debug)]
 pub struct Inspection {
-    pub packets: Arc<Mutex<Vec<AppPacket>>>,
+    pub packets: Arc<Mutex<Vec<NetworkPacket>>>,
+
     pub state: TableState,
     pub fuzzy: Arc<Mutex<Fuzzy>>,
     pub manuall_scroll: bool,
     pub packet_end_index: usize,
     pub packet_window_size: usize,
     pub packet_index: Option<usize>,
+    tcp_map: Arc<Mutex<IpMap>>,
+    udp_map: Arc<Mutex<IpMap>>,
 }
 
 impl Inspection {
-    pub fn new(packets: Arc<Mutex<Vec<AppPacket>>>) -> Self {
+    pub fn new(packets: Arc<Mutex<Vec<NetworkPacket>>>) -> Self {
+        let tcp_map = Arc::new(Mutex::new(IpMap::new()));
+        let udp_map = Arc::new(Mutex::new(IpMap::new()));
+        let conn_channels = Channels::new();
+        let conn_info = pid::ConnectionsInfo::new(conn_channels.sender.clone());
+        conn_info.spawn();
+
+        thread::spawn({
+            let tcp_map = tcp_map.clone();
+            let udp_map = udp_map.clone();
+            let connection_info_receiver = conn_channels.receiver.clone();
+            move || loop {
+                if let Ok((rcv_tcp_map, rcv_udp_map)) = connection_info_receiver.recv() {
+                    let mut _tcp_map = tcp_map.lock().unwrap();
+                    *_tcp_map = rcv_tcp_map;
+                    drop(_tcp_map);
+                    let mut _udp_map = udp_map.lock().unwrap();
+                    *_udp_map = rcv_udp_map;
+                    drop(_udp_map);
+                }
+            }
+        });
+
         Self {
             packets: packets.clone(),
             state: TableState::default(),
@@ -45,6 +76,8 @@ impl Inspection {
             packet_end_index: 0,
             packet_window_size: 0,
             packet_index: None,
+            tcp_map,
+            udp_map,
         }
     }
 
@@ -134,15 +167,15 @@ impl Inspection {
                 }
 
                 KeyCode::Char('s') => {
-                    let app_packets = self.packets.lock().unwrap();
-                    if app_packets.is_empty() {
+                    let net_packets = self.packets.lock().unwrap();
+                    if net_packets.is_empty() {
                         Notification::send(
                             "There is no packets".to_string(),
                             NotificationLevel::Info,
                             event_sender,
                         )?;
                     } else {
-                        match export::export(&app_packets) {
+                        match export::export(&net_packets) {
                             Ok(_) => {
                                 Notification::send(
                                     "Packets exported to ~/oryx/capture file".to_string(),
@@ -179,7 +212,7 @@ impl Inspection {
                 if i > 1 {
                     i - 1
                 } else if i == 0 && self.packet_end_index > self.packet_window_size {
-                    // shit the window by one
+                    // shift the window by one
                     self.packet_end_index -= 1;
                     0
                 } else {
@@ -221,7 +254,10 @@ impl Inspection {
 
     pub fn render(&mut self, frame: &mut Frame, block: Rect) {
         let app_packets = self.packets.lock().unwrap();
+        let tcp_map = self.tcp_map.lock().unwrap().clone();
+        let udp_map = self.udp_map.lock().unwrap().clone();
         let mut fuzzy = self.fuzzy.lock().unwrap();
+
         let fuzzy_packets = fuzzy.clone().packets.clone();
 
         let pattern = fuzzy.clone();
@@ -254,10 +290,11 @@ impl Inspection {
         };
 
         let widths = [
-            Constraint::Min(19),    // Source Address
-            Constraint::Length(11), // Source Port
-            Constraint::Min(19),    // Destination Address
-            Constraint::Length(16), // Destination Port
+            Constraint::Min(15),    // Source Address
+            Constraint::Length(12), // Source Port
+            Constraint::Min(20),    // Destination Address
+            Constraint::Length(17), // Destination Port
+            Constraint::Length(5),  // Pid
             Constraint::Length(8),  // Protocol
             Constraint::Length(3),  // manual scroll sign
         ];
@@ -327,26 +364,40 @@ impl Inspection {
                 }
             }
         };
+        //
+        let packets_to_display = packets_to_display
+            .iter()
+            .map(|p| AppPacket::from_network_packet(p, &tcp_map, &udp_map))
+            .collect::<Vec<AppPacket>>();
 
         // Style the packets
         let packets: Vec<Row> = if fuzzy.is_enabled() & !fuzzy.filter.value().is_empty() {
             packets_to_display
                 .iter()
-                .map(|app_packet| match app_packet {
-                    AppPacket::Arp(packet) => Row::new(vec![
+                .map(|app_packet| match app_packet.packet {
+                    NetworkPacket::Arp(packet) => Row::new(vec![
                         fuzzy::highlight(pattern, packet.src_mac.to_string()).blue(),
                         Cell::from(Line::from("-").centered()).yellow(),
                         fuzzy::highlight(pattern, packet.dst_mac.to_string()).blue(),
                         Cell::from(Line::from("-").centered()).yellow(),
+                        Cell::from(Line::from("-").centered()).yellow(),
                         fuzzy::highlight(pattern, "ARP".to_string()).cyan(),
                     ]),
-                    AppPacket::Ip(packet) => match packet {
+                    NetworkPacket::Ip(packet) => match packet {
                         IpPacket::V4(ipv4_packet) => match ipv4_packet.proto {
                             IpProto::Tcp(p) => Row::new(vec![
                                 fuzzy::highlight(pattern, ipv4_packet.src_ip.to_string()).blue(),
                                 fuzzy::highlight(pattern, p.src_port.to_string()).yellow(),
                                 fuzzy::highlight(pattern, ipv4_packet.dst_ip.to_string()).blue(),
                                 fuzzy::highlight(pattern, p.dst_port.to_string()).yellow(),
+                                Cell::from(
+                                    Line::from(match app_packet.pid {
+                                        Some(pid) => pid.to_string(),
+                                        None => "-".to_string(),
+                                    })
+                                    .centered(),
+                                )
+                                .yellow(),
                                 fuzzy::highlight(pattern, "TCP".to_string()).cyan(),
                             ]),
                             IpProto::Udp(p) => Row::new(vec![
@@ -354,12 +405,21 @@ impl Inspection {
                                 fuzzy::highlight(pattern, p.src_port.to_string()).yellow(),
                                 fuzzy::highlight(pattern, ipv4_packet.dst_ip.to_string()).blue(),
                                 fuzzy::highlight(pattern, p.dst_port.to_string()).yellow(),
+                                Cell::from(
+                                    Line::from(match app_packet.pid {
+                                        Some(pid) => pid.to_string(),
+                                        None => "-".to_string(),
+                                    })
+                                    .centered(),
+                                )
+                                .yellow(),
                                 fuzzy::highlight(pattern, "UDP".to_string()).cyan(),
                             ]),
                             IpProto::Icmp(_) => Row::new(vec![
                                 fuzzy::highlight(pattern, ipv4_packet.src_ip.to_string()).blue(),
                                 Cell::from(Line::from("-").centered()).yellow(),
                                 fuzzy::highlight(pattern, ipv4_packet.dst_ip.to_string()).blue(),
+                                Cell::from(Line::from("-").centered()).yellow(),
                                 Cell::from(Line::from("-").centered()).yellow(),
                                 fuzzy::highlight(pattern, "ICMP".to_string()).cyan(),
                             ]),
@@ -370,6 +430,7 @@ impl Inspection {
                                 fuzzy::highlight(pattern, p.src_port.to_string()).yellow(),
                                 fuzzy::highlight(pattern, ipv6_packet.dst_ip.to_string()).blue(),
                                 fuzzy::highlight(pattern, p.dst_port.to_string()).yellow(),
+                                Cell::from(Line::from("-").centered()).yellow(),
                                 fuzzy::highlight(pattern, "TCP".to_string()).cyan(),
                             ]),
                             IpProto::Udp(p) => Row::new(vec![
@@ -377,12 +438,14 @@ impl Inspection {
                                 fuzzy::highlight(pattern, p.src_port.to_string()).yellow(),
                                 fuzzy::highlight(pattern, ipv6_packet.dst_ip.to_string()).blue(),
                                 fuzzy::highlight(pattern, p.dst_port.to_string()).yellow(),
+                                Cell::from(Line::from("-").centered()).yellow(),
                                 fuzzy::highlight(pattern, "UDP".to_string()).cyan(),
                             ]),
                             IpProto::Icmp(_) => Row::new(vec![
                                 fuzzy::highlight(pattern, ipv6_packet.src_ip.to_string()).blue(),
                                 Cell::from(Line::from("-").centered()).yellow(),
                                 fuzzy::highlight(pattern, ipv6_packet.dst_ip.to_string()).blue(),
+                                Cell::from(Line::from("-").centered()).yellow(),
                                 Cell::from(Line::from("-").centered()).yellow(),
                                 fuzzy::highlight(pattern, "ICMP".to_string()).cyan(),
                             ]),
@@ -393,8 +456,8 @@ impl Inspection {
         } else {
             packets_to_display
                 .iter()
-                .map(|app_packet| match app_packet {
-                    AppPacket::Arp(packet) => Row::new(vec![
+                .map(|app_packet| match app_packet.packet {
+                    NetworkPacket::Arp(packet) => Row::new(vec![
                         Span::from(packet.src_mac.to_string())
                             .into_centered_line()
                             .blue(),
@@ -403,9 +466,10 @@ impl Inspection {
                             .into_centered_line()
                             .blue(),
                         Span::from("-").into_centered_line().yellow(),
+                        Span::from("-").into_centered_line().yellow(),
                         Span::from("ARP".to_string()).into_centered_line().cyan(),
                     ]),
-                    AppPacket::Ip(packet) => match packet {
+                    NetworkPacket::Ip(packet) => match packet {
                         IpPacket::V4(ipv4_packet) => match ipv4_packet.proto {
                             IpProto::Tcp(p) => Row::new(vec![
                                 Span::from(ipv4_packet.src_ip.to_string())
@@ -420,6 +484,12 @@ impl Inspection {
                                 Span::from(p.dst_port.to_string())
                                     .into_centered_line()
                                     .yellow(),
+                                Span::from(match app_packet.pid {
+                                    Some(pid) => pid.to_string(),
+                                    None => "-".to_string(),
+                                })
+                                .into_centered_line()
+                                .yellow(),
                                 Span::from("TCP".to_string()).into_centered_line().cyan(),
                             ]),
                             IpProto::Udp(p) => Row::new(vec![
@@ -435,6 +505,12 @@ impl Inspection {
                                 Span::from(p.dst_port.to_string())
                                     .into_centered_line()
                                     .yellow(),
+                                Span::from(match app_packet.pid {
+                                    Some(pid) => pid.to_string(),
+                                    None => "-".to_string(),
+                                })
+                                .into_centered_line()
+                                .yellow(),
                                 Span::from("UDP".to_string()).into_centered_line().cyan(),
                             ]),
                             IpProto::Icmp(_) => Row::new(vec![
@@ -445,6 +521,7 @@ impl Inspection {
                                 Span::from(ipv4_packet.dst_ip.to_string())
                                     .into_centered_line()
                                     .blue(),
+                                Span::from("-").into_centered_line().yellow(),
                                 Span::from("-").into_centered_line().yellow(),
                                 Span::from("ICMP".to_string()).into_centered_line().cyan(),
                             ]),
@@ -463,6 +540,7 @@ impl Inspection {
                                 Span::from(p.dst_port.to_string())
                                     .into_centered_line()
                                     .yellow(),
+                                Span::from("-").into_centered_line().yellow(),
                                 Span::from("TCP".to_string()).into_centered_line().cyan(),
                             ]),
                             IpProto::Udp(p) => Row::new(vec![
@@ -478,6 +556,7 @@ impl Inspection {
                                 Span::from(p.dst_port.to_string())
                                     .into_centered_line()
                                     .yellow(),
+                                Span::from("-").into_centered_line().yellow(),
                                 Span::from("UDP".to_string()).into_centered_line().cyan(),
                             ]),
                             IpProto::Icmp(_) => Row::new(vec![
@@ -488,6 +567,7 @@ impl Inspection {
                                 Span::from(ipv6_packet.dst_ip.to_string())
                                     .into_centered_line()
                                     .blue(),
+                                Span::from("-").into_centered_line().yellow(),
                                 Span::from("-").into_centered_line().yellow(),
                                 Span::from("ICMP".to_string()).into_centered_line().cyan(),
                             ]),
@@ -513,6 +593,7 @@ impl Inspection {
                     Line::from("Source Port").centered(),
                     Line::from("Destination Address").centered(),
                     Line::from("Destination Port").centered(),
+                    Line::from("Pid").centered(),
                     Line::from("Protocol").centered(),
                     {
                         if self.manuall_scroll {
@@ -640,7 +721,7 @@ impl Inspection {
         let fuzzy = self.fuzzy.lock().unwrap();
         let packets = self.packets.lock().unwrap();
 
-        let packet = if fuzzy.is_enabled() {
+        let net_packet = if fuzzy.is_enabled() {
             fuzzy.packets[self.packet_index.unwrap()]
         } else {
             packets[self.packet_index.unwrap()]
@@ -657,9 +738,9 @@ impl Inspection {
                 .border_type(BorderType::Thick),
             block,
         );
-        match packet {
-            AppPacket::Ip(ip_packet) => ip_packet.render(block, frame),
-            AppPacket::Arp(arp_packet) => arp_packet.render(block, frame),
+        match net_packet {
+            NetworkPacket::Ip(ip_packet) => ip_packet.render(block, frame),
+            NetworkPacket::Arp(arp_packet) => arp_packet.render(block, frame),
         };
     }
 }

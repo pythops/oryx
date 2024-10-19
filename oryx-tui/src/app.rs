@@ -12,7 +12,7 @@ use std::{
 
 use crate::{filter::Filter, help::Help};
 use crate::{filter::IoChannels, notification::Notification};
-use crate::{packet::AppPacket, section::Section};
+use crate::{packet::NetworkPacket, section::Section};
 
 pub type AppResult<T> = std::result::Result<T, Box<dyn error::Error>>;
 
@@ -31,6 +31,17 @@ pub struct DataEventHandler {
     pub sender: kanal::Sender<[u8; RawPacket::LEN]>,
     pub handler: thread::JoinHandle<()>,
 }
+#[derive(Debug, Clone)]
+pub struct Channels<T> {
+    pub sender: kanal::Sender<T>,
+    pub receiver: kanal::Receiver<T>,
+}
+impl<T> Channels<T> {
+    pub fn new() -> Self {
+        let (sender, receiver) = kanal::unbounded();
+        Self { sender, receiver }
+    }
+}
 
 #[derive(Debug)]
 pub struct App {
@@ -38,7 +49,7 @@ pub struct App {
     pub help: Help,
     pub filter: Filter,
     pub start_sniffing: bool,
-    pub packets: Arc<Mutex<Vec<AppPacket>>>,
+    pub packets: Arc<Mutex<Vec<NetworkPacket>>>,
     pub notifications: Vec<Notification>,
     pub section: Section,
     pub data_channel_sender: kanal::Sender<[u8; RawPacket::LEN]>,
@@ -54,34 +65,37 @@ impl Default for App {
 
 impl App {
     pub fn new() -> Self {
-        let packets = Arc::new(Mutex::new(Vec::with_capacity(AppPacket::LEN * 1024 * 1024)));
+        let net_packets: Arc<Mutex<Vec<NetworkPacket>>> = Arc::new(Mutex::new(Vec::with_capacity(
+            NetworkPacket::LEN * 1024 * 1024,
+        )));
+        let data_channels = Channels::new();
 
-        let (sender, receiver) = kanal::unbounded();
-
-        let firewall_channels = IoChannels::new();
         thread::spawn({
-            let packets = packets.clone();
+            let net_packets = net_packets.clone();
             move || loop {
-                if let Ok(raw_packet) = receiver.recv() {
-                    let app_packet = AppPacket::from(raw_packet);
-                    let mut packets = packets.lock().unwrap();
-                    if packets.len() == packets.capacity() {
-                        packets.reserve(1024 * 1024);
+                if let Ok(raw_packet) = data_channels.receiver.recv() {
+                    let network_packet = NetworkPacket::from(raw_packet);
+                    let mut net_packets = net_packets.lock().unwrap();
+                    if net_packets.len() == net_packets.capacity() {
+                        net_packets.reserve(1024 * 1024);
                     }
-                    packets.push(app_packet);
+
+                    net_packets.push(network_packet);
                 }
             }
         });
+
+        let firewall_channels = IoChannels::new();
 
         Self {
             running: true,
             help: Help::new(),
             filter: Filter::new(firewall_channels.clone()),
             start_sniffing: false,
-            packets: packets.clone(),
+            packets: net_packets.clone(),
             notifications: Vec::new(),
-            section: Section::new(packets.clone(), firewall_channels.clone()),
-            data_channel_sender: sender,
+            section: Section::new(net_packets.clone(), firewall_channels.clone()),
+            data_channel_sender: data_channels.sender,
             is_editing: false,
             active_popup: None,
         }
