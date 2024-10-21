@@ -4,46 +4,67 @@ on:
   push:
     tags:
       - "*"
+
+env:
+  RUST_TC_CHANNEL: stable
+
 jobs:
   build:
-    permissions:
-      contents: write
+    strategy:
+      matrix:
+        architecture: [x86_64, aarch64]
+        libc: [gnu, musl]
     continue-on-error: false
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - uses: cargo-bins/cargo-binstall@main
+      # Install LLVM 19
+      - name: Install LLVM 19
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          UBUNTU_CODENAME=$(lsb_release -cs)
+          echo "deb [signed-by=/usr/share/keyrings/llvm-archive-keyring.gpg] http://apt.llvm.org/$UBUNTU_CODENAME/ llvm-toolchain-$UBUNTU_CODENAME-19 main" | sudo tee /etc/apt/sources.list.d/llvm.list
+          curl -fsSL https://apt.llvm.org/llvm-snapshot.gpg.key | sudo gpg --dearmor -o /usr/share/keyrings/llvm-archive-keyring.gpg
+          sudo apt-get update
+          sudo apt-get install -y llvm-19 llvm-19-dev llvm-19-tools llvm-19-dev libpolly-19-dev lld-19 clang-19
+
+      - name: Install extra apt dependencies
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y podman binutils-aarch64-linux-gnu binutils-x86-64-linux-gnu musl-tools libc6-amd64-cross libc6-arm64-cross libc6
 
       - uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: nightly
+          toolchain: ${{ env.RUST_TC_CHANNEL }}
           components: clippy rustfmt
 
       - name: Install the dependencies
         run: |
-          sudo apt update
-          sudo apt install -y podman binutils-aarch64-linux-gnu musl-tools
-          cargo binstall -y cross
-          cargo binstall -y bpf-linker
+          cargo install cross
+          cargo install bpf-linker
 
       - name: Build oryx-ebpf
         run: cargo xtask build-ebpf --release
 
-      - name: Build for arm64 musl
+      - name: Build for ${{ matrix.architecture }} using ${{ matrix.libc }} libc
+        env:
+          CROSS_CONTAINER_ENGINE: podman
         run: |
-          CROSS_CONTAINER_ENGINE=podman cross build --target aarch64-unknown-linux-musl --release
-          cp target/aarch64-unknown-linux-musl/release/oryx oryx-aarch64-unknown-linux-musl
+          cross +${{ env.RUST_TC_CHANNEL }} build --target ${{ matrix.architecture }}-unknown-linux-${{ matrix.libc }} --release
+          cp -v target/${{ matrix.architecture }}-unknown-linux-${{ matrix.libc }}/release/oryx oryx-${{ matrix.architecture }}-unknown-linux-${{ matrix.libc }}
 
-      - name: Build for x86_64 musl
+      - name: Verify the binaries
         run: |
-          CROSS_CONTAINER_ENGINE=podman cross build --target x86_64-unknown-linux-musl --release
-          cp target/x86_64-unknown-linux-musl/release/oryx oryx-x86_64-unknown-linux-musl
+          file oryx-*-unknown-linux-*
 
-      - name: Upload Binary
+      - name: Upload binary
         uses: softprops/action-gh-release@v2
         with:
-          files: "oryx*"
+          files: "oryx-${{ matrix.architecture }}-unknown-linux-${{ matrix.libc }}"
           body: |
             [Release.md](${{ github.server_url }}/${{ github.repository }}/blob/main/Release.md)
