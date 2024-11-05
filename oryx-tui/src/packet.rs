@@ -1,9 +1,11 @@
+pub mod direction;
 pub mod link;
 pub mod network;
 pub mod transport;
 
 use std::{fmt::Display, mem, net::Ipv4Addr};
 
+use direction::TrafficDirection;
 use link::{ArpPacket, ArpType, MacAddr};
 use network::{IcmpPacket, IcmpType, IpPacket, IpProto, Ipv4Packet, Ipv6Packet};
 use network_types::ip::IpHdr;
@@ -11,16 +13,27 @@ use oryx_common::{ProtoHdr, RawPacket};
 use transport::{TcpPacket, UdpPacket};
 
 #[derive(Debug, Copy, Clone)]
-pub enum AppPacket {
-    Ip(IpPacket),
-    Arp(ArpPacket),
+pub struct AppPacket {
+    pub packet: NetworkPacket,
+    pub pid: Option<usize>,
+    pub direction: TrafficDirection,
 }
 
 impl AppPacket {
     pub const LEN: usize = mem::size_of::<Self>();
 }
 
-impl Display for AppPacket {
+#[derive(Debug, Copy, Clone)]
+pub enum NetworkPacket {
+    Ip(IpPacket),
+    Arp(ArpPacket),
+}
+
+impl NetworkPacket {
+    pub const LEN: usize = mem::size_of::<Self>();
+}
+
+impl Display for NetworkPacket {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             Self::Arp(packet) => write!(f, "{}", packet),
@@ -29,7 +42,20 @@ impl Display for AppPacket {
     }
 }
 
-impl From<[u8; RawPacket::LEN]> for AppPacket {
+impl Display for AppPacket {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self.pid {
+            Some(pid) => {
+                write!(f, "{} {}", self.packet, pid)
+            }
+            None => {
+                write!(f, "{}", self.packet)
+            }
+        }
+    }
+}
+
+impl From<[u8; RawPacket::LEN]> for NetworkPacket {
     fn from(value: [u8; RawPacket::LEN]) -> Self {
         let raw_packet = value.as_ptr() as *const RawPacket;
         match unsafe { &*raw_packet } {
@@ -87,7 +113,7 @@ impl From<[u8; RawPacket::LEN]> for AppPacket {
                         }
                     };
 
-                    AppPacket::Ip(IpPacket::V4(Ipv4Packet {
+                    NetworkPacket::Ip(IpPacket::V4(Ipv4Packet {
                         src_ip,
                         dst_ip,
                         ihl: u8::from_be(ipv4_packet.ihl()),
@@ -153,7 +179,7 @@ impl From<[u8; RawPacket::LEN]> for AppPacket {
                         }
                     };
 
-                    AppPacket::Ip(IpPacket::V6(Ipv6Packet {
+                    NetworkPacket::Ip(IpPacket::V6(Ipv6Packet {
                         traffic_class: ipv6_packet.priority(),
                         flow_label: ipv6_packet.flow_label,
                         payload_length: u16::from_be(ipv6_packet.payload_len),

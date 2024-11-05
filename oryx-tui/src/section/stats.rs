@@ -17,10 +17,10 @@ use ratatui::{
 use crate::{
     bandwidth::Bandwidth,
     dns::get_hostname,
-    interface::NetworkInterface,
     packet::{
+        direction::TrafficDirection,
         network::{IpPacket, IpProto},
-        AppPacket,
+        AppPacket, NetworkPacket,
     },
 };
 
@@ -41,7 +41,7 @@ pub struct Stats {
 }
 
 impl Stats {
-    pub fn new(packets: Arc<Mutex<Vec<AppPacket>>>, selected_interface: NetworkInterface) -> Self {
+    pub fn new(packets: Arc<Mutex<Vec<AppPacket>>>) -> Self {
         let packet_stats: Arc<Mutex<PacketStats>> = Arc::new(Mutex::new(PacketStats::default()));
 
         thread::spawn({
@@ -51,24 +51,23 @@ impl Stats {
                 loop {
                     thread::sleep(Duration::from_millis(500));
 
-                    let packets = { packets.lock().unwrap().clone() };
+                    let app_packets = { packets.lock().unwrap().clone() };
 
-                    if packets.is_empty() {
+                    if app_packets.is_empty() {
                         continue;
                     }
                     let mut packet_stats = packet_stats.lock().unwrap();
-                    for packet in packets[last_index..].iter() {
-                        match packet {
-                            AppPacket::Arp(_) => {
+
+                    for app_packet in app_packets[last_index..].iter() {
+                        match app_packet.packet {
+                            NetworkPacket::Arp(_) => {
                                 packet_stats.link.arp += 1;
                             }
-                            AppPacket::Ip(packet) => match packet {
+                            NetworkPacket::Ip(packet) => match packet {
                                 IpPacket::V4(ipv4_packet) => {
                                     packet_stats.network.ipv4 += 1;
 
-                                    if !ipv4_packet.dst_ip.is_private()
-                                        && !ipv4_packet.dst_ip.is_loopback()
-                                    {
+                                    if app_packet.direction == TrafficDirection::Egress {
                                         if let Some((_, counts)) = packet_stats
                                             .addresses
                                             .get_mut(&IpAddr::V4(ipv4_packet.dst_ip))
@@ -103,10 +102,7 @@ impl Stats {
                                 IpPacket::V6(ipv6_packet) => {
                                     packet_stats.network.ipv6 += 1;
 
-                                    if !selected_interface
-                                        .addresses
-                                        .contains(&IpAddr::V6(ipv6_packet.dst_ip))
-                                    {
+                                    if app_packet.direction == TrafficDirection::Egress {
                                         if let Some((_, counts)) = packet_stats
                                             .addresses
                                             .get_mut(&IpAddr::V6(ipv6_packet.dst_ip))
@@ -144,7 +140,7 @@ impl Stats {
                         packet_stats.total += 1;
                     }
 
-                    last_index = packets.len() - 1;
+                    last_index = app_packets.len() - 1;
                 }
             }
         });

@@ -20,7 +20,7 @@ use crate::{
     notification::{Notification, NotificationLevel},
     packet::{
         network::{IpPacket, IpProto},
-        AppPacket,
+        AppPacket, NetworkPacket,
     },
 };
 
@@ -332,15 +332,15 @@ impl Inspection {
         let packets: Vec<Row> = if fuzzy.is_enabled() & !fuzzy.filter.value().is_empty() {
             packets_to_display
                 .iter()
-                .map(|app_packet| match app_packet {
-                    AppPacket::Arp(packet) => Row::new(vec![
+                .map(|app_packet| match app_packet.packet {
+                    NetworkPacket::Arp(packet) => Row::new(vec![
                         fuzzy::highlight(pattern, packet.src_mac.to_string()).blue(),
                         Cell::from(Line::from("-").centered()).yellow(),
                         fuzzy::highlight(pattern, packet.dst_mac.to_string()).blue(),
                         Cell::from(Line::from("-").centered()).yellow(),
                         fuzzy::highlight(pattern, "ARP".to_string()).cyan(),
                     ]),
-                    AppPacket::Ip(packet) => match packet {
+                    NetworkPacket::Ip(packet) => match packet {
                         IpPacket::V4(ipv4_packet) => match ipv4_packet.proto {
                             IpProto::Tcp(p) => Row::new(vec![
                                 fuzzy::highlight(pattern, ipv4_packet.src_ip.to_string()).blue(),
@@ -393,8 +393,8 @@ impl Inspection {
         } else {
             packets_to_display
                 .iter()
-                .map(|app_packet| match app_packet {
-                    AppPacket::Arp(packet) => Row::new(vec![
+                .map(|app_packet| match app_packet.packet {
+                    NetworkPacket::Arp(packet) => Row::new(vec![
                         Span::from(packet.src_mac.to_string())
                             .into_centered_line()
                             .blue(),
@@ -405,7 +405,7 @@ impl Inspection {
                         Span::from("-").into_centered_line().yellow(),
                         Span::from("ARP".to_string()).into_centered_line().cyan(),
                     ]),
-                    AppPacket::Ip(packet) => match packet {
+                    NetworkPacket::Ip(packet) => match packet {
                         IpPacket::V4(ipv4_packet) => match ipv4_packet.proto {
                             IpProto::Tcp(p) => Row::new(vec![
                                 Span::from(ipv4_packet.src_ip.to_string())
@@ -527,7 +527,7 @@ impl Inspection {
             )
             .column_spacing(2)
             .flex(Flex::SpaceBetween)
-            .highlight_style(Style::new().bg(ratatui::style::Color::DarkGray))
+            .row_highlight_style(Style::new().bg(ratatui::style::Color::DarkGray))
             .highlight_spacing(HighlightSpacing::Always)
             .block(Block::default().padding(Padding::uniform(1)));
 
@@ -657,9 +657,9 @@ impl Inspection {
                 .border_type(BorderType::Thick),
             block,
         );
-        match packet {
-            AppPacket::Ip(ip_packet) => ip_packet.render(block, frame),
-            AppPacket::Arp(arp_packet) => arp_packet.render(block, frame),
+        match packet.packet {
+            NetworkPacket::Ip(ip_packet) => ip_packet.render(block, frame),
+            NetworkPacket::Arp(arp_packet) => arp_packet.render(block, frame),
         };
     }
 }

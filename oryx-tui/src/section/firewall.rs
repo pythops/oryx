@@ -15,7 +15,7 @@ use std::{fs, net::IpAddr, num::ParseIntError, os::unix::fs::chown, str::FromStr
 use tui_input::{backend::crossterm::EventHandler, Input};
 use uuid;
 
-use crate::{app::AppResult, filter::direction::TrafficDirection, notification::Notification};
+use crate::{app::AppResult, notification::Notification, packet::direction::TrafficDirection};
 
 #[derive(Debug, Clone)]
 pub enum FirewallSignal {
@@ -682,7 +682,7 @@ impl Firewall {
         let table = Table::new(rows, widths)
             .column_spacing(2)
             .flex(Flex::SpaceBetween)
-            .highlight_style(Style::default().bg(Color::DarkGray))
+            .row_highlight_style(Style::default().bg(Color::DarkGray))
             .header(
                 Row::new(vec![
                     Line::from("Name").centered().blue(),

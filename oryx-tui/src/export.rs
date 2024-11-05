@@ -8,7 +8,7 @@ use crate::{
     app::AppResult,
     packet::{
         network::{IpPacket, IpProto},
-        AppPacket,
+        AppPacket, NetworkPacket,
     },
 };
 
@@ -39,8 +39,8 @@ pub fn export(packets: &[AppPacket]) -> AppResult<()> {
         headers.0, headers.1, headers.2, headers.3, headers.4
     )?;
     for packet in packets {
-        match packet {
-            AppPacket::Arp(p) => {
+        match packet.packet {
+            NetworkPacket::Arp(p) => {
                 writeln!(
                     file,
                     "{:39}  {:^11}  {:39}  {:^11}  ARP",
@@ -50,7 +50,7 @@ pub fn export(packets: &[AppPacket]) -> AppResult<()> {
                     "-"
                 )?;
             }
-            AppPacket::Ip(packet) => match packet {
+            NetworkPacket::Ip(packet) => match packet {
                 IpPacket::V4(ipv4_packet) => match ipv4_packet.proto {
                     IpProto::Tcp(p) => {
                         writeln!(

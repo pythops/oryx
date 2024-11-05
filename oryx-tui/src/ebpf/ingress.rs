@@ -19,6 +19,7 @@ use crate::{
     event::Event,
     filter::FilterChannelSignal,
     notification::{Notification, NotificationLevel},
+    packet::direction::TrafficDirection,
     section::firewall::FirewallSignal,
 };
 use mio::{unix::SourceFd, Events, Interest, Poll, Token};
@@ -31,7 +32,7 @@ use super::{
 pub fn load_ingress(
     iface: String,
     notification_sender: kanal::Sender<Event>,
-    data_sender: kanal::Sender<[u8; RawPacket::LEN]>,
+    data_sender: kanal::Sender<([u8; RawPacket::LEN], TrafficDirection)>,
     filter_channel_receiver: kanal::Receiver<FilterChannelSignal>,
     firewall_ingress_receiver: kanal::Receiver<FirewallSignal>,
     terminate: Arc<AtomicBool>,
@@ -225,7 +226,7 @@ pub fn load_ingress(
                                 break;
                             }
                             let packet: [u8; RawPacket::LEN] = item.to_owned().try_into().unwrap();
-                            data_sender.send(packet).ok();
+                            data_sender.send((packet, TrafficDirection::Ingress)).ok();
                         }
                     }
                 }

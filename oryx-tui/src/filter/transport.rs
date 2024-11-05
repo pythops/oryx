@@ -119,7 +119,7 @@ impl TransportFilter {
         ];
 
         let table = Table::new(transport_filters, widths)
-            .highlight_style(Style::new().bg(ratatui::style::Color::DarkGray));
+            .row_highlight_style(Style::new().bg(ratatui::style::Color::DarkGray));
 
         frame.render_widget(
             Block::new()

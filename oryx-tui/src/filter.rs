@@ -5,7 +5,7 @@ mod network;
 mod transport;
 
 use crossterm::event::{KeyCode, KeyEvent};
-use direction::{TrafficDirection, TrafficDirectionFilter};
+use direction::TrafficDirectionFilter;
 use link::LinkFilter;
 use network::NetworkFilter;
 use oryx_common::{
@@ -30,6 +30,7 @@ use crate::{
     ebpf::{egress::load_egress, ingress::load_ingress},
     event::Event,
     interface::Interface,
+    packet::direction::TrafficDirection,
     section::firewall::FirewallSignal,
 };
 
@@ -145,7 +146,7 @@ impl Filter {
     pub fn start(
         &mut self,
         notification_sender: kanal::Sender<Event>,
-        data_sender: kanal::Sender<[u8; RawPacket::LEN]>,
+        data_sender: kanal::Sender<([u8; RawPacket::LEN], TrafficDirection)>,
     ) -> AppResult<()> {
         let iface = self.interface.selected_interface.name.clone();
 
