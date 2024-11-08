@@ -1,0 +1,17 @@
+[package]
+name = "test-sockaddr-ebpf"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+test-sockaddr-common = { path = "../test-sockaddr-common" }
+
+aya-ebpf = { workspace = true }
+aya-log-ebpf = { workspace = true }
+
+[build-dependencies]
+which = { workspace = true }
+
+[[bin]]
+name = "test-sockaddr"
+path = "src/main.rs"
