@@ -193,7 +193,7 @@ pub fn load_egress(
             });
 
             // packets reading
-            let mut ring_buf = RingBuffer::new(&mut bpf);
+            let mut ring_buf = RingBuffer::new(&mut bpf, "DATA");
 
             poll.registry()
                 .register(

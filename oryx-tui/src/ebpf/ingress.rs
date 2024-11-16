@@ -197,7 +197,7 @@ pub fn load_ingress(
             });
 
             // packets reader
-            let mut ring_buf = RingBuffer::new(&mut bpf);
+            let mut ring_buf = RingBuffer::new(&mut bpf, "DATA");
 
             poll.registry()
                 .register(

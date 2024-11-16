@@ -1,6 +1,7 @@
 pub mod egress;
 mod firewall;
 pub mod ingress;
+pub mod pid;
 
 use std::{io, os::fd::AsRawFd};
 
@@ -16,8 +17,8 @@ pub struct RingBuffer<'a> {
 }
 
 impl<'a> RingBuffer<'a> {
-    fn new(ebpf: &'a mut Ebpf) -> Self {
-        let buffer = RingBuf::try_from(ebpf.map_mut("DATA").unwrap()).unwrap();
+    fn new(ebpf: &'a mut Ebpf, name: &'a str) -> Self {
+        let buffer = RingBuf::try_from(ebpf.map_mut(name).unwrap()).unwrap();
         Self { buffer }
     }
 

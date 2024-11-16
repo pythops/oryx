@@ -3,9 +3,10 @@
 
 use aya_ebpf::{
     bindings::{TC_ACT_PIPE, TC_ACT_SHOT},
-    macros::{classifier, map},
+    macros::{cgroup_sock_addr, classifier, map},
     maps::{Array, HashMap, RingBuf},
-    programs::TcContext,
+    programs::{SockAddrContext, TcContext},
+    EbpfContext,
 };
 use core::mem;
 use network_types::{
@@ -23,6 +24,9 @@ use oryx_common::{
 
 #[map]
 static DATA: RingBuf = RingBuf::with_byte_size(4096 * RawPacket::LEN as u32, 0);
+
+#[map]
+static PID_DATA: RingBuf = RingBuf::with_byte_size(1024, 0);
 
 #[map]
 static NETWORK_FILTERS: Array<u32> = Array::with_max_entries(8, 0);
@@ -304,6 +308,24 @@ fn process(ctx: TcContext) -> Result<i32, ()> {
     };
 
     Ok(TC_ACT_PIPE)
+}
+
+#[cgroup_sock_addr(connect4)]
+pub fn socket_connect(ctx: SockAddrContext) -> i32 {
+    match sock_connect(ctx) {
+        Ok(ret) => ret,
+        Err(ret) => ret,
+    }
+}
+
+fn sock_connect(ctx: SockAddrContext) -> Result<i32, i32> {
+    let pid = ctx.pid();
+
+    if let Some(mut buf) = PID_DATA.reserve::<u32>(0) {
+        unsafe { (*buf.as_mut_ptr()) = pid };
+        buf.submit(0);
+    }
+    Ok(1)
 }
 
 #[panic_handler]

@@ -5,6 +5,7 @@ use std::{
 
 use crate::{
     app::{ActivePopup, App, AppResult},
+    ebpf::pid::load_pid,
     event::Event,
     filter::FocusedBlock,
     section::{stats::Stats, FocusedSection},
@@ -24,6 +25,11 @@ pub fn handle_key_events(
                     app.section.stats = Some(Stats::new(app.packets.clone()));
                     app.filter
                         .start(event_sender.clone(), app.data_channel_sender.clone())?;
+                    load_pid(
+                        app.pid_map.clone(),
+                        event_sender.clone(),
+                        app.pid_terminate.clone(),
+                    );
 
                     sleep(Duration::from_millis(100));
                     app.start_sniffing = true;

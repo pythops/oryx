@@ -5,7 +5,7 @@ use ratatui::{
 };
 use std::{
     error,
-    sync::{Arc, Mutex},
+    sync::{atomic::AtomicBool, Arc, Mutex},
     thread,
     time::Duration,
 };
@@ -14,7 +14,7 @@ use crate::{
     filter::Filter,
     help::Help,
     packet::{direction::TrafficDirection, NetworkPacket},
-    pid,
+    pid::{self, ConnectionMap},
 };
 
 use crate::{filter::IoChannels, notification::Notification};
@@ -50,6 +50,8 @@ pub struct App {
     pub data_channel_sender: kanal::Sender<([u8; RawPacket::LEN], TrafficDirection)>,
     pub is_editing: bool,
     pub active_popup: Option<ActivePopup>,
+    pub pid_terminate: Arc<AtomicBool>,
+    pub pid_map: Arc<Mutex<ConnectionMap>>,
 }
 
 impl Default for App {
@@ -61,19 +63,24 @@ impl Default for App {
 impl App {
     pub fn new() -> Self {
         let packets = Arc::new(Mutex::new(Vec::with_capacity(RawPacket::LEN * 1024 * 1024)));
+        let pid_map = Arc::new(Mutex::new(ConnectionMap::new()));
 
         let (sender, receiver) = kanal::unbounded();
 
         let firewall_channels = IoChannels::new();
         thread::spawn({
             let packets = packets.clone();
+            let pid_map = pid_map.clone();
             move || loop {
-                let pid_map = pid::ConnectionMap::new();
                 if let Ok((raw_packet, direction)) = receiver.recv() {
                     let network_packet = NetworkPacket::from(raw_packet);
 
                     let pid = {
                         if direction == TrafficDirection::Egress {
+                            let pid_map = {
+                                let map = pid_map.lock().unwrap();
+                                map.clone()
+                            };
                             pid::get_pid(network_packet, &pid_map)
                         } else {
                             None
@@ -107,6 +114,8 @@ impl App {
             data_channel_sender: sender,
             is_editing: false,
             active_popup: None,
+            pid_terminate: Arc::new(AtomicBool::new(false)),
+            pid_map,
         }
     }
 
@@ -147,6 +156,8 @@ impl App {
 
     pub fn quit(&mut self) {
         self.filter.terminate();
+        self.pid_terminate
+            .store(true, std::sync::atomic::Ordering::Relaxed);
         thread::sleep(Duration::from_millis(110));
         self.running = false;
     }
