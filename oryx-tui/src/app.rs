@@ -14,7 +14,9 @@ use crate::{
     filter::Filter,
     help::Help,
     packet::{direction::TrafficDirection, NetworkPacket},
+    pid,
 };
+
 use crate::{filter::IoChannels, notification::Notification};
 use crate::{packet::AppPacket, section::Section};
 
@@ -66,17 +68,29 @@ impl App {
         thread::spawn({
             let packets = packets.clone();
             move || loop {
+                let pid_map = pid::ConnectionMap::new();
                 if let Ok((raw_packet, direction)) = receiver.recv() {
                     let network_packet = NetworkPacket::from(raw_packet);
+
+                    let pid = {
+                        if direction == TrafficDirection::Egress {
+                            pid::get_pid(network_packet, &pid_map)
+                        } else {
+                            None
+                        }
+                    };
+
                     let app_packet = AppPacket {
                         packet: network_packet,
-                        pid: None,
+                        pid,
                         direction,
                     };
+
                     let mut packets = packets.lock().unwrap();
                     if packets.len() == packets.capacity() {
                         packets.reserve(1024 * 1024);
                     }
+
                     packets.push(app_packet);
                 }
             }

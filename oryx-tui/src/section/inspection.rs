@@ -259,6 +259,7 @@ impl Inspection {
             Constraint::Min(19),    // Destination Address
             Constraint::Length(16), // Destination Port
             Constraint::Length(8),  // Protocol
+            Constraint::Length(8),  // Pid
             Constraint::Length(3),  // manual scroll sign
         ];
 
@@ -348,6 +349,13 @@ impl Inspection {
                                 fuzzy::highlight(pattern, ipv4_packet.dst_ip.to_string()).blue(),
                                 fuzzy::highlight(pattern, p.dst_port.to_string()).yellow(),
                                 fuzzy::highlight(pattern, "TCP".to_string()).cyan(),
+                                {
+                                    if let Some(pid) = app_packet.pid {
+                                        fuzzy::highlight(pattern, pid.to_string()).cyan()
+                                    } else {
+                                        Cell::from(Line::from("-").centered()).yellow()
+                                    }
+                                },
                             ]),
                             IpProto::Udp(p) => Row::new(vec![
                                 fuzzy::highlight(pattern, ipv4_packet.src_ip.to_string()).blue(),
@@ -355,6 +363,13 @@ impl Inspection {
                                 fuzzy::highlight(pattern, ipv4_packet.dst_ip.to_string()).blue(),
                                 fuzzy::highlight(pattern, p.dst_port.to_string()).yellow(),
                                 fuzzy::highlight(pattern, "UDP".to_string()).cyan(),
+                                {
+                                    if let Some(pid) = app_packet.pid {
+                                        fuzzy::highlight(pattern, pid.to_string()).cyan()
+                                    } else {
+                                        Cell::from(Line::from("-").centered()).yellow()
+                                    }
+                                },
                             ]),
                             IpProto::Icmp(_) => Row::new(vec![
                                 fuzzy::highlight(pattern, ipv4_packet.src_ip.to_string()).blue(),
@@ -362,6 +377,7 @@ impl Inspection {
                                 fuzzy::highlight(pattern, ipv4_packet.dst_ip.to_string()).blue(),
                                 Cell::from(Line::from("-").centered()).yellow(),
                                 fuzzy::highlight(pattern, "ICMP".to_string()).cyan(),
+                                Cell::from(Line::from("-").centered()).yellow(),
                             ]),
                         },
                         IpPacket::V6(ipv6_packet) => match ipv6_packet.proto {
@@ -371,6 +387,7 @@ impl Inspection {
                                 fuzzy::highlight(pattern, ipv6_packet.dst_ip.to_string()).blue(),
                                 fuzzy::highlight(pattern, p.dst_port.to_string()).yellow(),
                                 fuzzy::highlight(pattern, "TCP".to_string()).cyan(),
+                                Cell::from(Line::from("-").centered()).yellow(),
                             ]),
                             IpProto::Udp(p) => Row::new(vec![
                                 fuzzy::highlight(pattern, ipv6_packet.src_ip.to_string()).blue(),
@@ -378,6 +395,7 @@ impl Inspection {
                                 fuzzy::highlight(pattern, ipv6_packet.dst_ip.to_string()).blue(),
                                 fuzzy::highlight(pattern, p.dst_port.to_string()).yellow(),
                                 fuzzy::highlight(pattern, "UDP".to_string()).cyan(),
+                                Cell::from(Line::from("-").centered()).yellow(),
                             ]),
                             IpProto::Icmp(_) => Row::new(vec![
                                 fuzzy::highlight(pattern, ipv6_packet.src_ip.to_string()).blue(),
@@ -385,6 +403,7 @@ impl Inspection {
                                 fuzzy::highlight(pattern, ipv6_packet.dst_ip.to_string()).blue(),
                                 Cell::from(Line::from("-").centered()).yellow(),
                                 fuzzy::highlight(pattern, "ICMP".to_string()).cyan(),
+                                Cell::from(Line::from("-").centered()).yellow(),
                             ]),
                         },
                     },
@@ -421,6 +440,13 @@ impl Inspection {
                                     .into_centered_line()
                                     .yellow(),
                                 Span::from("TCP".to_string()).into_centered_line().cyan(),
+                                {
+                                    if let Some(pid) = app_packet.pid {
+                                        Span::from(pid.to_string()).into_centered_line().yellow()
+                                    } else {
+                                        Span::from("-".to_string()).into_centered_line().yellow()
+                                    }
+                                },
                             ]),
                             IpProto::Udp(p) => Row::new(vec![
                                 Span::from(ipv4_packet.src_ip.to_string())
@@ -436,6 +462,13 @@ impl Inspection {
                                     .into_centered_line()
                                     .yellow(),
                                 Span::from("UDP".to_string()).into_centered_line().cyan(),
+                                {
+                                    if let Some(pid) = app_packet.pid {
+                                        Span::from(pid.to_string()).into_centered_line().yellow()
+                                    } else {
+                                        Span::from("-".to_string()).into_centered_line().yellow()
+                                    }
+                                },
                             ]),
                             IpProto::Icmp(_) => Row::new(vec![
                                 Span::from(ipv4_packet.src_ip.to_string())
@@ -514,6 +547,7 @@ impl Inspection {
                     Line::from("Destination Address").centered(),
                     Line::from("Destination Port").centered(),
                     Line::from("Protocol").centered(),
+                    Line::from("Pid").centered(),
                     {
                         if self.manuall_scroll {
                             Line::from("󰹆").centered().yellow()
