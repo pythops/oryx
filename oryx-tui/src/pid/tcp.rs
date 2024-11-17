@@ -13,7 +13,7 @@ pub struct TcpConnectionMap {
 }
 
 impl TcpConnectionMap {
-    fn inode_map() -> HashMap<usize, u64> {
+    pub fn inode_map() -> HashMap<usize, u64> {
         let mut map = HashMap::new();
         let mut file = File::open("/proc/net/tcp").unwrap();
         let mut buffer = String::new();

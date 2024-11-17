@@ -65,8 +65,8 @@ fn decode_hex_port(hex_str: &str) -> Result<u16, ParseIntError> {
 
 #[derive(Clone, Debug)]
 pub struct ConnectionMap {
-    tcp: TcpConnectionMap,
-    udp: UdpConnectionMap,
+    pub tcp: TcpConnectionMap,
+    pub udp: UdpConnectionMap,
 }
 
 impl ConnectionMap {

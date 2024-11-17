@@ -16,7 +16,7 @@ use log::error;
 use crate::{
     event::Event,
     notification::{Notification, NotificationLevel},
-    pid::ConnectionMap,
+    pid::{tcp::TcpConnectionMap, udp::UdpConnectionMap, ConnectionMap},
 };
 use mio::{unix::SourceFd, Events, Interest, Poll, Token};
 
@@ -115,9 +115,44 @@ pub fn load_pid(
                             let pid = u32::from_ne_bytes(pid);
 
                             let fd_dir = format!("/proc/{}/fd", pid);
-                            if let Ok(_fds) = fs::read_dir(&fd_dir) {
+                            if let Ok(fds) = fs::read_dir(&fd_dir) {
                                 let mut map = pid_map.lock().unwrap();
-                                *map = ConnectionMap::new();
+                                let tcp_inode_map = TcpConnectionMap::inode_map();
+                                let udp_inode_map = UdpConnectionMap::inode_map();
+
+                                for fd in fds.flatten() {
+                                    let link_path = fd.path();
+
+                                    if let Ok(link_target) = fs::read_link(&link_path) {
+                                        if let Some(inode_str) = link_target.to_str() {
+                                            if inode_str.starts_with("socket:[")
+                                                && inode_str.ends_with(']')
+                                            {
+                                                if let Ok(inode) = inode_str[8..inode_str.len() - 1]
+                                                    .parse::<usize>()
+                                                {
+                                                    if let Some(connection_hash) =
+                                                        tcp_inode_map.get(&inode)
+                                                    {
+                                                        map.tcp.map.insert(
+                                                            *connection_hash,
+                                                            pid.try_into().unwrap(),
+                                                        );
+                                                    }
+
+                                                    if let Some(connection_hash) =
+                                                        udp_inode_map.get(&inode)
+                                                    {
+                                                        map.udp.map.insert(
+                                                            *connection_hash,
+                                                            pid.try_into().unwrap(),
+                                                        );
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }

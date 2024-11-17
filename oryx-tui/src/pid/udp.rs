@@ -13,7 +13,7 @@ pub struct UdpConnectionMap {
 }
 
 impl UdpConnectionMap {
-    fn inode_map() -> HashMap<usize, u64> {
+    pub fn inode_map() -> HashMap<usize, u64> {
         let mut map = HashMap::new();
         let mut file = File::open("/proc/net/udp").unwrap();
         let mut buffer = String::new();
