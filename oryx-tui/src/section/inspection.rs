@@ -527,7 +527,7 @@ impl Inspection {
             )
             .column_spacing(2)
             .flex(Flex::SpaceBetween)
-            .highlight_style(Style::new().bg(ratatui::style::Color::DarkGray))
+            .row_highlight_style(Style::new().bg(ratatui::style::Color::DarkGray))
             .highlight_spacing(HighlightSpacing::Always)
             .block(Block::default().padding(Padding::uniform(1)));
 

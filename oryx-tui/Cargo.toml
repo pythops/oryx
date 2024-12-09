@@ -10,9 +10,9 @@ edition.workspace = true
 
 [dependencies]
 crossterm = { version = "0.28", default-features = false }
-ratatui = "0.28"
-tui-big-text = "0.6"
-tui-input = "0.10"
+ratatui = "0.29"
+tui-big-text = "0.7"
+tui-input = "0.11"
 libc = "0.2"
 aya = "0.13"
 oryx-common = { path = "../oryx-common" }

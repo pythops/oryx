@@ -209,7 +209,7 @@ impl Interface {
                     .style(Style::new().bold())
                     .bottom_margin(1),
             )
-            .highlight_style(Style::new().bg(ratatui::style::Color::DarkGray))
+            .row_highlight_style(Style::new().bg(ratatui::style::Color::DarkGray))
             .column_spacing(3);
 
         frame.render_widget(

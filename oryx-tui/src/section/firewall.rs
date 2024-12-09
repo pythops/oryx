@@ -682,7 +682,7 @@ impl Firewall {
         let table = Table::new(rows, widths)
             .column_spacing(2)
             .flex(Flex::SpaceBetween)
-            .highlight_style(Style::default().bg(Color::DarkGray))
+            .row_highlight_style(Style::default().bg(Color::DarkGray))
             .header(
                 Row::new(vec![
                     Line::from("Name").centered().blue(),

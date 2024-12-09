@@ -121,7 +121,7 @@ impl TrafficDirectionFilter {
         ];
 
         let table = Table::new(filters, widths)
-            .highlight_style(Style::new().bg(ratatui::style::Color::DarkGray));
+            .row_highlight_style(Style::new().bg(ratatui::style::Color::DarkGray));
 
         frame.render_widget(
             Block::new()

@@ -102,7 +102,7 @@ impl LinkFilter {
         ])];
 
         let table = Table::new(link_filters, widths)
-            .highlight_style(Style::new().bg(ratatui::style::Color::DarkGray));
+            .row_highlight_style(Style::new().bg(ratatui::style::Color::DarkGray));
 
         frame.render_widget(
             Block::new()
