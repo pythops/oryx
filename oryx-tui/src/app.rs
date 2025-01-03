@@ -10,7 +10,11 @@ use std::{
     time::Duration,
 };
 
-use crate::{filter::Filter, help::Help};
+use crate::{
+    filter::Filter,
+    help::Help,
+    packet::{direction::TrafficDirection, NetworkPacket},
+};
 use crate::{filter::IoChannels, notification::Notification};
 use crate::{packet::AppPacket, section::Section};
 
@@ -41,7 +45,7 @@ pub struct App {
     pub packets: Arc<Mutex<Vec<AppPacket>>>,
     pub notifications: Vec<Notification>,
     pub section: Section,
-    pub data_channel_sender: kanal::Sender<[u8; RawPacket::LEN]>,
+    pub data_channel_sender: kanal::Sender<([u8; RawPacket::LEN], TrafficDirection)>,
     pub is_editing: bool,
     pub active_popup: Option<ActivePopup>,
 }
@@ -54,20 +58,25 @@ impl Default for App {
 
 impl App {
     pub fn new() -> Self {
-        let packets = Arc::new(Mutex::new(Vec::with_capacity(AppPacket::LEN * 1024 * 1024)));
+        let packets = Arc::new(Mutex::new(Vec::with_capacity(RawPacket::LEN * 1024 * 1024)));
 
         let (sender, receiver) = kanal::unbounded();
 
         let firewall_channels = IoChannels::new();
+
         thread::spawn({
             let packets = packets.clone();
             move || loop {
-                if let Ok(raw_packet) = receiver.recv() {
-                    let app_packet = AppPacket::from(raw_packet);
+                if let Ok((raw_packet, direction)) = receiver.recv() {
+                    let network_packet = NetworkPacket::from(raw_packet);
                     let mut packets = packets.lock().unwrap();
                     if packets.len() == packets.capacity() {
                         packets.reserve(1024 * 1024);
                     }
+                    let app_packet = AppPacket {
+                        packet: network_packet,
+                        direction,
+                    };
                     packets.push(app_packet);
                 }
             }

@@ -4,7 +4,6 @@ use core::mem;
 
 use network_types::{arp::ArpHdr, icmp::IcmpHdr, ip::IpHdr, tcp::TcpHdr, udp::UdpHdr};
 
-pub mod ip;
 pub mod protocols;
 
 pub const MAX_FIREWALL_RULES: u32 = 32;

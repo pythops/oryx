@@ -35,10 +35,10 @@ impl Fuzzy {
                 let mut pattern = String::new();
                 loop {
                     thread::sleep(Duration::from_millis(TICK_RATE));
-                    let packets = packets.lock().unwrap();
                     let mut fuzzy = fuzzy.lock().unwrap();
 
                     if fuzzy.is_enabled() && !fuzzy.filter.value().is_empty() {
+                        let packets = packets.lock().unwrap();
                         let current_pattern = fuzzy.filter.value().to_owned();
                         if current_pattern != pattern {
                             fuzzy.find(packets.as_slice());
@@ -98,7 +98,7 @@ impl Fuzzy {
         self.packets = packets
             .iter()
             .copied()
-            .filter(|p| p.to_string().contains(self.filter.value()))
+            .filter(|p| p.packet.to_string().contains(self.filter.value()))
             .collect::<Vec<AppPacket>>();
     }
 
@@ -107,7 +107,7 @@ impl Fuzzy {
             &mut packets
                 .iter()
                 .copied()
-                .filter(|p| p.to_string().contains(self.filter.value()))
+                .filter(|p| p.packet.to_string().contains(self.filter.value()))
                 .collect::<Vec<AppPacket>>(),
         );
     }

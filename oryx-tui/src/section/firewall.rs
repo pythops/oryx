@@ -15,7 +15,7 @@ use std::{fs, net::IpAddr, num::ParseIntError, os::unix::fs::chown, str::FromStr
 use tui_input::{backend::crossterm::EventHandler, Input};
 use uuid;
 
-use crate::{app::AppResult, filter::direction::TrafficDirection, notification::Notification};
+use crate::{app::AppResult, notification::Notification, packet::direction::TrafficDirection};
 
 #[derive(Debug, Clone)]
 pub enum FirewallSignal {

@@ -17,7 +17,7 @@ libc = "0.2"
 aya = "0.13"
 oryx-common = { path = "../oryx-common" }
 mio = { version = "1", features = ["os-poll", "os-ext"] }
-itertools = "0.13"
+itertools = "0.14"
 dirs = "5"
 kanal = "0.1.0-pre8"
 mimalloc = "0.1"

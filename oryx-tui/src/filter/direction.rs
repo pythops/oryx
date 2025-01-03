@@ -1,9 +1,6 @@
-use std::{
-    fmt::Display,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
 };
 
 use ratatui::{
@@ -12,7 +9,8 @@ use ratatui::{
     widgets::{Block, BorderType, Borders, Row, Table, TableState},
     Frame,
 };
-use serde::{Deserialize, Serialize};
+
+use crate::packet::direction::TrafficDirection;
 
 #[derive(Debug)]
 pub struct TrafficDirectionFilter {
@@ -21,21 +19,6 @@ pub struct TrafficDirectionFilter {
     pub applied_direction: Vec<TrafficDirection>,
     pub terminate_ingress: Arc<AtomicBool>,
     pub terminate_egress: Arc<AtomicBool>,
-}
-
-#[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize)]
-pub enum TrafficDirection {
-    Ingress,
-    Egress,
-}
-
-impl Display for TrafficDirection {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            TrafficDirection::Ingress => write!(f, "Ingress"),
-            TrafficDirection::Egress => write!(f, "Egress"),
-        }
-    }
 }
 
 impl Default for TrafficDirectionFilter {

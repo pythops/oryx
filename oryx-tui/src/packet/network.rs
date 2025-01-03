@@ -257,8 +257,8 @@ impl Ipv6Packet {
                 Span::styled("Flow Label", Style::new().bold()),
                 Span::from(format!(
                     "{:#0x}",
-                    (self.flow_label[0] as u32) << 16
-                        | (self.flow_label[1] as u32) << 8
+                    ((self.flow_label[0] as u32) << 16)
+                        | ((self.flow_label[1] as u32) << 8)
                         | (self.flow_label[2] as u32)
                 )),
             ]),

@@ -15,8 +15,9 @@ use ratatui::{
 };
 
 use crate::packet::{
+    direction::TrafficDirection,
     network::{IpPacket, IpProto},
-    AppPacket,
+    AppPacket, NetworkPacket,
 };
 
 const WIN_SIZE: usize = 100_000;
@@ -42,11 +43,18 @@ impl SynFlood {
                     let packets = packets.lock().unwrap();
                     packets.len().saturating_sub(1)
                 };
+
                 thread::sleep(Duration::from_secs(5));
+
                 let app_packets = {
                     let packets = packets.lock().unwrap();
                     packets.clone()
                 };
+
+                let app_packets: Vec<AppPacket> = app_packets
+                    .into_iter()
+                    .filter(|packet| packet.direction == TrafficDirection::Ingress)
+                    .collect();
 
                 let mut map = map.lock().unwrap();
                 map.clear();
@@ -59,8 +67,8 @@ impl SynFlood {
 
                 app_packets[start_index..app_packets.len().saturating_sub(1)]
                     .iter()
-                    .for_each(|packet| {
-                        if let AppPacket::Ip(ip_packet) = packet {
+                    .for_each(|app_packet| {
+                        if let NetworkPacket::Ip(ip_packet) = app_packet.packet {
                             if let IpPacket::V4(ipv4_packet) = ip_packet {
                                 if let IpProto::Tcp(tcp_packet) = ipv4_packet.proto {
                                     if tcp_packet.syn == 1 {
@@ -92,7 +100,8 @@ impl SynFlood {
                         }
                     });
 
-                if (nb_syn_packets as f64 / WIN_SIZE as f64) > 0.45 {
+                // 90% of incoming packets
+                if (nb_syn_packets as f64 / WIN_SIZE as f64) > 0.95 {
                     detected.store(true, std::sync::atomic::Ordering::Relaxed);
                 } else {
                     detected.store(false, std::sync::atomic::Ordering::Relaxed);
