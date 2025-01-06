@@ -71,9 +71,7 @@ pub fn handle_key_events(
                         app.is_editing = false;
                     }
                     ActivePopup::NewMetricExplorer => {
-                        app.section
-                            .metrics
-                            .handle_popup_keys(key_event, event_sender.clone())?;
+                        app.section.metrics.handle_popup_keys(key_event)?;
                         app.is_editing = false;
                     }
                     _ => {}
@@ -99,12 +97,7 @@ pub fn handle_key_events(
                     }
                 }
                 ActivePopup::NewMetricExplorer => {
-                    if app
-                        .section
-                        .metrics
-                        .handle_popup_keys(key_event, event_sender.clone())
-                        .is_ok()
-                    {
+                    if app.section.metrics.handle_popup_keys(key_event).is_ok() {
                         app.active_popup = None;
                         app.is_editing = false;
                     }
@@ -122,9 +115,7 @@ pub fn handle_key_events(
                         .handle_keys(key_event, event_sender.clone())?;
                 }
                 ActivePopup::NewMetricExplorer => {
-                    app.section
-                        .metrics
-                        .handle_popup_keys(key_event, event_sender.clone())?;
+                    app.section.metrics.handle_popup_keys(key_event)?;
                 }
                 _ => {}
             },

@@ -28,10 +28,36 @@ use crate::{
 
 #[derive(Debug)]
 pub struct Metrics {
-    user_input: Input,
+    user_input: UserInput,
     app_packets: Arc<Mutex<Vec<AppPacket>>>,
     port_count: Option<Arc<Mutex<PortCountMetric>>>,
     terminate: Arc<AtomicBool>,
+}
+
+#[derive(Debug, Clone, Default)]
+struct UserInput {
+    input: Input,
+    error: Option<String>,
+}
+
+impl UserInput {
+    fn validate(&mut self) -> AppResult<()> {
+        self.error = None;
+        if self.input.value().parse::<u16>().is_err() {
+            self.error = Some("Invalid Port".to_string());
+            return Err("Validation Error".into());
+        }
+        Ok(())
+    }
+
+    fn clear(&mut self) {
+        self.input.reset();
+        self.error = None;
+    }
+
+    fn value(&self) -> u16 {
+        self.input.value().parse().unwrap()
+    }
 }
 
 #[derive(Debug, Default, Clone)]
@@ -44,7 +70,7 @@ pub struct PortCountMetric {
 impl Metrics {
     pub fn new(packets: Arc<Mutex<Vec<AppPacket>>>) -> Self {
         Self {
-            user_input: Input::default(),
+            user_input: UserInput::default(),
             app_packets: packets,
             port_count: None,
             terminate: Arc::new(AtomicBool::new(false)),
@@ -107,25 +133,23 @@ impl Metrics {
             self.terminate
                 .store(true, std::sync::atomic::Ordering::Relaxed);
             self.port_count = None;
-            self.user_input.reset();
+            self.user_input.clear();
             self.terminate
                 .store(false, std::sync::atomic::Ordering::Relaxed);
         }
     }
 
-    pub fn handle_popup_keys(
-        &mut self,
-        key_event: KeyEvent,
-        _sender: kanal::Sender<crate::event::Event>,
-    ) -> AppResult<()> {
+    pub fn handle_popup_keys(&mut self, key_event: KeyEvent) -> AppResult<()> {
         match key_event.code {
             KeyCode::Esc => {
-                self.user_input.reset();
+                self.user_input.clear();
             }
 
             KeyCode::Enter => {
-                //TODO: validate input
-                let port: u16 = self.user_input.value().parse().unwrap();
+                self.user_input.validate()?;
+
+                let port: u16 = self.user_input.value();
+
                 let port_count = Arc::new(Mutex::new(PortCountMetric {
                     port,
                     tcp_count: 0,
@@ -198,7 +222,7 @@ impl Metrics {
             }
 
             _ => {
-                self.user_input.handle_event(&Event::Key(key_event));
+                self.user_input.input.handle_event(&Event::Key(key_event));
             }
         }
 
@@ -227,14 +251,28 @@ impl Metrics {
             .split(layout[1])[1];
 
         //TODO: Center
-        let rows = [Row::new(vec![
-            Cell::from("Packet Counter".to_string())
-                .bg(Color::DarkGray)
-                .fg(Color::White),
-            Cell::from(self.user_input.value())
-                .bg(Color::DarkGray)
-                .fg(Color::White),
-        ])];
+        let rows = [
+            Row::new(vec![
+                Cell::from("Packet Counter".to_string())
+                    .bg(Color::DarkGray)
+                    .fg(Color::White),
+                Cell::from(self.user_input.input.value())
+                    .bg(Color::DarkGray)
+                    .fg(Color::White),
+            ]),
+            Row::new(vec![Cell::new(""), Cell::new("")]),
+            Row::new(vec![
+                Cell::new(""),
+                Cell::from({
+                    if let Some(error) = &self.user_input.error {
+                        error.to_string()
+                    } else {
+                        String::new()
+                    }
+                })
+                .red(),
+            ]),
+        ];
 
         let widths = [Constraint::Percentage(49), Constraint::Percentage(49)];
 
