@@ -11,6 +11,7 @@ pub fn render(app: &mut App, frame: &mut Frame) {
             ActivePopup::PacketInfos => app.section.inspection.render_packet_infos_popup(frame),
             ActivePopup::UpdateFilters => app.filter.render_update_popup(frame),
             ActivePopup::NewFirewallRule => app.section.firewall.render_new_rule_popup(frame),
+            ActivePopup::NewMetricExplorer => app.section.metrics.render_new_rule_popup(frame),
         }
     }
     for (index, notification) in app.notifications.iter().enumerate() {
