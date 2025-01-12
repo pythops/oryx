@@ -14,7 +14,7 @@ use ratatui::{
     text::Line,
     widgets::{
         Bar, BarChart, BarGroup, Block, BorderType, Borders, Cell, Clear, HighlightSpacing,
-        Padding, Row, Table,
+        Padding, Row, Scrollbar, ScrollbarOrientation, ScrollbarState, Table,
     },
     Frame,
 };
@@ -125,7 +125,6 @@ impl Metrics {
             self.metrics[self.state.offset..self.state.offset + self.window_height].to_vec()
         };
 
-        // for (index, port_count_metric) in self.metrics[self.state.offset..].iter().enumerate() {
         for (index, port_count_metric) in metrics_to_display.iter().enumerate() {
             let metric = { port_count_metric.lock().unwrap().clone() };
 
@@ -177,6 +176,23 @@ impl Metrics {
                     horizontal: 0,
                     vertical: 1,
                 }),
+            );
+        }
+
+        if self.metrics.len() > self.window_height {
+            let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
+                .begin_symbol(Some("↑"))
+                .end_symbol(Some("↓"));
+
+            let mut scrollbar_state = ScrollbarState::new(self.metrics.len())
+                .position(self.state.offset * self.window_height);
+            frame.render_stateful_widget(
+                scrollbar,
+                block.inner(Margin {
+                    vertical: 1,
+                    horizontal: 0,
+                }),
+                &mut scrollbar_state,
             );
         }
     }
