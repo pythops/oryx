@@ -11,6 +11,7 @@
 - Real-time traffic inspection and visualization.
 - Comprehensive Traffic Statistics.
 - Firewall functionalities.
+- Metrics explorer.
 - Fuzzy search.
 
 ## 💡 Prerequisites
