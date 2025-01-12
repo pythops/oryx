@@ -215,7 +215,7 @@ impl Metrics {
                 }
             }
 
-            KeyCode::Char('k') => {
+            KeyCode::Char('k') | KeyCode::Up => {
                 let i = match self.state.selected {
                     Some(i) => {
                         if i > self.state.offset {
@@ -233,7 +233,7 @@ impl Metrics {
                 self.state.selected = Some(i);
             }
 
-            KeyCode::Char('j') => {
+            KeyCode::Char('j') | KeyCode::Down => {
                 let i = match self.state.selected {
                     Some(i) => {
                         if i < self.window_height - 1 {
