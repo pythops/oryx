@@ -1,4 +1,5 @@
 use std::{
+    cmp,
     sync::{atomic::AtomicBool, Arc, Mutex},
     thread,
     time::Duration,
@@ -8,11 +9,12 @@ use crossterm::event::{Event, KeyCode, KeyEvent};
 use tui_input::{backend::crossterm::EventHandler, Input};
 
 use ratatui::{
-    layout::{Alignment, Constraint, Direction, Flex, Layout, Rect},
+    layout::{Alignment, Constraint, Direction, Flex, Layout, Margin, Rect},
     style::{Color, Style, Stylize},
     text::Line,
     widgets::{
-        Bar, BarChart, BarGroup, Block, Borders, Cell, Clear, HighlightSpacing, Padding, Row, Table,
+        Bar, BarChart, BarGroup, Block, BorderType, Borders, Cell, Clear, HighlightSpacing,
+        Padding, Row, Table,
     },
     Frame,
 };
@@ -26,12 +28,20 @@ use crate::{
     },
 };
 
+#[derive(Debug, Default)]
+struct ListState {
+    offset: usize,
+    selected: Option<usize>,
+}
+
 #[derive(Debug)]
 pub struct Metrics {
     user_input: UserInput,
     app_packets: Arc<Mutex<Vec<AppPacket>>>,
-    port_count: Option<Arc<Mutex<PortCountMetric>>>,
+    metrics: Vec<Arc<Mutex<PortCountMetric>>>,
     terminate: Arc<AtomicBool>,
+    state: ListState,
+    window_height: usize,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -72,29 +82,51 @@ impl Metrics {
         Self {
             user_input: UserInput::default(),
             app_packets: packets,
-            port_count: None,
+            metrics: Vec::new(),
             terminate: Arc::new(AtomicBool::new(false)),
+            state: ListState::default(),
+            window_height: 0,
         }
     }
 
-    pub fn render(&self, frame: &mut Frame, block: Rect) {
-        let layout = Layout::default()
+    pub fn render(&mut self, frame: &mut Frame, block: Rect) {
+        self.window_height = block.height.saturating_sub(4) as usize / 8;
+
+        let constraints: Vec<Constraint> = (0..self.window_height)
+            .map(|_| Constraint::Length(8))
+            .collect();
+
+        let chunks = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([Constraint::Length(4), Constraint::Fill(1)])
-            .flex(ratatui::layout::Flex::SpaceBetween)
-            .split(block);
+            .constraints(constraints)
+            .split(block.inner(Margin {
+                horizontal: 0,
+                vertical: 2,
+            }));
 
-        let block = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints([
-                Constraint::Fill(1),
-                Constraint::Percentage(90),
-                Constraint::Fill(1),
-            ])
-            .flex(ratatui::layout::Flex::SpaceBetween)
-            .split(layout[1])[1];
+        let blocks: Vec<_> = chunks
+            .iter()
+            .map(|b| {
+                Layout::default()
+                    .direction(Direction::Horizontal)
+                    .constraints([
+                        Constraint::Fill(1),
+                        Constraint::Percentage(90),
+                        Constraint::Fill(1),
+                    ])
+                    .flex(ratatui::layout::Flex::SpaceBetween)
+                    .split(*b)[1]
+            })
+            .collect();
 
-        if let Some(port_count_metric) = &self.port_count {
+        let metrics_to_display = if self.metrics.len() <= self.window_height {
+            self.metrics.clone()
+        } else {
+            self.metrics[self.state.offset..self.state.offset + self.window_height].to_vec()
+        };
+
+        // for (index, port_count_metric) in self.metrics[self.state.offset..].iter().enumerate() {
+        for (index, port_count_metric) in metrics_to_display.iter().enumerate() {
             let metric = { port_count_metric.lock().unwrap().clone() };
 
             let chart = BarChart::default()
@@ -121,21 +153,88 @@ impl Metrics {
                 .block(
                     Block::new()
                         .title_alignment(Alignment::Center)
-                        .padding(Padding::vertical(1))
+                        .borders(Borders::LEFT)
+                        .border_style({
+                            if self.state.selected.unwrap() - self.state.offset == index {
+                                Style::new().fg(Color::Magenta)
+                            } else {
+                                Style::new().fg(Color::Gray)
+                            }
+                        })
+                        .border_type({
+                            if self.state.selected.unwrap() - self.state.offset == index {
+                                BorderType::Thick
+                            } else {
+                                BorderType::Plain
+                            }
+                        })
+                        .padding(Padding::uniform(1))
                         .title_top(format!("Port: {}", metric.port)),
                 );
-            frame.render_widget(chart, block);
+            frame.render_widget(
+                chart,
+                blocks[index].inner(Margin {
+                    horizontal: 0,
+                    vertical: 1,
+                }),
+            );
         }
     }
 
     pub fn handle_keys(&mut self, key_event: KeyEvent) {
-        if let KeyCode::Char('d') = key_event.code {
-            self.terminate
-                .store(true, std::sync::atomic::Ordering::Relaxed);
-            self.port_count = None;
-            self.user_input.clear();
-            self.terminate
-                .store(false, std::sync::atomic::Ordering::Relaxed);
+        match key_event.code {
+            KeyCode::Char('d') => {
+                if let Some(selected_item_index) = &mut self.state.selected {
+                    self.terminate
+                        .store(true, std::sync::atomic::Ordering::Relaxed);
+
+                    let _ = self.metrics.remove(*selected_item_index);
+
+                    self.user_input.clear();
+
+                    self.state.selected = Some(selected_item_index.saturating_sub(1));
+
+                    self.terminate
+                        .store(false, std::sync::atomic::Ordering::Relaxed);
+                }
+            }
+
+            KeyCode::Char('k') => {
+                let i = match self.state.selected {
+                    Some(i) => {
+                        if i > self.state.offset {
+                            i - 1
+                        } else if i == self.state.offset && self.state.offset > 0 {
+                            self.state.offset -= 1;
+                            i - 1
+                        } else {
+                            0
+                        }
+                    }
+                    None => 0,
+                };
+
+                self.state.selected = Some(i);
+            }
+
+            KeyCode::Char('j') => {
+                let i = match self.state.selected {
+                    Some(i) => {
+                        if i < self.window_height - 1 {
+                            cmp::min(i + 1, self.metrics.len() - 1)
+                        } else if self.metrics.len() - 1 == i {
+                            i
+                        } else {
+                            self.state.offset += 1;
+                            i + 1
+                        }
+                    }
+                    None => 0,
+                };
+
+                self.state.selected = Some(i);
+            }
+            _ => {}
         }
     }
 
@@ -150,14 +249,14 @@ impl Metrics {
 
                 let port: u16 = self.user_input.value();
 
-                let port_count = Arc::new(Mutex::new(PortCountMetric {
+                let port_count_metric = Arc::new(Mutex::new(PortCountMetric {
                     port,
                     tcp_count: 0,
                     udp_count: 0,
                 }));
 
                 thread::spawn({
-                    let port_count = port_count.clone();
+                    let port_count_metric = port_count_metric.clone();
                     let terminate = self.terminate.clone();
                     let packets = self.app_packets.clone();
                     move || {
@@ -170,7 +269,7 @@ impl Metrics {
                             if app_packets.is_empty() {
                                 continue;
                             }
-                            let mut metric = port_count.lock().unwrap();
+                            let mut metric = port_count_metric.lock().unwrap();
                             for app_packet in app_packets[last_index..].iter() {
                                 if terminate.load(std::sync::atomic::Ordering::Relaxed) {
                                     break 'main;
@@ -218,7 +317,12 @@ impl Metrics {
                     }
                 });
 
-                self.port_count = Some(port_count);
+                self.metrics.push(port_count_metric);
+                if self.metrics.len() == 1 {
+                    self.state.selected = Some(0);
+                }
+
+                self.user_input.clear();
             }
 
             _ => {
