@@ -214,6 +214,12 @@ impl Section {
                         Span::from(" Nav").bold(),
                     ]),
                     FocusedSection::Metrics => Line::from(vec![
+                        Span::from("k,").bold(),
+                        Span::from("  Up").bold(),
+                        Span::from(" | ").bold(),
+                        Span::from("j,").bold(),
+                        Span::from("  Down").bold(),
+                        Span::from(" | ").bold(),
                         Span::from("n").bold(),
                         Span::from(" New").bold(),
                         Span::from(" | ").bold(),
