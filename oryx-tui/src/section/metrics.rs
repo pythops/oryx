@@ -200,6 +200,9 @@ impl Metrics {
     pub fn handle_keys(&mut self, key_event: KeyEvent) {
         match key_event.code {
             KeyCode::Char('d') => {
+                if self.metrics.is_empty() {
+                    return;
+                }
                 if let Some(selected_item_index) = &mut self.state.selected {
                     self.terminate
                         .store(true, std::sync::atomic::Ordering::Relaxed);
@@ -234,6 +237,9 @@ impl Metrics {
             }
 
             KeyCode::Char('j') | KeyCode::Down => {
+                if self.metrics.is_empty() {
+                    return;
+                }
                 let i = match self.state.selected {
                     Some(i) => {
                         if i < self.window_height - 1 {
