@@ -28,6 +28,7 @@ pub enum ActivePopup {
     UpdateFilters,
     PacketInfos,
     NewFirewallRule,
+    NewMetricExplorer,
 }
 
 #[derive(Debug)]

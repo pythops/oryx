@@ -18,7 +18,7 @@ aya = "0.13"
 oryx-common = { path = "../oryx-common" }
 mio = { version = "1", features = ["os-poll", "os-ext"] }
 itertools = "0.14"
-dirs = "5"
+dirs = "6"
 kanal = "0.1.0-pre8"
 mimalloc = "0.1"
 clap = { version = "4", features = ["derive", "cargo"] }
@@ -28,6 +28,7 @@ log = "0.4"
 env_logger = "0.11"
 serde_json = "1"
 serde = { version = "1", features = ["derive"] }
+regex = "1"
 
 [[bin]]
 name = "oryx"

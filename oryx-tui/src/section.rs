@@ -1,6 +1,7 @@
 pub mod alert;
 pub mod firewall;
 pub mod inspection;
+pub mod metrics;
 pub mod stats;
 
 use std::sync::{Arc, Mutex};
@@ -10,6 +11,7 @@ use crossterm::event::{KeyCode, KeyEvent};
 use firewall::{Firewall, FirewallSignal};
 
 use inspection::Inspection;
+use metrics::Metrics;
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Margin, Rect},
     style::{Color, Style, Stylize},
@@ -30,6 +32,7 @@ use crate::{
 pub enum FocusedSection {
     Inspection,
     Stats,
+    Metrics,
     Alerts,
     Firewall,
 }
@@ -39,6 +42,7 @@ pub struct Section {
     pub focused_section: FocusedSection,
     pub inspection: Inspection,
     pub stats: Option<Stats>,
+    pub metrics: Metrics,
     pub alert: Alert,
     pub firewall: Firewall,
 }
@@ -52,6 +56,7 @@ impl Section {
             focused_section: FocusedSection::Inspection,
             inspection: Inspection::new(packets.clone()),
             stats: None,
+            metrics: Metrics::new(packets.clone()),
             alert: Alert::new(packets.clone()),
             firewall: Firewall::new(firewall_chans.ingress.sender, firewall_chans.egress.sender),
         }
@@ -77,6 +82,16 @@ impl Section {
                     )
                 } else {
                     Span::from("  Stats 󱕍   ").fg(Color::DarkGray)
+                }
+            }
+            FocusedSection::Metrics => {
+                if is_focused {
+                    Span::styled(
+                        "  Metrics    ",
+                        Style::default().bg(Color::Green).fg(Color::White).bold(),
+                    )
+                } else {
+                    Span::from("  Metrics    ").fg(Color::DarkGray)
                 }
             }
             FocusedSection::Alerts => self.alert.title_span(is_focused),
@@ -132,6 +147,13 @@ impl Section {
                     Span::from(" | ").bold(),
                     Span::from(" ").bold(),
                     Span::from(": Naviguate").bold(),
+                ]),
+                Some(ActivePopup::NewMetricExplorer) => Line::from(vec![
+                    Span::from("󱊷 ").bold(),
+                    Span::from(": Discard").bold(),
+                    Span::from(" | ").bold(),
+                    Span::from("󱞦 ").bold(),
+                    Span::from(": Run").bold(),
                 ]),
                 Some(ActivePopup::PacketInfos) | Some(ActivePopup::Help) => Line::from(vec![
                     Span::from("󱊷 ").bold(),
@@ -191,6 +213,25 @@ impl Section {
                         Span::from(" ").bold(),
                         Span::from(" Nav").bold(),
                     ]),
+                    FocusedSection::Metrics => Line::from(vec![
+                        Span::from("k,").bold(),
+                        Span::from("  Up").bold(),
+                        Span::from(" | ").bold(),
+                        Span::from("j,").bold(),
+                        Span::from("  Down").bold(),
+                        Span::from(" | ").bold(),
+                        Span::from("n").bold(),
+                        Span::from(" New").bold(),
+                        Span::from(" | ").bold(),
+                        Span::from("d").bold(),
+                        Span::from(" Delete").bold(),
+                        Span::from(" | ").bold(),
+                        Span::from("f").bold(),
+                        Span::from(" Filters").bold(),
+                        Span::from(" | ").bold(),
+                        Span::from(" ").bold(),
+                        Span::from(" Nav").bold(),
+                    ]),
                     _ => Line::from(vec![
                         Span::from("f").bold(),
                         Span::from(" Filters").bold(),
@@ -219,6 +260,7 @@ impl Section {
                     Line::from(vec![
                         self.title_span(FocusedSection::Inspection),
                         self.title_span(FocusedSection::Stats),
+                        self.title_span(FocusedSection::Metrics),
                         self.title_span(FocusedSection::Alerts),
                         self.title_span(FocusedSection::Firewall),
                     ])
@@ -232,6 +274,7 @@ impl Section {
             block,
         );
     }
+
     pub fn render(
         &mut self,
         frame: &mut Frame,
@@ -259,6 +302,7 @@ impl Section {
                     stats.render(frame, section_block, network_interace)
                 }
             }
+            FocusedSection::Metrics => self.metrics.render(frame, section_block),
             FocusedSection::Alerts => self.alert.render(frame, section_block),
             FocusedSection::Firewall => self.firewall.render(frame, section_block),
         }
@@ -272,7 +316,8 @@ impl Section {
         match key_event.code {
             KeyCode::Tab => match self.focused_section {
                 FocusedSection::Inspection => self.focused_section = FocusedSection::Stats,
-                FocusedSection::Stats => self.focused_section = FocusedSection::Alerts,
+                FocusedSection::Stats => self.focused_section = FocusedSection::Metrics,
+                FocusedSection::Metrics => self.focused_section = FocusedSection::Alerts,
                 FocusedSection::Alerts => self.focused_section = FocusedSection::Firewall,
                 FocusedSection::Firewall => self.focused_section = FocusedSection::Inspection,
             },
@@ -280,7 +325,8 @@ impl Section {
             KeyCode::BackTab => match self.focused_section {
                 FocusedSection::Inspection => self.focused_section = FocusedSection::Firewall,
                 FocusedSection::Stats => self.focused_section = FocusedSection::Inspection,
-                FocusedSection::Alerts => self.focused_section = FocusedSection::Stats,
+                FocusedSection::Metrics => self.focused_section = FocusedSection::Stats,
+                FocusedSection::Alerts => self.focused_section = FocusedSection::Metrics,
                 FocusedSection::Firewall => self.focused_section = FocusedSection::Alerts,
             },
 
@@ -291,6 +337,7 @@ impl Section {
                 FocusedSection::Firewall => self
                     .firewall
                     .handle_keys(key_event, notification_sender.clone())?,
+                FocusedSection::Metrics => self.metrics.handle_keys(key_event),
                 _ => {}
             },
         }

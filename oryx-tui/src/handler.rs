@@ -70,6 +70,10 @@ pub fn handle_key_events(
                             .handle_keys(key_event, event_sender.clone())?;
                         app.is_editing = false;
                     }
+                    ActivePopup::NewMetricExplorer => {
+                        app.section.metrics.handle_popup_keys(key_event)?;
+                        app.is_editing = false;
+                    }
                     _ => {}
                 }
             }
@@ -92,6 +96,12 @@ pub fn handle_key_events(
                         app.is_editing = false;
                     }
                 }
+                ActivePopup::NewMetricExplorer => {
+                    if app.section.metrics.handle_popup_keys(key_event).is_ok() {
+                        app.active_popup = None;
+                        app.is_editing = false;
+                    }
+                }
                 _ => {}
             },
 
@@ -103,6 +113,9 @@ pub fn handle_key_events(
                     app.section
                         .firewall
                         .handle_keys(key_event, event_sender.clone())?;
+                }
+                ActivePopup::NewMetricExplorer => {
+                    app.section.metrics.handle_popup_keys(key_event)?;
                 }
                 _ => {}
             },
@@ -158,10 +171,20 @@ pub fn handle_key_events(
 
         KeyCode::Char('n') | KeyCode::Char('e') => {
             if app.section.focused_section == FocusedSection::Firewall
-                && app.section.handle_keys(key_event, event_sender).is_ok()
+                && app
+                    .section
+                    .handle_keys(key_event, event_sender.clone())
+                    .is_ok()
             {
                 app.is_editing = true;
                 app.active_popup = Some(ActivePopup::NewFirewallRule);
+            }
+
+            if app.section.focused_section == FocusedSection::Metrics
+                && app.section.handle_keys(key_event, event_sender).is_ok()
+            {
+                app.is_editing = true;
+                app.active_popup = Some(ActivePopup::NewMetricExplorer);
             }
         }
 
