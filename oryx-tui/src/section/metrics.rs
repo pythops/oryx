@@ -64,13 +64,20 @@ impl UserInput {
             }),
             Err(_) => {
                 let Some(caps) = re.captures(self.input.value()) else {
-                    self.error = Some("Invalid Port --".to_string());
+                    self.error = Some("Invalid Port(s)".to_string());
                     return Err("Validation Error".into());
                 };
-                Ok(Range {
-                    start: caps["start"].parse()?,
-                    end: caps["end"].parse()?,
-                })
+
+                let start: u16 = caps["start"].parse()?;
+                let end: u16 = caps["end"].parse()?;
+
+                // Empty range
+                if start >= end {
+                    self.error = Some("Invalid Port Range".to_string());
+                    return Err("Validation Error".into());
+                }
+
+                Ok(Range { start, end })
             }
         }
     }
@@ -397,7 +404,7 @@ impl Metrics {
         //TODO: Center
         let rows = [
             Row::new(vec![
-                Cell::from("Packet Counter".to_string())
+                Cell::from("Port Packet Counter".to_string())
                     .bg(Color::DarkGray)
                     .fg(Color::White),
                 Cell::from(self.user_input.input.value())
