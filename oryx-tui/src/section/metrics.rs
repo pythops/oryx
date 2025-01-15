@@ -13,7 +13,7 @@ use tui_input::{backend::crossterm::EventHandler, Input};
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Flex, Layout, Margin, Rect},
     style::{Color, Style, Stylize},
-    text::Line,
+    text::{Line, Text},
     widgets::{
         Bar, BarChart, BarGroup, Block, BorderType, Borders, Cell, Clear, HighlightSpacing,
         Padding, Row, Scrollbar, ScrollbarOrientation, ScrollbarState, Table,
@@ -385,7 +385,7 @@ impl Metrics {
             .direction(Direction::Vertical)
             .constraints([
                 Constraint::Fill(1),
-                Constraint::Length(9),
+                Constraint::Length(10), // Form
                 Constraint::Fill(1),
             ])
             .flex(ratatui::layout::Flex::SpaceBetween)
@@ -400,6 +400,16 @@ impl Metrics {
             ])
             .flex(ratatui::layout::Flex::SpaceBetween)
             .split(layout[1])[1];
+
+        let (form_block, message_block) = {
+            let chunks = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([Constraint::Fill(1), Constraint::Length(3)])
+                .flex(ratatui::layout::Flex::SpaceBetween)
+                .split(block);
+
+            (chunks[0], chunks[1])
+        };
 
         //TODO: Center
         let rows = [
@@ -438,19 +448,37 @@ impl Metrics {
             )
             .column_spacing(2)
             .flex(Flex::SpaceBetween)
-            .highlight_spacing(HighlightSpacing::Always)
-            .block(
-                Block::default()
-                    .title(" Metrics Explorer ")
-                    .bold()
-                    .title_alignment(ratatui::layout::Alignment::Center)
-                    .borders(Borders::all())
-                    .border_type(ratatui::widgets::BorderType::Thick)
-                    .border_style(Style::default().green())
-                    .padding(Padding::uniform(1)),
-            );
+            .highlight_spacing(HighlightSpacing::Always);
+
+        let help_message =
+            Text::styled("💡Examples: 443, 8080, 5555-9999", Style::new().dark_gray()).centered();
 
         frame.render_widget(Clear, block);
-        frame.render_widget(table, block);
+        frame.render_widget(
+            table,
+            form_block.inner(Margin {
+                horizontal: 2,
+                vertical: 0,
+            }),
+        );
+        frame.render_widget(
+            help_message,
+            message_block.inner(Margin {
+                horizontal: 2,
+                vertical: 0,
+            }),
+        );
+
+        frame.render_widget(
+            Block::default()
+                .title(" Metrics Explorer ")
+                .bold()
+                .title_alignment(ratatui::layout::Alignment::Center)
+                .borders(Borders::all())
+                .border_type(ratatui::widgets::BorderType::Thick)
+                .border_style(Style::default().green())
+                .padding(Padding::uniform(1)),
+            block,
+        );
     }
 }
