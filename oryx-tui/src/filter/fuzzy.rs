@@ -1,5 +1,5 @@
 use std::{
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, RwLock},
     thread,
     time::Duration,
 };
@@ -24,7 +24,7 @@ pub struct Fuzzy {
 }
 
 impl Fuzzy {
-    pub fn new(packets: Arc<Mutex<Vec<AppPacket>>>) -> Arc<Mutex<Self>> {
+    pub fn new(packets: Arc<RwLock<Vec<AppPacket>>>) -> Arc<Mutex<Self>> {
         let fuzzy = Arc::new(Mutex::new(Self::default()));
 
         thread::spawn({
@@ -38,7 +38,7 @@ impl Fuzzy {
                     let mut fuzzy = fuzzy.lock().unwrap();
 
                     if fuzzy.is_enabled() && !fuzzy.filter.value().is_empty() {
-                        let packets = packets.lock().unwrap();
+                        let packets = packets.read().unwrap();
                         let current_pattern = fuzzy.filter.value().to_owned();
                         if current_pattern != pattern {
                             fuzzy.find(packets.as_slice());

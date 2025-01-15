@@ -1,7 +1,7 @@
 use std::{
     cmp,
     ops::Range,
-    sync::{atomic::AtomicBool, Arc, Mutex},
+    sync::{atomic::AtomicBool, Arc, Mutex, RwLock},
     thread,
     time::Duration,
 };
@@ -39,7 +39,7 @@ struct ListState {
 #[derive(Debug)]
 pub struct Metrics {
     user_input: UserInput,
-    app_packets: Arc<Mutex<Vec<AppPacket>>>,
+    app_packets: Arc<RwLock<Vec<AppPacket>>>,
     metrics: Vec<Arc<Mutex<PortCountMetric>>>,
     terminate: Arc<AtomicBool>,
     state: ListState,
@@ -96,7 +96,7 @@ pub struct PortCountMetric {
 }
 
 impl Metrics {
-    pub fn new(packets: Arc<Mutex<Vec<AppPacket>>>) -> Self {
+    pub fn new(packets: Arc<RwLock<Vec<AppPacket>>>) -> Self {
         Self {
             user_input: UserInput::default(),
             app_packets: packets,
@@ -311,7 +311,7 @@ impl Metrics {
                         'main: loop {
                             thread::sleep(Duration::from_millis(100));
 
-                            let app_packets = { packets.lock().unwrap().clone() };
+                            let app_packets = { packets.read().unwrap().clone() };
 
                             if app_packets.is_empty() {
                                 continue;

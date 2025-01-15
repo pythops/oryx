@@ -1,7 +1,7 @@
 use std::{
     collections::HashMap,
     net::IpAddr,
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, RwLock},
     thread,
     time::Duration,
 };
@@ -41,7 +41,7 @@ pub struct Stats {
 }
 
 impl Stats {
-    pub fn new(packets: Arc<Mutex<Vec<AppPacket>>>) -> Self {
+    pub fn new(packets: Arc<RwLock<Vec<AppPacket>>>) -> Self {
         let packet_stats: Arc<Mutex<PacketStats>> = Arc::new(Mutex::new(PacketStats::default()));
 
         thread::spawn({
@@ -51,7 +51,7 @@ impl Stats {
                 loop {
                     thread::sleep(Duration::from_millis(500));
 
-                    let app_packets = { packets.lock().unwrap().clone() };
+                    let app_packets = { packets.read().unwrap().clone() };
 
                     if app_packets.is_empty() {
                         continue;

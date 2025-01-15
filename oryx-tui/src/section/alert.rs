@@ -6,7 +6,7 @@ use ratatui::{
     text::{Span, Text},
     Frame,
 };
-use std::sync::{atomic::Ordering, Arc, Mutex};
+use std::sync::{atomic::Ordering, Arc, RwLock};
 use syn_flood::SynFlood;
 
 use crate::packet::AppPacket;
@@ -19,7 +19,7 @@ pub struct Alert {
 }
 
 impl Alert {
-    pub fn new(packets: Arc<Mutex<Vec<AppPacket>>>) -> Self {
+    pub fn new(packets: Arc<RwLock<Vec<AppPacket>>>) -> Self {
         Self {
             syn_flood: SynFlood::new(packets),
             flash_count: 1,

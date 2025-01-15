@@ -1,4 +1,4 @@
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, RwLock};
 
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
@@ -26,7 +26,7 @@ use crate::{
 
 #[derive(Debug)]
 pub struct Inspection {
-    pub packets: Arc<Mutex<Vec<AppPacket>>>,
+    pub packets: Arc<RwLock<Vec<AppPacket>>>,
     pub state: TableState,
     pub fuzzy: Arc<Mutex<Fuzzy>>,
     pub manuall_scroll: bool,
@@ -36,7 +36,7 @@ pub struct Inspection {
 }
 
 impl Inspection {
-    pub fn new(packets: Arc<Mutex<Vec<AppPacket>>>) -> Self {
+    pub fn new(packets: Arc<RwLock<Vec<AppPacket>>>) -> Self {
         Self {
             packets: packets.clone(),
             state: TableState::default(),
@@ -49,7 +49,7 @@ impl Inspection {
     }
 
     pub fn can_show_popup(&mut self) -> bool {
-        let packets = self.packets.lock().unwrap();
+        let packets = self.packets.read().unwrap();
         let fuzzy = self.fuzzy.lock().unwrap();
 
         if fuzzy.is_enabled() {
@@ -134,7 +134,7 @@ impl Inspection {
                 }
 
                 KeyCode::Char('s') => {
-                    let app_packets = self.packets.lock().unwrap();
+                    let app_packets = self.packets.read().unwrap();
                     if app_packets.is_empty() {
                         Notification::send(
                             "There is no packets".to_string(),
@@ -168,7 +168,7 @@ impl Inspection {
     }
 
     pub fn scroll_up(&mut self) {
-        let app_packets = self.packets.lock().unwrap();
+        let app_packets = self.packets.read().unwrap();
         if !self.manuall_scroll {
             self.manuall_scroll = true;
             // Record the last position. Usefull for selecting the packets to display
@@ -193,7 +193,7 @@ impl Inspection {
     }
 
     pub fn scroll_down(&mut self) {
-        let app_packets = self.packets.lock().unwrap();
+        let app_packets = self.packets.read().unwrap();
 
         if !self.manuall_scroll {
             self.manuall_scroll = true;
@@ -220,7 +220,7 @@ impl Inspection {
     }
 
     pub fn render(&mut self, frame: &mut Frame, block: Rect) {
-        let app_packets = self.packets.lock().unwrap();
+        let app_packets = self.packets.read().unwrap();
         let mut fuzzy = self.fuzzy.lock().unwrap();
         let fuzzy_packets = fuzzy.clone().packets.clone();
 
@@ -638,7 +638,7 @@ impl Inspection {
             .split(layout[1])[1];
 
         let fuzzy = self.fuzzy.lock().unwrap();
-        let packets = self.packets.lock().unwrap();
+        let packets = self.packets.read().unwrap();
 
         let app_packet = if fuzzy.is_enabled() {
             fuzzy.packets[self.packet_index.unwrap()]

@@ -4,7 +4,7 @@ pub mod inspection;
 pub mod metrics;
 pub mod stats;
 
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, RwLock};
 
 use alert::Alert;
 use crossterm::event::{KeyCode, KeyEvent};
@@ -49,7 +49,7 @@ pub struct Section {
 
 impl Section {
     pub fn new(
-        packets: Arc<Mutex<Vec<AppPacket>>>,
+        packets: Arc<RwLock<Vec<AppPacket>>>,
         firewall_chans: IoChannels<FirewallSignal>,
     ) -> Self {
         Self {

@@ -1,7 +1,7 @@
 use std::{
     collections::HashMap,
     net::IpAddr,
-    sync::{atomic::AtomicBool, Arc, Mutex},
+    sync::{atomic::AtomicBool, Arc, Mutex, RwLock},
     thread,
     time::Duration,
 };
@@ -29,7 +29,7 @@ pub struct SynFlood {
 }
 
 impl SynFlood {
-    pub fn new(packets: Arc<Mutex<Vec<AppPacket>>>) -> Self {
+    pub fn new(packets: Arc<RwLock<Vec<AppPacket>>>) -> Self {
         let map: Arc<Mutex<HashMap<IpAddr, usize>>> = Arc::new(Mutex::new(HashMap::new()));
 
         let detected = Arc::new(AtomicBool::new(false));
@@ -40,14 +40,14 @@ impl SynFlood {
             let detected = detected.clone();
             move || loop {
                 let start_index = {
-                    let packets = packets.lock().unwrap();
+                    let packets = packets.read().unwrap();
                     packets.len().saturating_sub(1)
                 };
 
                 thread::sleep(Duration::from_secs(5));
 
                 let app_packets = {
-                    let packets = packets.lock().unwrap();
+                    let packets = packets.read().unwrap();
                     packets.clone()
                 };
 

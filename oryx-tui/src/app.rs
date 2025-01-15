@@ -5,7 +5,7 @@ use ratatui::{
 };
 use std::{
     error,
-    sync::{Arc, Mutex},
+    sync::{Arc, RwLock},
     thread,
     time::Duration,
 };
@@ -43,7 +43,7 @@ pub struct App {
     pub help: Help,
     pub filter: Filter,
     pub start_sniffing: bool,
-    pub packets: Arc<Mutex<Vec<AppPacket>>>,
+    pub packets: Arc<RwLock<Vec<AppPacket>>>,
     pub notifications: Vec<Notification>,
     pub section: Section,
     pub data_channel_sender: kanal::Sender<([u8; RawPacket::LEN], TrafficDirection)>,
@@ -59,7 +59,9 @@ impl Default for App {
 
 impl App {
     pub fn new() -> Self {
-        let packets = Arc::new(Mutex::new(Vec::with_capacity(RawPacket::LEN * 1024 * 1024)));
+        let packets = Arc::new(RwLock::new(Vec::with_capacity(
+            RawPacket::LEN * 1024 * 1024,
+        )));
 
         let (sender, receiver) = kanal::unbounded();
 
@@ -70,7 +72,7 @@ impl App {
             move || loop {
                 if let Ok((raw_packet, direction)) = receiver.recv() {
                     let network_packet = NetworkPacket::from(raw_packet);
-                    let mut packets = packets.lock().unwrap();
+                    let mut packets = packets.write().unwrap();
                     if packets.len() == packets.capacity() {
                         packets.reserve(1024 * 1024);
                     }
