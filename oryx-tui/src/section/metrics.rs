@@ -1,11 +1,13 @@
 use std::{
     cmp,
+    ops::Range,
     sync::{atomic::AtomicBool, Arc, Mutex},
     thread,
     time::Duration,
 };
 
 use crossterm::event::{Event, KeyCode, KeyEvent};
+use regex::Regex;
 use tui_input::{backend::crossterm::EventHandler, Input};
 
 use ratatui::{
@@ -51,28 +53,37 @@ struct UserInput {
 }
 
 impl UserInput {
-    fn validate(&mut self) -> AppResult<()> {
+    fn validate(&mut self) -> AppResult<Range<u16>> {
         self.error = None;
-        if self.input.value().parse::<u16>().is_err() {
-            self.error = Some("Invalid Port".to_string());
-            return Err("Validation Error".into());
+        let re = Regex::new(r"^(?<start>\d{1,5})\-(?<end>\d{1,5})$").unwrap();
+
+        match self.input.value().parse::<u16>() {
+            Ok(v) => Ok(Range {
+                start: v,
+                end: v + 1,
+            }),
+            Err(_) => {
+                let Some(caps) = re.captures(self.input.value()) else {
+                    self.error = Some("Invalid Port --".to_string());
+                    return Err("Validation Error".into());
+                };
+                Ok(Range {
+                    start: caps["start"].parse()?,
+                    end: caps["end"].parse()?,
+                })
+            }
         }
-        Ok(())
     }
 
     fn clear(&mut self) {
         self.input.reset();
         self.error = None;
     }
-
-    fn value(&self) -> u16 {
-        self.input.value().parse().unwrap()
-    }
 }
 
 #[derive(Debug, Default, Clone)]
 pub struct PortCountMetric {
-    port: u16,
+    port_range: Range<u16>,
     tcp_count: usize,
     udp_count: usize,
 }
@@ -168,7 +179,16 @@ impl Metrics {
                             }
                         })
                         .padding(Padding::uniform(1))
-                        .title_top(format!("Port: {}", metric.port)),
+                        .title_top({
+                            if metric.port_range.len() == 1 {
+                                format!("Port: {}", metric.port_range.start)
+                            } else {
+                                format!(
+                                    "Ports: {}-{}",
+                                    metric.port_range.start, metric.port_range.end
+                                )
+                            }
+                        }),
                 );
             frame.render_widget(
                 chart,
@@ -267,12 +287,10 @@ impl Metrics {
             }
 
             KeyCode::Enter => {
-                self.user_input.validate()?;
-
-                let port: u16 = self.user_input.value();
+                let port_range: Range<u16> = self.user_input.validate()?;
 
                 let port_count_metric = Arc::new(Mutex::new(PortCountMetric {
-                    port,
+                    port_range: port_range.clone(),
                     tcp_count: 0,
                     udp_count: 0,
                 }));
@@ -301,12 +319,12 @@ impl Metrics {
                                         match packet {
                                             IpPacket::V4(ipv4_packet) => match ipv4_packet.proto {
                                                 IpProto::Tcp(tcp_packet) => {
-                                                    if tcp_packet.dst_port == port {
+                                                    if port_range.contains(&tcp_packet.dst_port) {
                                                         metric.tcp_count += 1;
                                                     }
                                                 }
                                                 IpProto::Udp(udp_packet) => {
-                                                    if udp_packet.dst_port == port {
+                                                    if port_range.contains(&udp_packet.dst_port) {
                                                         metric.udp_count += 1;
                                                     }
                                                 }
@@ -314,12 +332,12 @@ impl Metrics {
                                             },
                                             IpPacket::V6(ipv6_packet) => match ipv6_packet.proto {
                                                 IpProto::Tcp(tcp_packet) => {
-                                                    if tcp_packet.dst_port == port {
+                                                    if port_range.contains(&tcp_packet.dst_port) {
                                                         metric.tcp_count += 1;
                                                     }
                                                 }
                                                 IpProto::Udp(udp_packet) => {
-                                                    if udp_packet.dst_port == port {
+                                                    if port_range.contains(&udp_packet.dst_port) {
                                                         metric.udp_count += 1;
                                                     }
                                                 }
