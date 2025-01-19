@@ -110,9 +110,7 @@ impl Metrics {
     pub fn render(&mut self, frame: &mut Frame, block: Rect) {
         self.window_height = block.height.saturating_sub(4) as usize / 8;
 
-        let constraints: Vec<Constraint> = (0..self.window_height)
-            .map(|_| Constraint::Length(8))
-            .collect();
+        let constraints = (0..self.window_height).map(|_| Constraint::Length(8));
 
         let chunks = Layout::default()
             .direction(Direction::Vertical)

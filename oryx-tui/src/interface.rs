@@ -168,40 +168,36 @@ impl Interface {
             Constraint::Fill(1),
         ];
 
-        let interfaces: Vec<Row> = self
-            .interfaces
-            .iter()
-            .map(|interface| {
-                let addr = {
-                    match interface
-                        .addresses
-                        .iter()
-                        .find(|a| matches!(a, IpAddr::V4(_) | IpAddr::V6(_)))
-                    {
-                        Some(a) => a.to_string(),
-                        None => String::new(),
-                    }
-                };
+        let interfaces = self.interfaces.iter().map(|interface| {
+            let addr = {
+                match interface
+                    .addresses
+                    .iter()
+                    .find(|a| matches!(a, IpAddr::V4(_) | IpAddr::V6(_)))
+                {
+                    Some(a) => a.to_string(),
+                    None => String::new(),
+                }
+            };
 
-                let state = if interface.is_up { "Up" } else { "Down" };
+            let state = if interface.is_up { "Up" } else { "Down" };
 
-                Row::new(if self.selected_interface.name == interface.name {
-                    vec![
-                        Line::from(" "),
-                        Line::from(interface.name.clone()),
-                        Line::from(state.to_string()).centered(),
-                        Line::from(addr.clone()),
-                    ]
-                } else {
-                    vec![
-                        Line::from(""),
-                        Line::from(interface.name.clone()),
-                        Line::from(state.to_string()).centered(),
-                        Line::from(addr.clone()),
-                    ]
-                })
+            Row::new(if self.selected_interface.name == interface.name {
+                vec![
+                    Line::from(" "),
+                    Line::from(interface.name.clone()),
+                    Line::from(state.to_string()).centered(),
+                    Line::from(addr.clone()),
+                ]
+            } else {
+                vec![
+                    Line::from(""),
+                    Line::from(interface.name.clone()),
+                    Line::from(state.to_string()).centered(),
+                    Line::from(addr.clone()),
+                ]
             })
-            .collect();
+        });
 
         let table = Table::new(interfaces, widths)
             .header(

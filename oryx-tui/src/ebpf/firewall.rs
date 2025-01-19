@@ -30,13 +30,12 @@ pub fn update_ipv4_blocklist(
                 } else {
                     let not_null_ports = blocked_ports
                         .into_iter()
-                        .filter(|p| (*p != 0 && *p != port))
-                        .collect::<Vec<u16>>();
+                        .filter(|p| (*p != 0 && *p != port));
 
                     let mut blocked_ports = [0; MAX_RULES_PORT];
 
-                    for (idx, p) in not_null_ports.iter().enumerate() {
-                        blocked_ports[idx] = *p;
+                    for (idx, p) in not_null_ports.enumerate() {
+                        blocked_ports[idx] = p;
                     }
 
                     if blocked_ports.iter().all(|&port| port == 0) {
@@ -98,13 +97,12 @@ pub fn update_ipv6_blocklist(
                 } else {
                     let not_null_ports = blocked_ports
                         .into_iter()
-                        .filter(|p| (*p != 0 && *p != port))
-                        .collect::<Vec<u16>>();
+                        .filter(|p| (*p != 0 && *p != port));
 
                     let mut blocked_ports = [0; MAX_RULES_PORT];
 
-                    for (idx, p) in not_null_ports.iter().enumerate() {
-                        blocked_ports[idx] = *p;
+                    for (idx, p) in not_null_ports.enumerate() {
+                        blocked_ports[idx] = p;
                     }
 
                     if blocked_ports.iter().all(|&port| port == 0) {

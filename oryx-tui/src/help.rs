@@ -119,14 +119,9 @@ impl Help {
 
         self.block_height = block.height as usize;
         let widths = [Constraint::Length(20), Constraint::Fill(1)];
-        let rows: Vec<Row> = self
-            .keys
-            .iter()
-            .map(|key| {
-                Row::new(vec![key.0.to_owned(), key.1.into()])
-                    .style(Style::default().fg(Color::White))
-            })
-            .collect();
+        let rows = self.keys.iter().map(|key| {
+            Row::new(vec![key.0.to_owned(), key.1.into()]).style(Style::default().fg(Color::White))
+        });
         let rows_len = self.keys.len().saturating_sub(self.block_height - 6);
 
         let table = Table::new(rows, widths).block(
