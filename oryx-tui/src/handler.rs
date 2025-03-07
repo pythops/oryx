@@ -25,7 +25,7 @@ pub fn handle_key_events(
                     app.filter
                         .start(event_sender.clone(), app.data_channel_sender.clone())?;
 
-                    sleep(Duration::from_millis(100));
+                    sleep(Duration::from_millis(10));
                     app.start_sniffing = true;
                 }
             }

@@ -1,10 +1,16 @@
-use oryx_common::RawPacket;
+use clap::ArgMatches;
+use itertools::Itertools;
+use oryx_common::{
+    protocols::{LinkProtocol, NetworkProtocol, TransportProtocol},
+    RawPacket,
+};
 use ratatui::{
     layout::{Constraint, Direction, Layout},
     Frame,
 };
 use std::{
     error,
+    str::FromStr,
     sync::{Arc, RwLock},
     thread,
     time::Duration,
@@ -49,16 +55,11 @@ pub struct App {
     pub data_channel_sender: kanal::Sender<([u8; RawPacket::LEN], TrafficDirection)>,
     pub is_editing: bool,
     pub active_popup: Option<ActivePopup>,
-}
-
-impl Default for App {
-    fn default() -> Self {
-        Self::new()
-    }
+    pub start_from_cli: bool,
 }
 
 impl App {
-    pub fn new() -> Self {
+    pub fn new(cli_args: &ArgMatches) -> Self {
         let packets = Arc::new(RwLock::new(Vec::with_capacity(
             RawPacket::LEN * 1024 * 1024,
         )));
@@ -85,10 +86,105 @@ impl App {
             }
         });
 
+        let (interface_name, transport_protocols, network_protocols, link_protocols, direction) = {
+            if let Some(interface) = cli_args.get_one::<String>("interface") {
+                let transport_protocols = {
+                    if let Some(protocols) = cli_args.get_many::<String>("transport") {
+                        if protocols.clone().any(|protocol| protocol == "all") {
+                            TransportProtocol::all().to_vec()
+                        } else {
+                            let mut protocols = protocols
+                                .sorted()
+                                .map(|protocol| TransportProtocol::from_str(protocol).unwrap())
+                                .collect::<Vec<TransportProtocol>>();
+                            protocols.dedup();
+                            protocols
+                        }
+                    } else {
+                        TransportProtocol::all().to_vec()
+                    }
+                };
+
+                let network_protocols = {
+                    if let Some(protocols) = cli_args.get_many::<String>("network") {
+                        if protocols.clone().any(|protocol| protocol == "all") {
+                            NetworkProtocol::all().to_vec()
+                        } else {
+                            let mut protocols = protocols
+                                .sorted()
+                                .map(|protocol| NetworkProtocol::from_str(protocol).unwrap())
+                                .collect::<Vec<NetworkProtocol>>();
+                            protocols.dedup();
+                            protocols
+                        }
+                    } else {
+                        NetworkProtocol::all().to_vec()
+                    }
+                };
+
+                let link_protocols = {
+                    if let Some(protocols) = cli_args.get_many::<String>("link") {
+                        if protocols.clone().any(|protocol| protocol == "all") {
+                            LinkProtocol::all().to_vec()
+                        } else {
+                            let mut protocols = protocols
+                                .sorted()
+                                .map(|protocol| LinkProtocol::from_str(protocol).unwrap())
+                                .collect::<Vec<LinkProtocol>>();
+                            protocols.dedup();
+                            protocols
+                        }
+                    } else {
+                        LinkProtocol::all().to_vec()
+                    }
+                };
+
+                let direction = {
+                    if let Some(directions) = cli_args.get_many::<String>("direction") {
+                        if directions.clone().any(|direction| direction == "all") {
+                            TrafficDirection::all().to_vec()
+                        } else {
+                            let mut directions = directions
+                                .sorted()
+                                .map(|direction| TrafficDirection::from_str(direction).unwrap())
+                                .collect::<Vec<TrafficDirection>>();
+                            directions.dedup();
+                            directions
+                        }
+                    } else {
+                        TrafficDirection::all().to_vec()
+                    }
+                };
+
+                (
+                    Some(interface.clone()),
+                    transport_protocols,
+                    network_protocols,
+                    link_protocols,
+                    direction,
+                )
+            } else {
+                (
+                    None,
+                    TransportProtocol::all().to_vec(),
+                    NetworkProtocol::all().to_vec(),
+                    LinkProtocol::all().to_vec(),
+                    TrafficDirection::all().to_vec(),
+                )
+            }
+        };
+
         Self {
             running: true,
             help: Help::new(),
-            filter: Filter::new(firewall_channels.clone()),
+            filter: Filter::new(
+                firewall_channels.clone(),
+                interface_name.clone(),
+                transport_protocols,
+                network_protocols,
+                link_protocols,
+                direction,
+            ),
             start_sniffing: false,
             packets: packets.clone(),
             notifications: Vec::new(),
@@ -96,6 +192,7 @@ impl App {
             data_channel_sender: sender,
             is_editing: false,
             active_popup: None,
+            start_from_cli: interface_name.is_some(),
         }
     }
 

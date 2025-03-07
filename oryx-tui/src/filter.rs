@@ -104,16 +104,29 @@ pub struct Filter {
 }
 
 impl Filter {
-    pub fn new(firewall_chans: IoChannels<FirewallSignal>) -> Self {
+    pub fn new(
+        firewall_chans: IoChannels<FirewallSignal>,
+        interface_name: Option<String>,
+        transport: Vec<TransportProtocol>,
+        network: Vec<NetworkProtocol>,
+        link: Vec<LinkProtocol>,
+        direction: Vec<TrafficDirection>,
+    ) -> Self {
+        let focused_block = if interface_name.is_some() {
+            FocusedBlock::Apply
+        } else {
+            FocusedBlock::Interface
+        };
+
         Self {
-            interface: Interface::new(),
-            network: NetworkFilter::new(),
-            transport: TransportFilter::new(),
-            link: LinkFilter::new(),
-            traffic_direction: TrafficDirectionFilter::new(),
+            interface: Interface::new(interface_name),
+            transport: TransportFilter::new(transport),
+            network: NetworkFilter::new(network),
+            link: LinkFilter::new(link),
+            traffic_direction: TrafficDirectionFilter::new(direction),
             filter_chans: IoChannels::new(),
             firewall_chans,
-            focused_block: FocusedBlock::Interface,
+            focused_block,
         }
     }
 
@@ -625,26 +638,29 @@ impl Filter {
             [
                 Row::new(vec![
                     Line::styled("Transport", Style::new().bold()),
-                    Line::from_iter(TransportFilter::new().selected_protocols.iter().map(
-                        |filter| {
-                            if self.transport.applied_protocols.contains(filter) {
-                                Span::styled(
-                                    format!(" {}  ", filter),
-                                    Style::default().light_green(),
-                                )
-                            } else {
-                                Span::styled(
-                                    format!(" {}  ", filter),
-                                    Style::default().light_red(),
-                                )
-                            }
-                        },
-                    )),
+                    Line::from_iter(
+                        TransportFilter::new(TransportProtocol::all().to_vec())
+                            .selected_protocols
+                            .iter()
+                            .map(|filter| {
+                                if self.transport.applied_protocols.contains(filter) {
+                                    Span::styled(
+                                        format!(" {}  ", filter),
+                                        Style::default().light_green(),
+                                    )
+                                } else {
+                                    Span::styled(
+                                        format!(" {}  ", filter),
+                                        Style::default().light_red(),
+                                    )
+                                }
+                            }),
+                    ),
                 ]),
                 Row::new(vec![
                     Line::styled("Network", Style::new().bold()),
                     Line::from_iter(
-                        NetworkFilter::new()
+                        NetworkFilter::new(NetworkProtocol::all().to_vec())
                             .selected_protocols
                             .iter()
                             .map(|filter| {
@@ -664,18 +680,29 @@ impl Filter {
                 ]),
                 Row::new(vec![
                     Line::styled("Link", Style::new().bold()),
-                    Line::from_iter(LinkFilter::new().selected_protocols.iter().map(|filter| {
-                        if self.link.applied_protocols.contains(filter) {
-                            Span::styled(format!(" {}  ", filter), Style::default().light_green())
-                        } else {
-                            Span::styled(format!(" {}  ", filter), Style::default().light_red())
-                        }
-                    })),
+                    Line::from_iter(
+                        LinkFilter::new(LinkProtocol::all().to_vec())
+                            .selected_protocols
+                            .iter()
+                            .map(|filter| {
+                                if self.link.applied_protocols.contains(filter) {
+                                    Span::styled(
+                                        format!(" {}  ", filter),
+                                        Style::default().light_green(),
+                                    )
+                                } else {
+                                    Span::styled(
+                                        format!(" {}  ", filter),
+                                        Style::default().light_red(),
+                                    )
+                                }
+                            }),
+                    ),
                 ]),
                 Row::new(vec![
                     Line::styled("Direction", Style::new().bold()),
                     Line::from_iter(
-                        TrafficDirectionFilter::default()
+                        TrafficDirectionFilter::new(TrafficDirection::all().to_vec())
                             .selected_direction
                             .iter()
                             .map(|filter| {

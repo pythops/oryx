@@ -27,3 +27,5 @@ pub mod packet;
 pub mod section;
 
 pub mod dns;
+
+pub mod cli;

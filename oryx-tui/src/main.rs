@@ -3,9 +3,10 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 use std::io;
 
-use clap::{crate_description, crate_version, Command};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use oryx_tui::{
     app::{App, AppResult, TICK_RATE},
+    cli,
     event::{Event, EventHandler},
     handler::handle_key_events,
     tui::Tui,
@@ -14,23 +15,31 @@ use ratatui::{backend::CrosstermBackend, Terminal};
 
 fn main() -> AppResult<()> {
     env_logger::init();
-    Command::new("oryx")
-        .about(crate_description!())
-        .version(crate_version!())
-        .get_matches();
+
+    let cli_args = cli::cli().get_matches();
 
     if unsafe { libc::geteuid() } != 0 {
         eprintln!("This program must be run as root");
         std::process::exit(1);
     }
 
-    let mut app = App::new();
+    let mut app = App::new(&cli_args);
 
     let backend = CrosstermBackend::new(io::stdout());
     let terminal = Terminal::new(backend)?;
     let events = EventHandler::new(TICK_RATE);
+
+    let events_sender = events.sender.clone();
+
     let mut tui = Tui::new(terminal, events);
     tui.init()?;
+
+    if app.start_from_cli {
+        events_sender.send(Event::Key(KeyEvent::new(
+            KeyCode::Enter,
+            KeyModifiers::NONE,
+        )))?;
+    }
 
     while app.running {
         tui.draw(&mut app)?;
@@ -43,7 +52,7 @@ fn main() -> AppResult<()> {
                 app.notifications.push(notification);
             }
             Event::Reset => {
-                app = App::new();
+                app = App::new(&cli_args);
             }
             _ => {}
         }

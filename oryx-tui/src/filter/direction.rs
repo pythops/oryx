@@ -21,17 +21,11 @@ pub struct TrafficDirectionFilter {
     pub terminate_egress: Arc<AtomicBool>,
 }
 
-impl Default for TrafficDirectionFilter {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl TrafficDirectionFilter {
-    pub fn new() -> Self {
+    pub fn new(direction: Vec<TrafficDirection>) -> Self {
         TrafficDirectionFilter {
             state: TableState::default(),
-            selected_direction: vec![TrafficDirection::Ingress, TrafficDirection::Egress],
+            selected_direction: direction,
             applied_direction: Vec::new(),
             terminate_ingress: Arc::new(AtomicBool::new(false)),
             terminate_egress: Arc::new(AtomicBool::new(false)),
