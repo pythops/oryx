@@ -1,4 +1,4 @@
-use core::fmt::Display;
+use strum::{AsRefStr, Display, EnumString};
 
 #[derive(Debug, Copy, Clone)]
 #[repr(C, u8)]
@@ -8,14 +8,20 @@ pub enum Protocol {
     Link(LinkProtocol) = 2,
 }
 
+#[derive(Debug, PartialEq)]
+pub struct ParseProtocolError;
+
 // Transport Protocols
 
 pub const NB_TRANSPORT_PROTOCOL: u16 = 2;
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, AsRefStr, Display, EnumString)]
 #[repr(C)]
 pub enum TransportProtocol {
+    #[strum(ascii_case_insensitive)]
     TCP = 0,
+
+    #[strum(ascii_case_insensitive)]
     UDP = 1,
 }
 
@@ -25,24 +31,20 @@ impl TransportProtocol {
     }
 }
 
-impl Display for TransportProtocol {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        match self {
-            TransportProtocol::TCP => write!(f, "Tcp"),
-            TransportProtocol::UDP => write!(f, "Udp"),
-        }
-    }
-}
-
 // Network Protocols
 
 pub const NB_NETWORK_PROTOCOL: u16 = 3;
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, AsRefStr, Display, EnumString)]
 #[repr(C)]
 pub enum NetworkProtocol {
+    #[strum(ascii_case_insensitive)]
     Ipv4 = 0,
+
+    #[strum(ascii_case_insensitive)]
     Ipv6 = 1,
+
+    #[strum(ascii_case_insensitive)]
     Icmp = 2,
 }
 
@@ -56,34 +58,19 @@ impl NetworkProtocol {
     }
 }
 
-impl Display for NetworkProtocol {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        match self {
-            NetworkProtocol::Ipv4 => write!(f, "Ipv4"),
-            NetworkProtocol::Ipv6 => write!(f, "Ipv6"),
-            NetworkProtocol::Icmp => write!(f, "Icmp"),
-        }
-    }
-}
-
 // Link Protocols
 
 pub const NB_LINK_PROTOCOL: u16 = 1;
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, AsRefStr, Display, EnumString)]
 #[repr(C)]
 pub enum LinkProtocol {
+    #[strum(ascii_case_insensitive)]
     Arp = 0,
 }
 
 impl LinkProtocol {
     pub fn all() -> [LinkProtocol; 1] {
         [LinkProtocol::Arp]
-    }
-}
-
-impl Display for LinkProtocol {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "Arp")
     }
 }

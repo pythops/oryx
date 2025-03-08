@@ -14,7 +14,7 @@ use std::{
     path::PathBuf,
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct NetworkInterface {
     pub name: String,
     pub is_up: bool,
@@ -101,21 +101,28 @@ pub struct Interface {
     pub state: TableState,
 }
 
-impl Default for Interface {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl Interface {
-    pub fn new() -> Self {
+    pub fn new(interface_name: Option<String>) -> Self {
         let interfaces = NetworkInterface::list();
-        let selected_interface = interfaces[0].clone();
+
+        let selected_interface = {
+            if let Some(interface) = interface_name {
+                interfaces
+                    .iter()
+                    .find(|v| v.name == interface)
+                    .unwrap()
+                    .clone()
+            } else {
+                interfaces[0].clone()
+            }
+        };
+
+        let selected_interface_index = interfaces.iter().position(|n| n == &selected_interface);
 
         Self {
             interfaces,
             selected_interface,
-            state: TableState::default().with_selected(0),
+            state: TableState::default().with_selected(selected_interface_index),
         }
     }
 

@@ -13,17 +13,11 @@ pub struct TransportFilter {
     pub applied_protocols: Vec<TransportProtocol>,
 }
 
-impl Default for TransportFilter {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl TransportFilter {
-    pub fn new() -> Self {
+    pub fn new(protocols: Vec<TransportProtocol>) -> Self {
         Self {
             state: TableState::default(),
-            selected_protocols: vec![TransportProtocol::TCP, TransportProtocol::UDP],
+            selected_protocols: protocols,
             applied_protocols: Vec::new(),
         }
     }

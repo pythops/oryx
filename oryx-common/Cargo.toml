@@ -14,3 +14,4 @@ path = "src/lib.rs"
 
 [dependencies]
 network-types = "0.0.7"
+strum = { version = "0.27", default-features = false, features = ["derive"] }

@@ -13,21 +13,11 @@ pub struct NetworkFilter {
     pub applied_protocols: Vec<NetworkProtocol>,
 }
 
-impl Default for NetworkFilter {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl NetworkFilter {
-    pub fn new() -> Self {
+    pub fn new(protocols: Vec<NetworkProtocol>) -> Self {
         NetworkFilter {
             state: TableState::default(),
-            selected_protocols: vec![
-                NetworkProtocol::Ipv4,
-                NetworkProtocol::Ipv6,
-                NetworkProtocol::Icmp,
-            ],
+            selected_protocols: protocols,
             applied_protocols: Vec::new(),
         }
     }

@@ -13,17 +13,11 @@ pub struct LinkFilter {
     pub applied_protocols: Vec<LinkProtocol>,
 }
 
-impl Default for LinkFilter {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl LinkFilter {
-    pub fn new() -> Self {
+    pub fn new(protocols: Vec<LinkProtocol>) -> Self {
         Self {
             state: TableState::default(),
-            selected_protocols: vec![LinkProtocol::Arp],
+            selected_protocols: protocols,
             applied_protocols: Vec::new(),
         }
     }
