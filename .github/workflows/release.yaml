@@ -29,7 +29,9 @@ jobs:
           cargo binstall -y bpf-linker
 
       - name: Build oryx-ebpf
-        run: cargo xtask build-ebpf --release
+        run: |
+          cargo xtask build-ebpf
+          cargo xtask build-ebpf --release
 
       - name: Build for arm64 musl
         run: |
