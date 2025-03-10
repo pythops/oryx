@@ -47,29 +47,7 @@ rustup toolchain install nightly --component rust-src
 
 #### 2. Install [bpf-linker](https://github.com/aya-rs/bpf-linker)
 
-##### For `x86_64`
-
-Simply run the following command:
-
-```
-cargo install bpf-linker
-```
-
-##### For `arm64`
-
-For Debian based distributions, make sure you have the following dependencies installed:
-
-- `llvm-19`
-- `llvm-19-dev`
-- `libpolly-19-dev`
-
-then run the following command:
-
-```
-cargo install bpf-linker --no-default-features
-```
-
-> Check [bpf-linker Installation section](https://github.com/aya-rs/bpf-linker?tab=readme-ov-file#installation) for more infos.
+Check [bpf-linker Installation section](https://github.com/aya-rs/bpf-linker?tab=readme-ov-file#installation) .
 
 #### 3. Build
 
@@ -86,6 +64,9 @@ Run the following command to start `oryx`:
 ```
 sudo oryx
 ```
+
+> [!NOTE]
+> You can start `oryx` with args as well. Check `oryx --help` for the available options
 
 ## ⌨️ Key Bindings
 
