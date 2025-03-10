@@ -1,11 +1,13 @@
-## v0.5 - TBA
-
-- Ability to start `oryx` with options
-- Add metrics section
+## v0.5 - 2025-03-10
 
 ### Added
 
-- stats: top 10 websites support ipv6
+- Ability to start `oryx` with options
+- Add Metrics section
+
+### Updated
+
+- Stats section top 10 websites support ipv6
 
 ## v0.4 - 2024-10-13
 
