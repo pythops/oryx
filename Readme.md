@@ -66,7 +66,7 @@ sudo oryx
 ```
 
 > [!NOTE]
-> You can start `oryx` with args as well. Check `oryx --help` for the available options
+> You can start `oryx` with args as well. Check `oryx --help` to see the available options
 
 ## ⌨️ Key Bindings
 
