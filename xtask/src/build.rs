@@ -53,7 +53,6 @@ pub fn build(opts: Options) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-
 /// Run linter on the project with ORYX_BIN_DIR env var set
 pub fn lint() -> Result<(), anyhow::Error> {
     set_ebpf_build_base_dir("debug");

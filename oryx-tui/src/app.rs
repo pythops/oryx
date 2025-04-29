@@ -2,7 +2,7 @@ use clap::ArgMatches;
 use itertools::Itertools;
 use oryx_common::{
     protocols::{LinkProtocol, NetworkProtocol, TransportProtocol},
-    RawPacket,
+    RawFrame,
 };
 use ratatui::{
     layout::{Constraint, Direction, Layout},
@@ -19,7 +19,7 @@ use std::{
 use crate::{
     filter::Filter,
     help::Help,
-    packet::{direction::TrafficDirection, NetworkPacket},
+    packet::{direction::TrafficDirection, EthFrame},
 };
 use crate::{filter::IoChannels, notification::Notification};
 use crate::{packet::AppPacket, section::Section};
@@ -39,7 +39,7 @@ pub enum ActivePopup {
 
 #[derive(Debug)]
 pub struct DataEventHandler {
-    pub sender: kanal::Sender<[u8; RawPacket::LEN]>,
+    pub sender: kanal::Sender<[u8; RawFrame::LEN]>,
     pub handler: thread::JoinHandle<()>,
 }
 
@@ -52,7 +52,7 @@ pub struct App {
     pub packets: Arc<RwLock<Vec<AppPacket>>>,
     pub notifications: Vec<Notification>,
     pub section: Section,
-    pub data_channel_sender: kanal::Sender<([u8; RawPacket::LEN], TrafficDirection)>,
+    pub data_channel_sender: kanal::Sender<([u8; RawFrame::LEN], TrafficDirection)>,
     pub is_editing: bool,
     pub active_popup: Option<ActivePopup>,
     pub start_from_cli: bool,
@@ -60,9 +60,7 @@ pub struct App {
 
 impl App {
     pub fn new(cli_args: &ArgMatches) -> Self {
-        let packets = Arc::new(RwLock::new(Vec::with_capacity(
-            RawPacket::LEN * 1024 * 1024,
-        )));
+        let packets = Arc::new(RwLock::new(Vec::with_capacity(RawFrame::LEN * 1024 * 1024)));
 
         let (sender, receiver) = kanal::unbounded();
 
@@ -71,13 +69,15 @@ impl App {
         thread::spawn({
             let packets = packets.clone();
             move || loop {
-                if let Ok((raw_packet, direction)) = receiver.recv() {
-                    let network_packet = NetworkPacket::from(raw_packet);
+                if let Ok((raw_frame, direction)) = receiver.recv() {
+                    let eth_frame = EthFrame::from(raw_frame);
+                    let network_packet = eth_frame.payload;
                     let mut packets = packets.write().unwrap();
                     if packets.len() == packets.capacity() {
                         packets.reserve(1024 * 1024);
                     }
                     let app_packet = AppPacket {
+                        eth_header: eth_frame.header,
                         packet: network_packet,
                         direction,
                     };

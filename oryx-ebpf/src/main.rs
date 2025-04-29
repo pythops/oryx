@@ -18,11 +18,11 @@ use network_types::{
 };
 use oryx_common::{
     protocols::{LinkProtocol, NetworkProtocol, Protocol, TransportProtocol},
-    ProtoHdr, RawPacket, MAX_FIREWALL_RULES, MAX_RULES_PORT,
+    ProtoHdr, RawFrame, RawPacket, MAX_FIREWALL_RULES, MAX_RULES_PORT,
 };
 
 #[map]
-static DATA: RingBuf = RingBuf::with_byte_size(4096 * RawPacket::LEN as u32, 0);
+static DATA: RingBuf = RingBuf::with_byte_size(4096 * RawFrame::LEN as u32, 0);
 
 #[map]
 static NETWORK_FILTERS: Array<u32> = Array::with_max_entries(8, 0);
@@ -56,8 +56,8 @@ pub fn oryx(ctx: TcContext) -> i32 {
 }
 
 #[inline]
-fn submit(packet: RawPacket) {
-    if let Some(mut buf) = DATA.reserve::<RawPacket>(0) {
+fn submit(packet: RawFrame) {
+    if let Some(mut buf) = DATA.reserve::<RawFrame>(0) {
         unsafe { (*buf.as_mut_ptr()) = packet };
         buf.submit(0);
     }
@@ -183,10 +183,13 @@ fn process(ctx: TcContext) -> Result<i32, ()> {
                         return Ok(TC_ACT_PIPE);
                     }
 
-                    submit(RawPacket::Ip(
-                        IpHdr::V4(header),
-                        ProtoHdr::Tcp(unsafe { *tcphdr }),
-                    ));
+                    submit(RawFrame {
+                        header: ethhdr,
+                        payload: RawPacket::Ip(
+                            IpHdr::V4(header),
+                            ProtoHdr::Tcp(unsafe { *tcphdr }),
+                        ),
+                    });
                 }
                 IpProto::Udp => {
                     let udphdr: *const UdpHdr = ptr_at(&ctx, EthHdr::LEN + Ipv4Hdr::LEN)?;
@@ -207,20 +210,26 @@ fn process(ctx: TcContext) -> Result<i32, ()> {
                         return Ok(TC_ACT_PIPE);
                     }
 
-                    submit(RawPacket::Ip(
-                        IpHdr::V4(header),
-                        ProtoHdr::Udp(unsafe { *udphdr }),
-                    ));
+                    submit(RawFrame {
+                        header: ethhdr,
+                        payload: RawPacket::Ip(
+                            IpHdr::V4(header),
+                            ProtoHdr::Udp(unsafe { *udphdr }),
+                        ),
+                    });
                 }
                 IpProto::Icmp => {
                     if filter_packet(Protocol::Network(NetworkProtocol::Icmp)) {
                         return Ok(TC_ACT_PIPE);
                     }
                     let icmphdr: *const IcmpHdr = ptr_at(&ctx, EthHdr::LEN + Ipv4Hdr::LEN)?;
-                    submit(RawPacket::Ip(
-                        IpHdr::V4(header),
-                        ProtoHdr::Icmp(unsafe { *icmphdr }),
-                    ));
+                    submit(RawFrame {
+                        header: ethhdr,
+                        payload: RawPacket::Ip(
+                            IpHdr::V4(header),
+                            ProtoHdr::Icmp(unsafe { *icmphdr }),
+                        ),
+                    });
                 }
                 _ => {}
             }
@@ -252,10 +261,13 @@ fn process(ctx: TcContext) -> Result<i32, ()> {
                     {
                         return Ok(TC_ACT_PIPE);
                     }
-                    submit(RawPacket::Ip(
-                        IpHdr::V6(header),
-                        ProtoHdr::Tcp(unsafe { *tcphdr }),
-                    ));
+                    submit(RawFrame {
+                        header: ethhdr,
+                        payload: RawPacket::Ip(
+                            IpHdr::V6(header),
+                            ProtoHdr::Tcp(unsafe { *tcphdr }),
+                        ),
+                    });
                 }
                 IpProto::Udp => {
                     let udphdr: *const UdpHdr = ptr_at(&ctx, EthHdr::LEN + Ipv6Hdr::LEN)?;
@@ -275,20 +287,26 @@ fn process(ctx: TcContext) -> Result<i32, ()> {
                     {
                         return Ok(TC_ACT_PIPE);
                     }
-                    submit(RawPacket::Ip(
-                        IpHdr::V6(header),
-                        ProtoHdr::Udp(unsafe { *udphdr }),
-                    ));
+                    submit(RawFrame {
+                        header: ethhdr,
+                        payload: RawPacket::Ip(
+                            IpHdr::V6(header),
+                            ProtoHdr::Udp(unsafe { *udphdr }),
+                        ),
+                    });
                 }
                 IpProto::Icmp => {
                     if filter_packet(Protocol::Network(NetworkProtocol::Icmp)) {
                         return Ok(TC_ACT_PIPE);
                     }
                     let icmphdr: *const IcmpHdr = ptr_at(&ctx, EthHdr::LEN + Ipv6Hdr::LEN)?;
-                    submit(RawPacket::Ip(
-                        IpHdr::V6(header),
-                        ProtoHdr::Icmp(unsafe { *icmphdr }),
-                    ));
+                    submit(RawFrame {
+                        header: ethhdr,
+                        payload: RawPacket::Ip(
+                            IpHdr::V6(header),
+                            ProtoHdr::Icmp(unsafe { *icmphdr }),
+                        ),
+                    });
                 }
                 _ => {}
             }
@@ -298,7 +316,10 @@ fn process(ctx: TcContext) -> Result<i32, ()> {
                 return Ok(TC_ACT_PIPE);
             }
             let header: ArpHdr = ctx.load(EthHdr::LEN).map_err(|_| ())?;
-            submit(RawPacket::Arp(header));
+            submit(RawFrame {
+                header: ethhdr,
+                payload: RawPacket::Arp(header),
+            });
         }
         _ => {}
     };
