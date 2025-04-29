@@ -52,3 +52,23 @@ pub fn build(opts: Options) -> Result<(), anyhow::Error> {
     build_project(&opts).context("Error while building userspace application")?;
     Ok(())
 }
+
+
+/// Run linter on the project with ORYX_BIN_DIR env var set
+pub fn lint() -> Result<(), anyhow::Error> {
+    set_ebpf_build_base_dir("debug");
+    let status = Command::new("cargo")
+        .args([
+            "clippy",
+            "--workspace",
+            "--all-features",
+            "--",
+            "-D",
+            "warnings",
+        ])
+        .status()
+        .expect("failed to build userspace");
+
+    assert!(status.success());
+    Ok(())
+}

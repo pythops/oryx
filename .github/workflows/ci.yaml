@@ -21,11 +21,11 @@ jobs:
         run: cargo xtask build-ebpf
 
       - name: Build oryx-tui
-        run: cargo build
+        run: cargo xtask build
 
       - name: Linting
         run: |
-          cargo clippy --workspace --all-features -- -D warnings
+          cargo xtask lint
           cargo fmt --all -- --check
           cd oryx-ebpf
           cargo clippy --workspace --all-features -- -D warnings

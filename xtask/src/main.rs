@@ -17,6 +17,7 @@ enum Command {
     BuildEbpf(build_ebpf::Options),
     Run(run::Options),
     Build(build::Options),
+    Lint,
 }
 
 fn main() {
@@ -27,6 +28,7 @@ fn main() {
         BuildEbpf(opts) => build_ebpf::build_ebpf(opts),
         Run(opts) => run::run(opts),
         Build(opts) => build::build(opts),
+        Lint => build::lint(),
     };
 
     if let Err(e) = ret {
