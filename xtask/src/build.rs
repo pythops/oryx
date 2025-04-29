@@ -1,4 +1,4 @@
-use std::process::Command;
+use std::{path::Path, process::Command};
 
 use anyhow::Context as _;
 use clap::Parser;
@@ -15,12 +15,24 @@ pub struct Options {
     pub release: bool,
 }
 
+/// Set the ORYX_BIN_PATH env var based on build option
+fn set_ebpf_build_base_dir(build_type: &str) {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join(format!("../target/bpfel-unknown-none/{}/oryx", build_type))
+        .to_path_buf();
+    std::env::set_var("ORYX_BIN_PATH", &path);
+}
+
 /// Build the project
 fn build_project(opts: &Options) -> Result<(), anyhow::Error> {
     let mut args = vec!["build"];
     if opts.release {
-        args.push("--release")
+        args.push("--release");
+        set_ebpf_build_base_dir("release");
+    } else {
+        set_ebpf_build_base_dir("debug");
     }
+
     let status = Command::new("cargo")
         .args(&args)
         .status()
