@@ -18,7 +18,7 @@ pub struct Options {
 /// Set the ORYX_BIN_PATH env var based on build option
 fn set_ebpf_build_base_dir(build_type: &str) {
     let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join(format!("../target/bpfel-unknown-none/{}/oryx", build_type))
+        .join(format!("../target/bpfel-unknown-none/{build_type}/oryx"))
         .to_path_buf();
     std::env::set_var("ORYX_BIN_PATH", &path);
 }
