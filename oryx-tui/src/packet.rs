@@ -33,8 +33,8 @@ pub enum NetworkPacket {
 impl Display for NetworkPacket {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            Self::Arp(packet) => write!(f, "{}", packet),
-            Self::Ip(packet) => write!(f, "{}", packet),
+            Self::Arp(packet) => write!(f, "{packet}"),
+            Self::Ip(packet) => write!(f, "{packet}"),
         }
     }
 }

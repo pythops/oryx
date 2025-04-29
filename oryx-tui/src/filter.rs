@@ -645,12 +645,12 @@ impl Filter {
                             .map(|filter| {
                                 if self.transport.applied_protocols.contains(filter) {
                                     Span::styled(
-                                        format!(" {}  ", filter),
+                                        format!(" {filter}  "),
                                         Style::default().light_green(),
                                     )
                                 } else {
                                     Span::styled(
-                                        format!(" {}  ", filter),
+                                        format!(" {filter}  "),
                                         Style::default().light_red(),
                                     )
                                 }
@@ -666,12 +666,12 @@ impl Filter {
                             .map(|filter| {
                                 if self.network.applied_protocols.contains(filter) {
                                     Span::styled(
-                                        format!(" {}  ", filter),
+                                        format!(" {filter}  "),
                                         Style::default().light_green(),
                                     )
                                 } else {
                                     Span::styled(
-                                        format!(" {}  ", filter),
+                                        format!(" {filter}  "),
                                         Style::default().light_red(),
                                     )
                                 }
@@ -687,12 +687,12 @@ impl Filter {
                             .map(|filter| {
                                 if self.link.applied_protocols.contains(filter) {
                                     Span::styled(
-                                        format!(" {}  ", filter),
+                                        format!(" {filter}  "),
                                         Style::default().light_green(),
                                     )
                                 } else {
                                     Span::styled(
-                                        format!(" {}  ", filter),
+                                        format!(" {filter}  "),
                                         Style::default().light_red(),
                                     )
                                 }
@@ -708,12 +708,12 @@ impl Filter {
                             .map(|filter| {
                                 if self.traffic_direction.applied_direction.contains(filter) {
                                     Span::styled(
-                                        format!("󰞁 {}  ", filter),
+                                        format!("󰞁 {filter}  "),
                                         Style::default().light_green(),
                                     )
                                 } else {
                                     Span::styled(
-                                        format!("󰿝 {}  ", filter),
+                                        format!("󰿝 {filter}  "),
                                         Style::default().light_red(),
                                     )
                                 }
