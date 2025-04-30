@@ -26,20 +26,16 @@ impl ArpPacket {
     pub fn render(self, block: Rect, frame: &mut Frame) {
         let block = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Fill(1),
-                Constraint::Length(13),
-                Constraint::Fill(1),
-            ])
-            .flex(ratatui::layout::Flex::SpaceBetween)
+            .constraints([Constraint::Length(11), Constraint::Fill(1)])
+            .flex(ratatui::layout::Flex::SpaceAround)
             .margin(1)
-            .split(block)[1];
+            .split(block)[0];
 
         let (title_block, data_block) = {
             let chunks = Layout::default()
                 .direction(Direction::Horizontal)
                 .constraints([Constraint::Length(6), Constraint::Fill(1)])
-                .margin(2)
+                .margin(1)
                 .split(block);
 
             (chunks[0], chunks[1])
@@ -94,7 +90,7 @@ impl ArpPacket {
                 Span::from(self.dst_ip.to_string()),
             ]),
         ];
-        let table = Table::new(infos, widths).column_spacing(3).block(
+        let table = Table::new(infos, widths).column_spacing(2).block(
             Block::default()
                 .borders(Borders::LEFT)
                 .border_style(Style::new().bold().yellow())

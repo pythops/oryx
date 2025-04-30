@@ -42,7 +42,7 @@ pub enum BlockedPort {
 impl Display for BlockedPort {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            BlockedPort::Single(p) => write!(f, "{}", p),
+            BlockedPort::Single(p) => write!(f, "{p}"),
             BlockedPort::All => write!(f, "*"),
         }
     }
@@ -605,13 +605,7 @@ impl Firewall {
                         return Ok(());
                     }
                     let i = match self.state.selected() {
-                        Some(i) => {
-                            if i > 1 {
-                                i - 1
-                            } else {
-                                0
-                            }
-                        }
+                        Some(i) => i.saturating_sub(1),
                         None => 0,
                     };
 
