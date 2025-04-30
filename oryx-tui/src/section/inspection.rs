@@ -665,7 +665,7 @@ impl Inspection {
                     let chunks = Layout::default()
                         .direction(Direction::Vertical)
                         .constraints(Constraint::from_percentages([70, 30]))
-                        .flex(ratatui::layout::Flex::SpaceAround)
+                        .flex(ratatui::layout::Flex::Center)
                         .margin(2)
                         .split(block);
 

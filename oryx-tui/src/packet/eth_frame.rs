@@ -55,7 +55,7 @@ impl EthFrameHeader {
 
         let infos = [
             Row::new(vec![
-                Span::styled("Dest. MAC Address", Style::new().bold()),
+                Span::styled("Dest MAC Address", Style::new().bold()),
                 Span::from(self.dst.to_string()),
             ]),
             Row::new(vec![

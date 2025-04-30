@@ -56,9 +56,9 @@ pub fn oryx(ctx: TcContext) -> i32 {
 }
 
 #[inline]
-fn submit(packet: RawFrame) {
+fn submit(frame: RawFrame) {
     if let Some(mut buf) = DATA.reserve::<RawFrame>(0) {
-        unsafe { (*buf.as_mut_ptr()) = packet };
+        unsafe { (*buf.as_mut_ptr()) = frame };
         buf.submit(0);
     }
 }
