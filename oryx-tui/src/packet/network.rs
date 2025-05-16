@@ -145,7 +145,7 @@ impl Ipv4Packet {
             .bold()
             .block(Block::new().padding(Padding::top({
                 if title_block.height % 2 == 0 {
-                    title_block.height / 2 - 1
+                    (title_block.height / 2).saturating_sub(1)
                 } else {
                     title_block.height / 2
                 }
@@ -232,7 +232,7 @@ impl Ipv6Packet {
             .bold()
             .block(Block::new().padding(Padding::top({
                 if title_block.height % 2 == 0 {
-                    title_block.height / 2 - 1
+                    (title_block.height / 2).saturating_sub(1)
                 } else {
                     title_block.height / 2
                 }
@@ -314,7 +314,7 @@ impl IcmpPacket {
             .bold()
             .block(Block::new().padding(Padding::top({
                 if title_block.height % 2 == 0 {
-                    title_block.height / 2 - 1
+                    (title_block.height / 2).saturating_sub(1)
                 } else {
                     title_block.height / 2
                 }
