@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex, RwLock};
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Flex, Layout, Margin, Rect},
-    style::{Color, Style, Stylize},
+    style::{Style, Stylize},
     text::{Line, Span},
     widgets::{
         Block, BorderType, Borders, Cell, Clear, HighlightSpacing, Padding, Paragraph, Row,
@@ -180,7 +180,7 @@ impl Inspection {
                 if i > 1 {
                     i - 1
                 } else if i == 0 && self.packet_end_index > self.packet_window_size {
-                    // shit the window by one
+                    // shift the window by one
                     self.packet_end_index -= 1;
                     0
                 } else {
