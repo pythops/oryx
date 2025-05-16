@@ -31,21 +31,26 @@ impl From<EthHdr> for EthFrameHeader {
 
 impl EthFrameHeader {
     pub fn render(self, block: Rect, frame: &mut Frame) {
+        let block = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(2), Constraint::Fill(1)])
+            .split(block)[0];
+
         let (title_block, data_block) = {
             let chunks = Layout::default()
                 .direction(Direction::Horizontal)
-                .constraints([Constraint::Length(6), Constraint::Fill(1)])
-                .margin(2)
+                .constraints([Constraint::Length(10), Constraint::Fill(1)])
+                .horizontal_margin(4)
                 .split(block);
 
             (chunks[0], chunks[1])
         };
 
-        let title = Paragraph::new("Frame")
+        let title = Paragraph::new("Ethernet")
             .bold()
             .block(Block::new().padding(Padding::top({
                 if title_block.height % 2 == 0 {
-                    title_block.height / 2 - 1
+                    (title_block.height / 2).saturating_sub(1)
                 } else {
                     title_block.height / 2
                 }

@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex, RwLock};
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Flex, Layout, Margin, Rect},
-    style::{Style, Stylize},
+    style::{Color, Style, Stylize},
     text::{Line, Span},
     widgets::{
         Block, BorderType, Borders, Cell, Clear, HighlightSpacing, Padding, Paragraph, Row,
@@ -664,20 +664,13 @@ impl Inspection {
                 let (network_packet_block, eth_frame_block) = {
                     let chunks = Layout::default()
                         .direction(Direction::Vertical)
-                        .constraints(Constraint::from_percentages([70, 30]))
+                        .constraints([Constraint::Fill(1), Constraint::Length(8)])
                         .flex(ratatui::layout::Flex::Center)
-                        .margin(2)
+                        .horizontal_margin(4)
                         .split(block);
 
                     (chunks[0], chunks[1])
                 };
-
-                // split to apply extra margin to line up with network packet rendering
-                let eth_frame_block = Layout::default()
-                    .direction(Direction::Horizontal)
-                    .constraints(Constraint::from_percentages([95, 5]))
-                    .margin(2)
-                    .split(eth_frame_block)[0];
 
                 EthFrameHeader::from(app_packet.eth_header).render(eth_frame_block, frame);
                 ip_packet.render(network_packet_block, frame)

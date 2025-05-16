@@ -31,7 +31,7 @@ impl TcpPacket {
         let (title_block, data_block) = {
             let chunks = Layout::default()
                 .direction(Direction::Horizontal)
-                .constraints([Constraint::Length(6), Constraint::Fill(1)])
+                .constraints([Constraint::Length(10), Constraint::Fill(1)])
                 .margin(2)
                 .split(block);
 
@@ -141,7 +141,7 @@ impl UdpPacket {
         let (title_block, data_block) = {
             let chunks = Layout::default()
                 .direction(Direction::Horizontal)
-                .constraints([Constraint::Length(6), Constraint::Fill(1)])
+                .constraints([Constraint::Length(10), Constraint::Fill(1)])
                 .margin(2)
                 .split(block);
 
