@@ -19,6 +19,7 @@ use crate::{
     filter::fuzzy::{self, Fuzzy},
     notification::{Notification, NotificationLevel},
     packet::{
+        eth_frame::EthFrameHeader,
         network::{IpPacket, IpProto},
         AppPacket, NetworkPacket,
     },
@@ -179,7 +180,7 @@ impl Inspection {
                 if i > 1 {
                     i - 1
                 } else if i == 0 && self.packet_end_index > self.packet_window_size {
-                    // shit the window by one
+                    // shift the window by one
                     self.packet_end_index -= 1;
                     0
                 } else {
@@ -657,9 +658,43 @@ impl Inspection {
                 .border_type(BorderType::Thick),
             block,
         );
+
         match app_packet.packet {
-            NetworkPacket::Ip(ip_packet) => ip_packet.render(block, frame),
-            NetworkPacket::Arp(arp_packet) => arp_packet.render(block, frame),
+            NetworkPacket::Ip(ip_packet) => {
+                let (network_packet_block, eth_frame_block) = {
+                    let chunks = Layout::default()
+                        .direction(Direction::Vertical)
+                        .constraints([Constraint::Fill(1), Constraint::Length(8)])
+                        .flex(ratatui::layout::Flex::Center)
+                        .horizontal_margin(4)
+                        .split(block);
+
+                    (chunks[0], chunks[1])
+                };
+
+                EthFrameHeader::from(app_packet.eth_header).render(eth_frame_block, frame);
+                ip_packet.render(network_packet_block, frame)
+            }
+            NetworkPacket::Arp(arp_packet) => {
+                let (arp_block, eth_frame_block) = {
+                    let chunks = Layout::default()
+                        .direction(Direction::Vertical)
+                        .constraints([
+                            Constraint::Fill(1),
+                            Constraint::Percentage(50),
+                            Constraint::Length(6),
+                            Constraint::Fill(1),
+                        ])
+                        .flex(ratatui::layout::Flex::Center)
+                        .margin(2)
+                        .split(block);
+
+                    (chunks[1], chunks[2])
+                };
+
+                arp_packet.render(arp_block, frame);
+                EthFrameHeader::from(app_packet.eth_header).render(eth_frame_block, frame);
+            }
         };
     }
 }

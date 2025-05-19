@@ -134,7 +134,7 @@ impl Ipv4Packet {
         let (title_block, data_block) = {
             let chunks = Layout::default()
                 .direction(Direction::Horizontal)
-                .constraints([Constraint::Length(6), Constraint::Fill(1)])
+                .constraints([Constraint::Length(10), Constraint::Fill(1)])
                 .margin(2)
                 .split(block);
 
@@ -145,7 +145,7 @@ impl Ipv4Packet {
             .bold()
             .block(Block::new().padding(Padding::top({
                 if title_block.height % 2 == 0 {
-                    title_block.height / 2 - 1
+                    (title_block.height / 2).saturating_sub(1)
                 } else {
                     title_block.height / 2
                 }
@@ -221,7 +221,7 @@ impl Ipv6Packet {
         let (title_block, data_block) = {
             let chunks = Layout::default()
                 .direction(Direction::Horizontal)
-                .constraints([Constraint::Length(6), Constraint::Fill(1)])
+                .constraints([Constraint::Length(10), Constraint::Fill(1)])
                 .margin(2)
                 .split(block);
 
@@ -232,7 +232,7 @@ impl Ipv6Packet {
             .bold()
             .block(Block::new().padding(Padding::top({
                 if title_block.height % 2 == 0 {
-                    title_block.height / 2 - 1
+                    (title_block.height / 2).saturating_sub(1)
                 } else {
                     title_block.height / 2
                 }
@@ -304,7 +304,7 @@ impl IcmpPacket {
         let (title_block, data_block) = {
             let chunks = Layout::default()
                 .direction(Direction::Horizontal)
-                .constraints([Constraint::Length(6), Constraint::Fill(1)])
+                .constraints([Constraint::Length(10), Constraint::Fill(1)])
                 .margin(2)
                 .split(block);
 
@@ -314,7 +314,7 @@ impl IcmpPacket {
             .bold()
             .block(Block::new().padding(Padding::top({
                 if title_block.height % 2 == 0 {
-                    title_block.height / 2 - 1
+                    (title_block.height / 2).saturating_sub(1)
                 } else {
                     title_block.height / 2
                 }

@@ -13,7 +13,7 @@ use oryx_common::{
         LinkProtocol, NetworkProtocol, Protocol, TransportProtocol, NB_LINK_PROTOCOL,
         NB_NETWORK_PROTOCOL, NB_TRANSPORT_PROTOCOL,
     },
-    RawPacket,
+    RawFrame,
 };
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Flex, Layout, Margin, Rect},
@@ -159,7 +159,7 @@ impl Filter {
     pub fn start(
         &mut self,
         notification_sender: kanal::Sender<Event>,
-        data_sender: kanal::Sender<([u8; RawPacket::LEN], TrafficDirection)>,
+        data_sender: kanal::Sender<([u8; RawFrame::LEN], TrafficDirection)>,
     ) -> AppResult<()> {
         let iface = self.interface.selected_interface.name.clone();
 
@@ -645,12 +645,12 @@ impl Filter {
                             .map(|filter| {
                                 if self.transport.applied_protocols.contains(filter) {
                                     Span::styled(
-                                        format!(" {}  ", filter),
+                                        format!(" {filter}  "),
                                         Style::default().light_green(),
                                     )
                                 } else {
                                     Span::styled(
-                                        format!(" {}  ", filter),
+                                        format!(" {filter}  "),
                                         Style::default().light_red(),
                                     )
                                 }
@@ -666,12 +666,12 @@ impl Filter {
                             .map(|filter| {
                                 if self.network.applied_protocols.contains(filter) {
                                     Span::styled(
-                                        format!(" {}  ", filter),
+                                        format!(" {filter}  "),
                                         Style::default().light_green(),
                                     )
                                 } else {
                                     Span::styled(
-                                        format!(" {}  ", filter),
+                                        format!(" {filter}  "),
                                         Style::default().light_red(),
                                     )
                                 }
@@ -687,12 +687,12 @@ impl Filter {
                             .map(|filter| {
                                 if self.link.applied_protocols.contains(filter) {
                                     Span::styled(
-                                        format!(" {}  ", filter),
+                                        format!(" {filter}  "),
                                         Style::default().light_green(),
                                     )
                                 } else {
                                     Span::styled(
-                                        format!(" {}  ", filter),
+                                        format!(" {filter}  "),
                                         Style::default().light_red(),
                                     )
                                 }
@@ -708,12 +708,12 @@ impl Filter {
                             .map(|filter| {
                                 if self.traffic_direction.applied_direction.contains(filter) {
                                     Span::styled(
-                                        format!("󰞁 {}  ", filter),
+                                        format!("󰞁 {filter}  "),
                                         Style::default().light_green(),
                                     )
                                 } else {
                                     Span::styled(
-                                        format!("󰿝 {}  ", filter),
+                                        format!("󰿝 {filter}  "),
                                         Style::default().light_red(),
                                     )
                                 }
