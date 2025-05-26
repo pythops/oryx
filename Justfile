@@ -33,6 +33,3 @@ build:
 # Profile
 profile:
     CARGO_PROFILE_RELEASE_DEBUG=true cargo flamegraph  --root --bin oryx
-
-show_maps:
-    sudo watch -n3 "python3 maps.py"
