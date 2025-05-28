@@ -68,7 +68,7 @@ impl SynFlood {
                 app_packets[start_index..app_packets.len().saturating_sub(1)]
                     .iter()
                     .for_each(|app_packet| {
-                        if let NetworkPacket::Ip(ip_packet) = app_packet.packet {
+                        if let NetworkPacket::Ip(ip_packet) = app_packet.frame.payload {
                             if let IpPacket::V4(ipv4_packet) = ip_packet {
                                 if let IpProto::Tcp(tcp_packet) = ipv4_packet.proto {
                                     if tcp_packet.syn == 1 {

@@ -98,7 +98,11 @@ impl Fuzzy {
         self.packets = packets
             .iter()
             .copied()
-            .filter(|p| p.packet.to_string().contains(self.filter.value()))
+            .filter(|p| {
+                p.frame.payload.to_string().contains(self.filter.value())
+                    | p.pid
+                        .is_some_and(|v| v.to_string().contains(self.filter.value()))
+            })
             .collect::<Vec<AppPacket>>();
     }
 
@@ -107,7 +111,11 @@ impl Fuzzy {
             &mut packets
                 .iter()
                 .copied()
-                .filter(|p| p.packet.to_string().contains(self.filter.value()))
+                .filter(|p| {
+                    p.frame.payload.to_string().contains(self.filter.value())
+                        | p.pid
+                            .is_some_and(|v| v.to_string().contains(self.filter.value()))
+                })
                 .collect::<Vec<AppPacket>>(),
         );
     }

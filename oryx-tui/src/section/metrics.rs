@@ -320,7 +320,7 @@ impl Metrics {
                                     break 'main;
                                 }
                                 if app_packet.direction == TrafficDirection::Ingress {
-                                    if let NetworkPacket::Ip(packet) = app_packet.packet {
+                                    if let NetworkPacket::Ip(packet) = app_packet.frame.payload {
                                         match packet {
                                             IpPacket::V4(ipv4_packet) => match ipv4_packet.proto {
                                                 IpProto::Tcp(tcp_packet) => {

@@ -21,7 +21,7 @@ pub fn handle_key_events(
         match key_event.code {
             KeyCode::Enter => {
                 if app.filter.focused_block == FocusedBlock::Apply {
-                    app.section.stats = Some(Stats::new(app.frames.clone()));
+                    app.section.stats = Some(Stats::new(app.app_packets.clone()));
                     app.filter
                         .start(event_sender.clone(), app.data_channel_sender.clone())?;
 

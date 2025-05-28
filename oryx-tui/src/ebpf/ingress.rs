@@ -13,7 +13,7 @@ use aya::{
     EbpfLoader,
 };
 use log::error;
-use oryx_common::{protocols::Protocol, RawFrame, MAX_RULES_PORT};
+use oryx_common::{protocols::Protocol, RawData, MAX_RULES_PORT};
 
 use crate::{
     event::Event,
@@ -32,7 +32,7 @@ use super::{
 pub fn load_ingress(
     iface: String,
     notification_sender: kanal::Sender<Event>,
-    data_sender: kanal::Sender<([u8; RawFrame::LEN], TrafficDirection)>,
+    data_sender: kanal::Sender<([u8; RawData::LEN], TrafficDirection)>,
     filter_channel_receiver: kanal::Receiver<FilterChannelSignal>,
     firewall_ingress_receiver: kanal::Receiver<FirewallSignal>,
     terminate: Arc<AtomicBool>,
@@ -223,8 +223,8 @@ pub fn load_ingress(
                             if terminate.load(std::sync::atomic::Ordering::Relaxed) {
                                 break;
                             }
-                            let frame: [u8; RawFrame::LEN] = item.to_owned().try_into().unwrap();
-                            data_sender.send((frame, TrafficDirection::Ingress)).ok();
+                            let data: [u8; RawData::LEN] = item.to_owned().try_into().unwrap();
+                            data_sender.send((data, TrafficDirection::Ingress)).ok();
                         }
                     }
                 }

@@ -2,7 +2,7 @@ use clap::ArgMatches;
 use itertools::Itertools;
 use oryx_common::{
     protocols::{LinkProtocol, NetworkProtocol, TransportProtocol},
-    RawFrame,
+    RawData, RawFrame,
 };
 use ratatui::{
     layout::{Constraint, Direction, Layout},
@@ -49,10 +49,10 @@ pub struct App {
     pub help: Help,
     pub filter: Filter,
     pub start_sniffing: bool,
-    pub frames: Arc<RwLock<Vec<AppPacket>>>,
+    pub app_packets: Arc<RwLock<Vec<AppPacket>>>,
     pub notifications: Vec<Notification>,
     pub section: Section,
-    pub data_channel_sender: kanal::Sender<([u8; RawFrame::LEN], TrafficDirection)>,
+    pub data_channel_sender: kanal::Sender<([u8; RawData::LEN], TrafficDirection)>,
     pub is_editing: bool,
     pub active_popup: Option<ActivePopup>,
     pub start_from_cli: bool,
@@ -60,28 +60,30 @@ pub struct App {
 
 impl App {
     pub fn new(cli_args: &ArgMatches) -> Self {
-        let frames = Arc::new(RwLock::new(Vec::with_capacity(RawFrame::LEN * 1024 * 1024)));
+        let app_packets = Arc::new(RwLock::new(Vec::with_capacity(
+            AppPacket::LEN * 1024 * 1024,
+        )));
 
         let (sender, receiver) = kanal::unbounded();
 
         let firewall_channels = IoChannels::new();
 
         thread::spawn({
-            let frames = frames.clone();
+            let app_packets = app_packets.clone();
             move || loop {
-                if let Ok((raw_frame, direction)) = receiver.recv() {
-                    let eth_frame = EthFrame::from(raw_frame);
-                    let network_packet = eth_frame.payload;
-                    let mut frames = frames.write().unwrap();
-                    if frames.len() == frames.capacity() {
-                        frames.reserve(1024 * 1024);
-                    }
+                if let Ok((raw_data, direction)) = receiver.recv() {
+                    let data = RawData::from(raw_data);
+                    let frame = EthFrame::from(data.frame);
+                    let pid = data.pid;
+
+                    let mut app_packets = app_packets.write().unwrap();
+
                     let app_packet = AppPacket {
-                        eth_header: eth_frame.header,
-                        packet: network_packet,
+                        frame,
                         direction,
+                        pid,
                     };
-                    frames.push(app_packet);
+                    app_packets.push(app_packet);
                 }
             }
         });
@@ -186,9 +188,9 @@ impl App {
                 direction,
             ),
             start_sniffing: false,
-            frames: frames.clone(),
+            app_packets: app_packets.clone(),
             notifications: Vec::new(),
-            section: Section::new(frames.clone(), firewall_channels.clone()),
+            section: Section::new(app_packets.clone(), firewall_channels.clone()),
             data_channel_sender: sender,
             is_editing: false,
             active_popup: None,

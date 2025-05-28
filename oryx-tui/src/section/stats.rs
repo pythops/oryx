@@ -60,7 +60,7 @@ impl Stats {
                     let mut packet_stats = packet_stats.lock().unwrap();
 
                     for app_packet in app_packets[last_index..].iter() {
-                        match app_packet.packet {
+                        match app_packet.frame.payload {
                             NetworkPacket::Arp(_) => {
                                 packet_stats.link.arp += 1;
                             }

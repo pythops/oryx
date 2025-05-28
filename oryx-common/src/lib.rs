@@ -1,4 +1,5 @@
 #![no_std]
+#![feature(trivial_bounds)]
 
 use core::mem;
 
@@ -9,8 +10,25 @@ pub mod protocols;
 pub const MAX_FIREWALL_RULES: u32 = 32;
 pub const MAX_RULES_PORT: usize = 32;
 
-#[repr(C)]
 #[derive(Clone)]
+#[repr(C)]
+pub struct RawData {
+    pub frame: RawFrame,
+    pub pid: Option<u32>,
+}
+
+impl RawData {
+    pub const LEN: usize = mem::size_of::<RawData>();
+}
+
+impl From<[u8; RawData::LEN]> for RawData {
+    fn from(value: [u8; RawData::LEN]) -> Self {
+        unsafe { core::mem::transmute::<[u8; RawData::LEN], Self>(value) }
+    }
+}
+
+#[derive(Clone)]
+#[repr(C)]
 pub struct RawFrame {
     pub header: EthHdr,
     pub payload: RawPacket,
@@ -38,8 +56,8 @@ impl Clone for RawPacket {
     }
 }
 
-#[repr(C)]
 #[derive(Copy, Clone)]
+#[repr(C)]
 pub enum ProtoHdr {
     Tcp(TcpHdr),
     Udp(UdpHdr),
