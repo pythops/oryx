@@ -58,7 +58,7 @@ pub fn load_egress(
             {
                 Ok(v) => v,
                 Err(e) => {
-                    error!("Fail to load the egress eBPF bytecode. {}", e);
+                    error!("Fail to load the egress eBPF bytecode. {e}");
                     Notification::send(
                         "Fail to load the egress eBPF bytecode",
                         NotificationLevel::Error,
@@ -92,7 +92,7 @@ pub fn load_egress(
                 bpf.program_mut("oryx").unwrap().try_into().unwrap();
 
             if let Err(e) = program.load() {
-                error!("Fail to load the egress eBPF program to the kernel. {}", e);
+                error!("Fail to load the egress eBPF program to the kernel. {e}");
                 Notification::send(
                     "Fail to load the egress eBPF program to the kernel",
                     NotificationLevel::Error,
@@ -103,10 +103,7 @@ pub fn load_egress(
             };
 
             if let Err(e) = program.attach(&iface, TcAttachType::Egress) {
-                error!(
-                    "Failed to attach the egress eBPF program to the interface.{}",
-                    e
-                );
+                error!("Failed to attach the egress eBPF program to the interface.{e}",);
                 Notification::send(
                     "Failed to attach the egress eBPF program to the interface",
                     NotificationLevel::Error,

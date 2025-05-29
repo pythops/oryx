@@ -58,7 +58,7 @@ pub fn load_ingress(
             {
                 Ok(v) => v,
                 Err(e) => {
-                    error!("Failed to load the ingress eBPF bytecode. {}", e);
+                    error!("Failed to load the ingress eBPF bytecode. {e}");
                     Notification::send(
                         "Failed to load the ingress eBPF bytecode",
                         NotificationLevel::Error,
@@ -93,10 +93,7 @@ pub fn load_ingress(
                 bpf.program_mut("oryx").unwrap().try_into().unwrap();
 
             if let Err(e) = program.load() {
-                error!(
-                    "Failed to load the ingress eBPF program to the kernel. {}",
-                    e
-                );
+                error!("Failed to load the ingress eBPF program to the kernel. {e}",);
                 Notification::send(
                     "Failed to load the ingress eBPF program to the kernel",
                     NotificationLevel::Error,
@@ -107,10 +104,7 @@ pub fn load_ingress(
             };
 
             if let Err(e) = program.attach(&iface, TcAttachType::Ingress) {
-                error!(
-                    "Failed to attach the ingress eBPF program to the interface. {}",
-                    e
-                );
+                error!("Failed to attach the ingress eBPF program to the interface. {e}",);
                 Notification::send(
                     "Failed to attach the ingress eBPF program to the interface",
                     NotificationLevel::Error,
