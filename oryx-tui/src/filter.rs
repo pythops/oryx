@@ -13,7 +13,7 @@ use oryx_common::{
         LinkProtocol, NetworkProtocol, Protocol, TransportProtocol, NB_LINK_PROTOCOL,
         NB_NETWORK_PROTOCOL, NB_TRANSPORT_PROTOCOL,
     },
-    RawFrame,
+    RawData,
 };
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Flex, Layout, Margin, Rect},
@@ -159,7 +159,7 @@ impl Filter {
     pub fn start(
         &mut self,
         notification_sender: kanal::Sender<Event>,
-        data_sender: kanal::Sender<([u8; RawFrame::LEN], TrafficDirection)>,
+        data_sender: kanal::Sender<([u8; RawData::LEN], TrafficDirection)>,
     ) -> AppResult<()> {
         let iface = self.interface.selected_interface.name.clone();
 

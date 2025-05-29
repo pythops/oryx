@@ -15,9 +15,15 @@ use transport::{TcpPacket, UdpPacket};
 
 #[derive(Debug, Copy, Clone)]
 pub struct AppPacket {
-    pub eth_header: EthHdr,
-    pub packet: NetworkPacket,
+    pub frame: EthFrame,
     pub direction: TrafficDirection,
+    pub pid: Option<u32>,
+}
+
+#[derive(Debug, Copy, Clone)]
+pub struct EthFrame {
+    pub header: EthHdr,
+    pub payload: NetworkPacket,
 }
 
 impl AppPacket {
@@ -39,15 +45,9 @@ impl Display for NetworkPacket {
     }
 }
 
-pub struct EthFrame {
-    pub header: EthHdr,
-    pub payload: NetworkPacket,
-}
-
-impl From<[u8; RawFrame::LEN]> for EthFrame {
-    fn from(value: [u8; RawFrame::LEN]) -> Self {
-        let raw_packet = value.as_ptr() as *const RawFrame;
-        match unsafe { &(*raw_packet).payload } {
+impl From<RawFrame> for EthFrame {
+    fn from(value: RawFrame) -> Self {
+        match value.payload {
             RawPacket::Ip(packet, proto) => match packet {
                 IpHdr::V4(ipv4_packet) => {
                     let src_ip = Ipv4Addr::from(u32::from_be(ipv4_packet.src_addr));
@@ -103,7 +103,7 @@ impl From<[u8; RawFrame::LEN]> for EthFrame {
                     };
 
                     EthFrame {
-                        header: unsafe { (*raw_packet).header },
+                        header: value.header,
                         payload: NetworkPacket::Ip(IpPacket::V4(Ipv4Packet {
                             src_ip,
                             dst_ip,
@@ -172,7 +172,7 @@ impl From<[u8; RawFrame::LEN]> for EthFrame {
                     };
 
                     EthFrame {
-                        header: unsafe { (*raw_packet).header },
+                        header: value.header,
                         payload: NetworkPacket::Ip(IpPacket::V6(Ipv6Packet {
                             traffic_class: ipv6_packet.priority(),
                             flow_label: ipv6_packet.flow_label,
@@ -193,7 +193,7 @@ impl From<[u8; RawFrame::LEN]> for EthFrame {
                 };
 
                 EthFrame {
-                    header: unsafe { (*raw_packet).header },
+                    header: value.header,
                     payload: NetworkPacket::Arp(ArpPacket {
                         htype: packet.ptype,
                         ptype: packet.ptype,

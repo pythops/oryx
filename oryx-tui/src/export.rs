@@ -39,7 +39,7 @@ pub fn export(packets: &[AppPacket]) -> AppResult<()> {
         headers.0, headers.1, headers.2, headers.3, headers.4
     )?;
     for packet in packets {
-        match packet.packet {
+        match packet.frame.payload {
             NetworkPacket::Arp(p) => {
                 writeln!(
                     file,

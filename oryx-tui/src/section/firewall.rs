@@ -308,7 +308,7 @@ impl Firewall {
             Ok(saved_rules) => saved_rules,
 
             Err(err) => {
-                error!("{}", err.to_string());
+                error!("{err}");
                 Vec::new()
             }
         };
@@ -542,7 +542,7 @@ impl Firewall {
                             crate::notification::NotificationLevel::Error,
                             sender.clone(),
                         )?;
-                        error!("Error while syncing firewall rules. {}", e);
+                        error!("Error while syncing firewall rules. {e}");
                     }
                 },
 

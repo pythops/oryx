@@ -13,7 +13,7 @@ use aya::{
     EbpfLoader,
 };
 use log::error;
-use oryx_common::{protocols::Protocol, RawFrame, MAX_RULES_PORT};
+use oryx_common::{protocols::Protocol, RawData, MAX_RULES_PORT};
 
 use crate::{
     event::Event,
@@ -32,7 +32,7 @@ use super::{
 pub fn load_egress(
     iface: String,
     notification_sender: kanal::Sender<Event>,
-    data_sender: kanal::Sender<([u8; RawFrame::LEN], TrafficDirection)>,
+    data_sender: kanal::Sender<([u8; RawData::LEN], TrafficDirection)>,
     filter_channel_receiver: kanal::Receiver<FilterChannelSignal>,
     firewall_egress_receiver: kanal::Receiver<FirewallSignal>,
     terminate: Arc<AtomicBool>,
@@ -58,7 +58,7 @@ pub fn load_egress(
             {
                 Ok(v) => v,
                 Err(e) => {
-                    error!("Fail to load the egress eBPF bytecode. {}", e);
+                    error!("Fail to load the egress eBPF bytecode. {e}");
                     Notification::send(
                         "Fail to load the egress eBPF bytecode",
                         NotificationLevel::Error,
@@ -92,7 +92,7 @@ pub fn load_egress(
                 bpf.program_mut("oryx").unwrap().try_into().unwrap();
 
             if let Err(e) = program.load() {
-                error!("Fail to load the egress eBPF program to the kernel. {}", e);
+                error!("Fail to load the egress eBPF program to the kernel. {e}");
                 Notification::send(
                     "Fail to load the egress eBPF program to the kernel",
                     NotificationLevel::Error,
@@ -103,10 +103,7 @@ pub fn load_egress(
             };
 
             if let Err(e) = program.attach(&iface, TcAttachType::Egress) {
-                error!(
-                    "Failed to attach the egress eBPF program to the interface.{}",
-                    e
-                );
+                error!("Failed to attach the egress eBPF program to the interface.{e}",);
                 Notification::send(
                     "Failed to attach the egress eBPF program to the interface",
                     NotificationLevel::Error,
@@ -219,8 +216,8 @@ pub fn load_egress(
                             if terminate.load(std::sync::atomic::Ordering::Relaxed) {
                                 break;
                             }
-                            let frame: [u8; RawFrame::LEN] = item.to_owned().try_into().unwrap();
-                            data_sender.send((frame, TrafficDirection::Egress)).ok();
+                            let data: [u8; RawData::LEN] = item.to_owned().try_into().unwrap();
+                            data_sender.send((data, TrafficDirection::Egress)).ok();
                         }
                     }
                 }

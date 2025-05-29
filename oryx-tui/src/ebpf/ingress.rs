@@ -13,7 +13,7 @@ use aya::{
     EbpfLoader,
 };
 use log::error;
-use oryx_common::{protocols::Protocol, RawFrame, MAX_RULES_PORT};
+use oryx_common::{protocols::Protocol, RawData, MAX_RULES_PORT};
 
 use crate::{
     event::Event,
@@ -32,7 +32,7 @@ use super::{
 pub fn load_ingress(
     iface: String,
     notification_sender: kanal::Sender<Event>,
-    data_sender: kanal::Sender<([u8; RawFrame::LEN], TrafficDirection)>,
+    data_sender: kanal::Sender<([u8; RawData::LEN], TrafficDirection)>,
     filter_channel_receiver: kanal::Receiver<FilterChannelSignal>,
     firewall_ingress_receiver: kanal::Receiver<FirewallSignal>,
     terminate: Arc<AtomicBool>,
@@ -58,7 +58,7 @@ pub fn load_ingress(
             {
                 Ok(v) => v,
                 Err(e) => {
-                    error!("Failed to load the ingress eBPF bytecode. {}", e);
+                    error!("Failed to load the ingress eBPF bytecode. {e}");
                     Notification::send(
                         "Failed to load the ingress eBPF bytecode",
                         NotificationLevel::Error,
@@ -93,10 +93,7 @@ pub fn load_ingress(
                 bpf.program_mut("oryx").unwrap().try_into().unwrap();
 
             if let Err(e) = program.load() {
-                error!(
-                    "Failed to load the ingress eBPF program to the kernel. {}",
-                    e
-                );
+                error!("Failed to load the ingress eBPF program to the kernel. {e}",);
                 Notification::send(
                     "Failed to load the ingress eBPF program to the kernel",
                     NotificationLevel::Error,
@@ -107,10 +104,7 @@ pub fn load_ingress(
             };
 
             if let Err(e) = program.attach(&iface, TcAttachType::Ingress) {
-                error!(
-                    "Failed to attach the ingress eBPF program to the interface. {}",
-                    e
-                );
+                error!("Failed to attach the ingress eBPF program to the interface. {e}",);
                 Notification::send(
                     "Failed to attach the ingress eBPF program to the interface",
                     NotificationLevel::Error,
@@ -223,8 +217,8 @@ pub fn load_ingress(
                             if terminate.load(std::sync::atomic::Ordering::Relaxed) {
                                 break;
                             }
-                            let frame: [u8; RawFrame::LEN] = item.to_owned().try_into().unwrap();
-                            data_sender.send((frame, TrafficDirection::Ingress)).ok();
+                            let data: [u8; RawData::LEN] = item.to_owned().try_into().unwrap();
+                            data_sender.send((data, TrafficDirection::Ingress)).ok();
                         }
                     }
                 }

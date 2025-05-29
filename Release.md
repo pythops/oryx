@@ -1,3 +1,8 @@
+## v0.6 - TBA
+
+- Show ethernet header infos
+- Show PID for egress packets
+
 ## v0.5 - 2025-03-10
 
 ### Added
