@@ -152,7 +152,7 @@ fn filter_packet(protocol: Protocol) -> bool {
 
 #[inline]
 fn process(ctx: TcContext) -> Result<i32, ()> {
-    let ethhdr: EthHdr = ctx.load(0).map_err(|_| ())?;
+    let eth_header: *const EthHdr = ptr_at(&ctx, 0)?;
 
     let pid = if is_ingress() {
         None
@@ -160,23 +160,26 @@ fn process(ctx: TcContext) -> Result<i32, ()> {
         Some((bpf_get_current_pid_tgid() >> 32) as u32)
     };
 
-    match ethhdr.ether_type {
+    match unsafe { (*eth_header).ether_type } {
         EtherType::Ipv4 => {
-            let header: Ipv4Hdr = ctx.load(EthHdr::LEN).map_err(|_| ())?;
+            let ipv4_header: *const Ipv4Hdr = ptr_at(&ctx, EthHdr::LEN)?;
 
-            let addr = if is_ingress() {
-                u32::from_be(header.src_addr)
-            } else {
-                u32::from_be(header.dst_addr)
+            let addr = unsafe {
+                if is_ingress() {
+                    u32::from_be((*ipv4_header).src_addr)
+                } else {
+                    u32::from_be((*ipv4_header).dst_addr)
+                }
             };
 
-            match header.proto {
+            match unsafe { (*ipv4_header).proto } {
                 IpProto::Tcp => {
-                    let tcphdr: *const TcpHdr = ptr_at(&ctx, EthHdr::LEN + Ipv4Hdr::LEN)?;
+                    let tcp_header: *const TcpHdr = ptr_at(&ctx, EthHdr::LEN + Ipv4Hdr::LEN)?;
+
                     let port = if is_ingress() {
-                        u16::from_be(unsafe { (*tcphdr).source })
+                        u16::from_be(unsafe { (*tcp_header).source })
                     } else {
-                        u16::from_be(unsafe { (*tcphdr).dest })
+                        u16::from_be(unsafe { (*tcp_header).dest })
                     };
 
                     if block_ipv4(addr, port) {
@@ -190,23 +193,26 @@ fn process(ctx: TcContext) -> Result<i32, ()> {
                         return Ok(TC_ACT_PIPE);
                     }
 
-                    submit(RawData {
-                        frame: RawFrame {
-                            header: ethhdr,
-                            payload: RawPacket::Ip(
-                                IpHdr::V4(header),
-                                ProtoHdr::Tcp(unsafe { *tcphdr }),
-                            ),
-                        },
-                        pid,
-                    });
+                    unsafe {
+                        submit(RawData {
+                            frame: RawFrame {
+                                header: *eth_header,
+                                payload: RawPacket::Ip(
+                                    IpHdr::V4(*ipv4_header),
+                                    ProtoHdr::Tcp(*tcp_header),
+                                ),
+                            },
+                            pid,
+                        });
+                    }
                 }
                 IpProto::Udp => {
-                    let udphdr: *const UdpHdr = ptr_at(&ctx, EthHdr::LEN + Ipv4Hdr::LEN)?;
+                    let udp_header: *const UdpHdr = ptr_at(&ctx, EthHdr::LEN + Ipv4Hdr::LEN)?;
+
                     let port = if is_ingress() {
-                        u16::from_be(unsafe { (*udphdr).source })
+                        u16::from_be(unsafe { (*udp_header).source })
                     } else {
-                        u16::from_be(unsafe { (*udphdr).dest })
+                        u16::from_be(unsafe { (*udp_header).dest })
                     };
 
                     if block_ipv4(addr, port) {
@@ -220,51 +226,62 @@ fn process(ctx: TcContext) -> Result<i32, ()> {
                         return Ok(TC_ACT_PIPE);
                     }
 
-                    submit(RawData {
-                        frame: RawFrame {
-                            header: ethhdr,
-                            payload: RawPacket::Ip(
-                                IpHdr::V4(header),
-                                ProtoHdr::Udp(unsafe { *udphdr }),
-                            ),
-                        },
-                        pid,
-                    });
+                    unsafe {
+                        submit(RawData {
+                            frame: RawFrame {
+                                header: *eth_header,
+                                payload: RawPacket::Ip(
+                                    IpHdr::V4(*ipv4_header),
+                                    ProtoHdr::Udp(*udp_header),
+                                ),
+                            },
+                            pid,
+                        });
+                    }
                 }
                 IpProto::Icmp => {
                     if filter_packet(Protocol::Network(NetworkProtocol::Icmp)) {
                         return Ok(TC_ACT_PIPE);
                     }
-                    let icmphdr: *const IcmpHdr = ptr_at(&ctx, EthHdr::LEN + Ipv4Hdr::LEN)?;
-                    submit(RawData {
-                        frame: RawFrame {
-                            header: ethhdr,
-                            payload: RawPacket::Ip(
-                                IpHdr::V4(header),
-                                ProtoHdr::Icmp(unsafe { *icmphdr }),
-                            ),
-                        },
-                        pid,
-                    });
+                    let icmp_header: *const IcmpHdr = ptr_at(&ctx, EthHdr::LEN + Ipv4Hdr::LEN)?;
+
+                    unsafe {
+                        submit(RawData {
+                            frame: RawFrame {
+                                header: *eth_header,
+                                payload: RawPacket::Ip(
+                                    IpHdr::V4(*ipv4_header),
+                                    ProtoHdr::Icmp(*icmp_header),
+                                ),
+                            },
+                            pid,
+                        });
+                    }
                 }
                 _ => {}
             }
         }
         EtherType::Ipv6 => {
-            let header: Ipv6Hdr = ctx.load(EthHdr::LEN).map_err(|_| ())?;
-            let addr = if is_ingress() {
-                header.src_addr().to_bits()
-            } else {
-                header.dst_addr().to_bits()
+            let ipv6_header: *const Ipv6Hdr = ptr_at(&ctx, EthHdr::LEN)?;
+
+            let addr = unsafe {
+                if is_ingress() {
+                    (*ipv6_header).src_addr().to_bits()
+                } else {
+                    (*ipv6_header).dst_addr().to_bits()
+                }
             };
 
-            match header.next_hdr {
+            match unsafe { (*ipv6_header).next_hdr } {
                 IpProto::Tcp => {
-                    let tcphdr: *const TcpHdr = ptr_at(&ctx, EthHdr::LEN + Ipv6Hdr::LEN)?;
-                    let port = if is_ingress() {
-                        u16::from_be(unsafe { (*tcphdr).source })
-                    } else {
-                        u16::from_be(unsafe { (*tcphdr).dest })
+                    let tcp_header: *const TcpHdr = ptr_at(&ctx, EthHdr::LEN + Ipv6Hdr::LEN)?;
+
+                    let port = unsafe {
+                        if is_ingress() {
+                            u16::from_be((*tcp_header).source)
+                        } else {
+                            u16::from_be((*tcp_header).dest)
+                        }
                     };
 
                     if block_ipv6(addr, port) {
@@ -277,23 +294,29 @@ fn process(ctx: TcContext) -> Result<i32, ()> {
                     {
                         return Ok(TC_ACT_PIPE);
                     }
-                    submit(RawData {
-                        frame: RawFrame {
-                            header: ethhdr,
-                            payload: RawPacket::Ip(
-                                IpHdr::V6(header),
-                                ProtoHdr::Tcp(unsafe { *tcphdr }),
-                            ),
-                        },
-                        pid,
-                    });
+
+                    unsafe {
+                        submit(RawData {
+                            frame: RawFrame {
+                                header: *eth_header,
+                                payload: RawPacket::Ip(
+                                    IpHdr::V6(*ipv6_header),
+                                    ProtoHdr::Tcp(*tcp_header),
+                                ),
+                            },
+                            pid,
+                        });
+                    }
                 }
                 IpProto::Udp => {
-                    let udphdr: *const UdpHdr = ptr_at(&ctx, EthHdr::LEN + Ipv6Hdr::LEN)?;
-                    let port = if is_ingress() {
-                        u16::from_be(unsafe { (*udphdr).source })
-                    } else {
-                        u16::from_be(unsafe { (*udphdr).dest })
+                    let udp_header: *const UdpHdr = ptr_at(&ctx, EthHdr::LEN + Ipv6Hdr::LEN)?;
+
+                    let port = unsafe {
+                        if is_ingress() {
+                            u16::from_be((*udp_header).source)
+                        } else {
+                            u16::from_be((*udp_header).dest)
+                        }
                     };
 
                     if block_ipv6(addr, port) {
@@ -306,32 +329,38 @@ fn process(ctx: TcContext) -> Result<i32, ()> {
                     {
                         return Ok(TC_ACT_PIPE);
                     }
-                    submit(RawData {
-                        frame: RawFrame {
-                            header: ethhdr,
-                            payload: RawPacket::Ip(
-                                IpHdr::V6(header),
-                                ProtoHdr::Udp(unsafe { *udphdr }),
-                            ),
-                        },
-                        pid,
-                    });
+
+                    unsafe {
+                        submit(RawData {
+                            frame: RawFrame {
+                                header: *eth_header,
+                                payload: RawPacket::Ip(
+                                    IpHdr::V6(*ipv6_header),
+                                    ProtoHdr::Udp(*udp_header),
+                                ),
+                            },
+                            pid,
+                        });
+                    }
                 }
                 IpProto::Icmp => {
                     if filter_packet(Protocol::Network(NetworkProtocol::Icmp)) {
                         return Ok(TC_ACT_PIPE);
                     }
-                    let icmphdr: *const IcmpHdr = ptr_at(&ctx, EthHdr::LEN + Ipv6Hdr::LEN)?;
-                    submit(RawData {
-                        frame: RawFrame {
-                            header: ethhdr,
-                            payload: RawPacket::Ip(
-                                IpHdr::V6(header),
-                                ProtoHdr::Icmp(unsafe { *icmphdr }),
-                            ),
-                        },
-                        pid,
-                    });
+                    let icmp_header: *const IcmpHdr = ptr_at(&ctx, EthHdr::LEN + Ipv6Hdr::LEN)?;
+
+                    unsafe {
+                        submit(RawData {
+                            frame: RawFrame {
+                                header: *eth_header,
+                                payload: RawPacket::Ip(
+                                    IpHdr::V6(*ipv6_header),
+                                    ProtoHdr::Icmp(*icmp_header),
+                                ),
+                            },
+                            pid,
+                        });
+                    }
                 }
                 _ => {}
             }
@@ -340,14 +369,18 @@ fn process(ctx: TcContext) -> Result<i32, ()> {
             if filter_packet(Protocol::Link(LinkProtocol::Arp)) {
                 return Ok(TC_ACT_PIPE);
             }
-            let header: ArpHdr = ctx.load(EthHdr::LEN).map_err(|_| ())?;
-            submit(RawData {
-                frame: RawFrame {
-                    header: ethhdr,
-                    payload: RawPacket::Arp(header),
-                },
-                pid,
-            });
+
+            let arp_header: *const ArpHdr = ptr_at(&ctx, EthHdr::LEN)?;
+
+            unsafe {
+                submit(RawData {
+                    frame: RawFrame {
+                        header: *eth_header,
+                        payload: RawPacket::Arp(*arp_header),
+                    },
+                    pid,
+                });
+            }
         }
         _ => {}
     };
