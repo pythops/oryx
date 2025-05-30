@@ -1,4 +1,4 @@
-## v0.6 - TBA
+## v0.6 - 2025-05-30
 
 - Show ethernet header infos
 - Show PID for egress packets
