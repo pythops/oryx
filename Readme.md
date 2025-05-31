@@ -29,10 +29,10 @@ You can download the pre-built binaries from the release page [release page](htt
 
 ### 🐧Arch Linux
 
-You can install `oryx` from the [AUR](https://aur.archlinux.org/packages/oryx) with using an [AUR helper](https://wiki.archlinux.org/title/AUR_helpers).
+You can install `oryx` from the [extra repository](https://archlinux.org/packages/extra/x86_64/oryx/) with using [pacman](https://wiki.archlinux.org/title/Pacman):
 
 ```bash
-paru -S oryx
+pacman -S oryx
 ```
 
 ### ⚒️ Build from source
