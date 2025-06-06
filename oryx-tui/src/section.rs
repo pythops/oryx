@@ -61,7 +61,7 @@ impl Section {
             firewall: Firewall::new(firewall_chans.ingress.sender, firewall_chans.egress.sender),
         }
     }
-    fn title_span(&self, header_section: FocusedSection) -> Span {
+    fn title_span(&self, header_section: FocusedSection) -> Span<'_> {
         let is_focused = self.focused_section == header_section;
         match header_section {
             FocusedSection::Inspection => {
