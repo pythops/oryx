@@ -4,6 +4,8 @@ use std::{
     os::unix::fs::chown,
 };
 
+use chrono::Local;
+
 use crate::{
     app::AppResult,
     packet::{
@@ -15,6 +17,8 @@ use crate::{
 pub fn export(packets: &[AppPacket]) -> AppResult<()> {
     let uid = unsafe { libc::geteuid() };
 
+    let local_date = Local::now().format("%Y-%m-%d_%Hh%M");
+
     let oryx_export_dir = dirs::home_dir().unwrap().join("oryx");
 
     if !oryx_export_dir.exists() {
@@ -22,7 +26,7 @@ pub fn export(packets: &[AppPacket]) -> AppResult<()> {
         chown(&oryx_export_dir, Some(uid), Some(uid))?;
     }
 
-    let oryx_export_file = oryx_export_dir.join("capture");
+    let oryx_export_file = oryx_export_dir.join(format!("capture-{local_date}"));
 
     let mut file = OpenOptions::new()
         .create(true)
