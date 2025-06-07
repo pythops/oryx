@@ -10,6 +10,7 @@ use aya::{
     include_bytes_aligned,
     maps::{Array, HashMap},
     programs::{tc, SchedClassifier, TcAttachType},
+    util::KernelVersion,
     EbpfLoader,
 };
 use log::error;
@@ -28,6 +29,14 @@ use super::{
     firewall::{update_ipv4_blocklist, update_ipv6_blocklist},
     EbpfTrafficDirection, RingBuffer,
 };
+
+fn is_pid_helper_available() -> bool {
+    if let Ok(current_version) = KernelVersion::current() {
+        current_version >= KernelVersion::new(6, 10, 0)
+    } else {
+        false
+    }
+}
 
 pub fn load_egress(
     iface: String,
@@ -51,9 +60,12 @@ pub fn load_egress(
 
             let traffic_direction = EbpfTrafficDirection::Egress as i32;
 
+            let pid_helper_available = is_pid_helper_available() as u8;
+
             #[cfg(debug_assertions)]
             let mut bpf = match EbpfLoader::new()
                 .set_global("TRAFFIC_DIRECTION", &traffic_direction, true)
+                .set_global("PID_HELPER_AVAILABILITY", &pid_helper_available, false)
                 .load(include_bytes_aligned!(env!("ORYX_BIN_PATH")))
             {
                 Ok(v) => v,
