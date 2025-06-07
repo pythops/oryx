@@ -1,3 +1,8 @@
+## v0.6.1 - 2025-06-07
+
+- Fix ebpf load crash
+- Add date to AppPacket and show it in export file
+
 ## v0.6 - 2025-05-30
 
 - Show ethernet header infos
