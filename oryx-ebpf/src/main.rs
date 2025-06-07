@@ -46,10 +46,10 @@ static BLOCKLIST_IPV4: HashMap<u32, [u16; MAX_RULES_PORT]> =
     HashMap::<u32, [u16; MAX_RULES_PORT]>::with_max_entries(MAX_FIREWALL_RULES, 0);
 
 #[no_mangle]
-static TRAFFIC_DIRECTION: i32 = 0;
+static PID_HELPER_AVAILABILITY: u8 = 0;
 
 #[no_mangle]
-static PID_HELPER_AVAILABILITY: u8 = 0;
+static TRAFFIC_DIRECTION: i32 = 0;
 
 #[classifier]
 pub fn oryx(ctx: TcContext) -> i32 {
@@ -160,9 +160,9 @@ fn process(ctx: TcContext) -> Result<i32, ()> {
     let pid = if is_ingress() {
         None
     } else {
-        let pid_helper_available = unsafe { core::ptr::read_volatile(&PID_HELPER_AVAILABILITY) };
+        let is_pid_helper_available = unsafe { core::ptr::read_volatile(&PID_HELPER_AVAILABILITY) };
 
-        if pid_helper_available == 1 {
+        if is_pid_helper_available == 1 {
             Some((bpf_get_current_pid_tgid() >> 32) as u32)
         } else {
             None

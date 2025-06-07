@@ -60,12 +60,14 @@ pub fn load_egress(
 
             let traffic_direction = EbpfTrafficDirection::Egress as i32;
 
-            let pid_helper_available = is_pid_helper_available() as u8;
-
             #[cfg(debug_assertions)]
             let mut bpf = match EbpfLoader::new()
                 .set_global("TRAFFIC_DIRECTION", &traffic_direction, true)
-                .set_global("PID_HELPER_AVAILABILITY", &pid_helper_available, false)
+                .set_global(
+                    "PID_HELPER_AVAILABILITY",
+                    &(is_pid_helper_available() as u8),
+                    true,
+                )
                 .load(include_bytes_aligned!(env!("ORYX_BIN_PATH")))
             {
                 Ok(v) => v,
@@ -84,6 +86,11 @@ pub fn load_egress(
             #[cfg(not(debug_assertions))]
             let mut bpf = match EbpfLoader::new()
                 .set_global("TRAFFIC_DIRECTION", &traffic_direction, true)
+                .set_global(
+                    "PID_HELPER_AVAILABILITY",
+                    &(is_pid_helper_available() as u8),
+                    true,
+                )
                 .load(include_bytes_aligned!(env!("ORYX_BIN_PATH")))
             {
                 Ok(v) => v,
