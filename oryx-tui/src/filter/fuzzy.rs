@@ -145,7 +145,7 @@ impl Fuzzy {
     }
 }
 
-pub fn highlight(pattern: &str, input: String) -> Cell {
+pub fn highlight(pattern: &str, input: String) -> Cell<'_> {
     if !pattern.is_empty() {
         if input.contains(pattern) {
             let splits = input.split(pattern);

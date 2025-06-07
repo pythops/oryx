@@ -146,7 +146,7 @@ impl Inspection {
                         match export::export(&app_packets) {
                             Ok(_) => {
                                 Notification::send(
-                                    "Packets exported to ~/oryx/capture file".to_string(),
+                                    "Packets exported to ~/oryx directory".to_string(),
                                     NotificationLevel::Info,
                                     event_sender,
                                 )?;
