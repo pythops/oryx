@@ -6,6 +6,7 @@ pub mod transport;
 
 use std::{fmt::Display, mem, net::Ipv4Addr};
 
+use chrono::{DateTime, Utc};
 use direction::TrafficDirection;
 use link::{ArpPacket, ArpType, MacAddr};
 use network::{IcmpPacket, IcmpType, IpPacket, IpProto, Ipv4Packet, Ipv6Packet};
@@ -18,6 +19,7 @@ pub struct AppPacket {
     pub frame: EthFrame,
     pub direction: TrafficDirection,
     pub pid: Option<u32>,
+    pub timestamp: DateTime<Utc>,
 }
 
 #[derive(Debug, Copy, Clone)]

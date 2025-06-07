@@ -1,3 +1,4 @@
+use chrono::Utc;
 use clap::ArgMatches;
 use itertools::Itertools;
 use oryx_common::{
@@ -82,6 +83,7 @@ impl App {
                         frame,
                         direction,
                         pid,
+                        timestamp: Utc::now(),
                     };
                     app_packets.push(app_packet);
                 }

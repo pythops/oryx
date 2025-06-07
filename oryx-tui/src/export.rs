@@ -36,22 +36,35 @@ pub fn export(packets: &[AppPacket]) -> AppResult<()> {
         .unwrap();
     chown(oryx_export_file, Some(uid), Some(uid))?;
 
-    let headers = ("Src Ip", "Src Port", "Dst Ip", "Dst Port", "Protocol");
+    let headers = (
+        "Src Ip", "Src Port", "Dst Ip", "Dst Port", "Protocol", "Pid", "Date",
+    );
     writeln!(
         file,
-        "{:39}  {:11}  {:39}  {:11}  {}\n",
-        headers.0, headers.1, headers.2, headers.3, headers.4
+        "{:39}  {:11}  {:39}  {:11}  {:8}    {:10}  {:10}\n",
+        headers.0, headers.1, headers.2, headers.3, headers.4, headers.5, headers.6
     )?;
-    for packet in packets {
-        match packet.frame.payload {
+    for app_packet in packets {
+        let pid = if let Some(pid) = app_packet.pid {
+            pid.to_string()
+        } else {
+            "-".to_string()
+        };
+
+        let date = app_packet.timestamp.format("%Y-%m-%d %H:%M:%S");
+
+        match app_packet.frame.payload {
             NetworkPacket::Arp(p) => {
                 writeln!(
                     file,
-                    "{:39}  {:^11}  {:39}  {:^11}  ARP",
+                    "{:39}  {:^11}  {:39}  {:^11}  {:10}  {:10}  {:10}",
                     p.src_mac.to_string(),
                     "-",
                     p.dst_mac.to_string(),
-                    "-"
+                    "-",
+                    "ARP",
+                    pid,
+                    date
                 )?;
             }
             NetworkPacket::Ip(packet) => match packet {
@@ -59,22 +72,34 @@ pub fn export(packets: &[AppPacket]) -> AppResult<()> {
                     IpProto::Tcp(p) => {
                         writeln!(
                             file,
-                            "{:39}  {:<11}  {:39}  {:<11}  TCP",
-                            ipv4_packet.src_ip, p.src_port, ipv4_packet.dst_ip, p.dst_port
+                            "{:39}  {:<11}  {:39}  {:<11}  {:10}  {:10}  {:10}",
+                            ipv4_packet.src_ip,
+                            p.src_port,
+                            ipv4_packet.dst_ip,
+                            p.dst_port,
+                            "TCP",
+                            pid,
+                            date,
                         )?;
                     }
                     IpProto::Udp(p) => {
                         writeln!(
                             file,
-                            "{:39}  {:<11}  {:39}  {:<11}  UDP",
-                            ipv4_packet.src_ip, p.src_port, ipv4_packet.dst_ip, p.dst_port
+                            "{:39}  {:<11}  {:39}  {:<11}  {:10}  {:10}  {:10}",
+                            ipv4_packet.src_ip,
+                            p.src_port,
+                            ipv4_packet.dst_ip,
+                            p.dst_port,
+                            "UDP",
+                            pid,
+                            date
                         )?;
                     }
                     IpProto::Icmp(_) => {
                         writeln!(
                             file,
-                            "{:39}  {:^11}  {:39}  {:^11}  ICMP",
-                            ipv4_packet.src_ip, "-", ipv4_packet.dst_ip, "-"
+                            "{:39}  {:^11}  {:39}  {:^11}  {:10}  {:10}  {:10}",
+                            ipv4_packet.src_ip, "-", ipv4_packet.dst_ip, "-", "ICMP", pid, date
                         )?;
                     }
                 },
@@ -82,22 +107,34 @@ pub fn export(packets: &[AppPacket]) -> AppResult<()> {
                     IpProto::Tcp(p) => {
                         writeln!(
                             file,
-                            "{:39}  {:<11}  {:39}  {:<11}  TCP",
-                            ipv6_packet.src_ip, p.src_port, ipv6_packet.dst_ip, p.dst_port
+                            "{:39}  {:<11}  {:39}  {:<11}  {:10}  {:10}  {:10}",
+                            ipv6_packet.src_ip,
+                            p.src_port,
+                            ipv6_packet.dst_ip,
+                            p.dst_port,
+                            "TCP",
+                            pid,
+                            date
                         )?;
                     }
                     IpProto::Udp(p) => {
                         writeln!(
                             file,
-                            "{:39}  {:<11}  {:39}  {:<11}  UDP",
-                            ipv6_packet.src_ip, p.src_port, ipv6_packet.dst_ip, p.dst_port
+                            "{:39}  {:<11}  {:39}  {:<11}  {:10}  {:10}  {:10}",
+                            ipv6_packet.src_ip,
+                            p.src_port,
+                            ipv6_packet.dst_ip,
+                            p.dst_port,
+                            "UDP",
+                            pid,
+                            date
                         )?;
                     }
                     IpProto::Icmp(_) => {
                         writeln!(
                             file,
-                            "{:39}  {:^11}  {:39}  {:^11}  ICMP",
-                            ipv6_packet.src_ip, "-", ipv6_packet.dst_ip, "-"
+                            "{:39}  {:^11}  {:39}  {:^11}  {:10}  {:10}  {:10}",
+                            ipv6_packet.src_ip, "-", ipv6_packet.dst_ip, "-", "ICMP", pid, date
                         )?;
                     }
                 },
