@@ -48,6 +48,9 @@ static BLOCKLIST_IPV4: HashMap<u32, [u16; MAX_RULES_PORT]> =
 #[no_mangle]
 static TRAFFIC_DIRECTION: i32 = 0;
 
+#[no_mangle]
+static PID_HELPER_AVAILABILITY: u8 = 0;
+
 #[classifier]
 pub fn oryx(ctx: TcContext) -> i32 {
     match process(ctx) {
@@ -157,7 +160,13 @@ fn process(ctx: TcContext) -> Result<i32, ()> {
     let pid = if is_ingress() {
         None
     } else {
-        Some((bpf_get_current_pid_tgid() >> 32) as u32)
+        let pid_helper_available = unsafe { core::ptr::read_volatile(&PID_HELPER_AVAILABILITY) };
+
+        if pid_helper_available == 1 {
+            Some((bpf_get_current_pid_tgid() >> 32) as u32)
+        } else {
+            None
+        }
     };
 
     match unsafe { (*eth_header).ether_type } {
