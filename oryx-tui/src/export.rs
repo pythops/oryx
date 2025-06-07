@@ -17,7 +17,7 @@ use crate::{
 pub fn export(packets: &[AppPacket]) -> AppResult<()> {
     let uid = unsafe { libc::geteuid() };
 
-    let local_date = Local::now().format("%Y-%m-%d_%Hh%M");
+    let local_date = Local::now().format("%Y-%m-%d_%H-%M");
 
     let oryx_export_dir = dirs::home_dir().unwrap().join("oryx");
 
