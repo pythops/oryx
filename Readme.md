@@ -16,10 +16,19 @@
 
 ## 💡 Prerequisites
 
-A Linux based OS.
+#### A Linux based OS.
+
+Ideally with Linux kernel version 6.10 or higher to ensure all the features to work properly.
 
 > [!NOTE]
-> You might need to install [nerdfonts](https://www.nerdfonts.com/) for the icons to be displayed correctly.
+> If you're using Debian or Ubuntu, ensure you're on the following minimum versions:
+>
+> - Debian: Version 13 (Trixie) or newer
+> - Ubuntu: Version 24.04 (Noble) or newer
+
+#### Fonts
+
+You might need to install [nerdfonts](https://www.nerdfonts.com/) for the icons to be displayed correctly.
 
 ## 🚀 Installation
 
