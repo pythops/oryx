@@ -28,9 +28,8 @@ pub fn update_ipv4_blocklist(
                         unreachable!();
                     }
                 } else {
-                    let not_null_ports = blocked_ports
-                        .into_iter()
-                        .filter(|p| (*p != 0 && *p != port));
+                    let not_null_ports =
+                        blocked_ports.into_iter().filter(|p| *p != 0 && *p != port);
 
                     let mut blocked_ports = [0; MAX_RULES_PORT];
 
@@ -95,9 +94,8 @@ pub fn update_ipv6_blocklist(
                         unreachable!(); // list is full
                     }
                 } else {
-                    let not_null_ports = blocked_ports
-                        .into_iter()
-                        .filter(|p| (*p != 0 && *p != port));
+                    let not_null_ports =
+                        blocked_ports.into_iter().filter(|p| *p != 0 && *p != port);
 
                     let mut blocked_ports = [0; MAX_RULES_PORT];
 

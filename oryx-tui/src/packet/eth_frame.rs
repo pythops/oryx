@@ -49,7 +49,7 @@ impl EthFrameHeader {
         let title = Paragraph::new("Ethernet")
             .bold()
             .block(Block::new().padding(Padding::top({
-                if title_block.height % 2 == 0 {
+                if title_block.height.is_multiple_of(2) {
                     (title_block.height / 2).saturating_sub(1)
                 } else {
                     title_block.height / 2

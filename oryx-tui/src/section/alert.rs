@@ -79,7 +79,7 @@ impl Alert {
     pub fn title_span(&self, is_focused: bool) -> Span<'_> {
         if is_focused {
             if self.detected {
-                if self.flash_count % 12 == 0 {
+                if self.flash_count.is_multiple_of(12) {
                     Span::from("  Alert 󰐼   ").fg(Color::White).bg(Color::Red)
                 } else {
                     Span::from("  Alert 󰐼   ").bg(Color::Red)
@@ -91,7 +91,7 @@ impl Alert {
                 )
             }
         } else if self.detected {
-            if self.flash_count % 12 == 0 {
+            if self.flash_count.is_multiple_of(12) {
                 Span::from("  Alert 󰐼   ").fg(Color::White).bg(Color::Red)
             } else {
                 Span::from("  Alert 󰐼   ").fg(Color::Red)

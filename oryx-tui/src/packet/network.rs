@@ -144,7 +144,7 @@ impl Ipv4Packet {
         let title = Paragraph::new("IPv4")
             .bold()
             .block(Block::new().padding(Padding::top({
-                if title_block.height % 2 == 0 {
+                if title_block.height.is_multiple_of(2) {
                     (title_block.height / 2).saturating_sub(1)
                 } else {
                     title_block.height / 2
@@ -231,7 +231,7 @@ impl Ipv6Packet {
         let title = Paragraph::new("IPv6")
             .bold()
             .block(Block::new().padding(Padding::top({
-                if title_block.height % 2 == 0 {
+                if title_block.height.is_multiple_of(2) {
                     (title_block.height / 2).saturating_sub(1)
                 } else {
                     title_block.height / 2
@@ -313,7 +313,7 @@ impl IcmpPacket {
         let title = Paragraph::new("ICMP")
             .bold()
             .block(Block::new().padding(Padding::top({
-                if title_block.height % 2 == 0 {
+                if title_block.height.is_multiple_of(2) {
                     (title_block.height / 2).saturating_sub(1)
                 } else {
                     title_block.height / 2
