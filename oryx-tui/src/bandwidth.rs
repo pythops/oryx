@@ -97,6 +97,7 @@ impl Bandwidth {
                 loop {
                     thread::sleep(Duration::from_secs(1));
                     if fd.seek(std::io::SeekFrom::Start(0)).is_err() {
+                        drop(fd);
                         fd = File::open("/proc/net/dev").unwrap();
                     }
                     let mut buffer = String::new();
