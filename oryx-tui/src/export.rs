@@ -1,5 +1,5 @@
 use std::{
-    fs::{create_dir, OpenOptions},
+    fs::{OpenOptions, create_dir},
     io::prelude::*,
     os::unix::fs::chown,
 };
@@ -9,8 +9,8 @@ use chrono::Local;
 use crate::{
     app::AppResult,
     packet::{
-        network::{IpPacket, IpProto},
         AppPacket, NetworkPacket,
+        network::{IpPacket, IpProto},
     },
 };
 

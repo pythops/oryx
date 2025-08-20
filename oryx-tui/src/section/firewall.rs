@@ -3,16 +3,16 @@ use crossterm::event::{Event, KeyCode, KeyEvent};
 use log::{error, info};
 use oryx_common::MAX_FIREWALL_RULES;
 use ratatui::{
+    Frame,
     layout::{Constraint, Direction, Flex, Layout, Margin, Rect},
     style::{Color, Style, Stylize},
     text::{Line, Text},
     widgets::{Block, Borders, Cell, Clear, HighlightSpacing, Padding, Row, Table, TableState},
-    Frame,
 };
 use serde::{Deserialize, Serialize};
 use serde_json;
 use std::{fs, net::IpAddr, num::ParseIntError, os::unix::fs::chown, str::FromStr};
-use tui_input::{backend::crossterm::EventHandler, Input};
+use tui_input::{Input, backend::crossterm::EventHandler};
 use uuid;
 
 use crate::{app::AppResult, notification::Notification, packet::direction::TrafficDirection};

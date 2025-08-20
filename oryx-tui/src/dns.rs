@@ -1,4 +1,4 @@
-use libc::{c_char, getnameinfo, sockaddr_in, sockaddr_in6, socklen_t, NI_MAXHOST, NI_NAMEREQD};
+use libc::{NI_MAXHOST, NI_NAMEREQD, c_char, getnameinfo, sockaddr_in, sockaddr_in6, socklen_t};
 use std::ffi::CStr;
 use std::mem;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};

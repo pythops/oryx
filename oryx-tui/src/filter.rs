@@ -9,18 +9,18 @@ use direction::TrafficDirectionFilter;
 use link::LinkFilter;
 use network::NetworkFilter;
 use oryx_common::{
-    protocols::{
-        LinkProtocol, NetworkProtocol, Protocol, TransportProtocol, NB_LINK_PROTOCOL,
-        NB_NETWORK_PROTOCOL, NB_TRANSPORT_PROTOCOL,
-    },
     RawData,
+    protocols::{
+        LinkProtocol, NB_LINK_PROTOCOL, NB_NETWORK_PROTOCOL, NB_TRANSPORT_PROTOCOL,
+        NetworkProtocol, Protocol, TransportProtocol,
+    },
 };
 use ratatui::{
+    Frame,
     layout::{Alignment, Constraint, Direction, Flex, Layout, Margin, Rect},
     style::{Style, Stylize},
     text::{Line, Span, Text},
     widgets::{Block, BorderType, Borders, Clear, Padding, Row, Table, TableState},
-    Frame,
 };
 use transport::TransportFilter;
 use tui_big_text::{BigText, PixelSize};

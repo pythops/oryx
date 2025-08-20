@@ -5,11 +5,11 @@ pub mod ingress;
 use std::{io, os::fd::AsRawFd};
 
 use aya::{
-    maps::{ring_buf::RingBufItem, MapData, RingBuf},
     Ebpf,
+    maps::{MapData, RingBuf, ring_buf::RingBufItem},
 };
 
-use mio::{event::Source, unix::SourceFd, Interest, Registry, Token};
+use mio::{Interest, Registry, Token, event::Source, unix::SourceFd};
 
 pub struct RingBuffer<'a> {
     pub buffer: RingBuf<&'a mut MapData>,

@@ -1,9 +1,9 @@
 use oryx_common::protocols::{LinkProtocol, NB_LINK_PROTOCOL};
 use ratatui::{
+    Frame,
     layout::{Alignment, Constraint, Direction, Flex, Layout, Rect},
     style::{Color, Style, Stylize},
     widgets::{Block, BorderType, Borders, Row, Table, TableState},
-    Frame,
 };
 
 #[derive(Debug)]

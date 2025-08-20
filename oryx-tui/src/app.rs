@@ -2,12 +2,12 @@ use chrono::Utc;
 use clap::ArgMatches;
 use itertools::Itertools;
 use oryx_common::{
-    protocols::{LinkProtocol, NetworkProtocol, TransportProtocol},
     RawData, RawFrame,
+    protocols::{LinkProtocol, NetworkProtocol, TransportProtocol},
 };
 use ratatui::{
-    layout::{Constraint, Direction, Layout},
     Frame,
+    layout::{Constraint, Direction, Layout},
 };
 use std::{
     error,
@@ -20,7 +20,7 @@ use std::{
 use crate::{
     filter::Filter,
     help::Help,
-    packet::{direction::TrafficDirection, EthFrame},
+    packet::{EthFrame, direction::TrafficDirection},
 };
 use crate::{filter::IoChannels, notification::Notification};
 use crate::{packet::AppPacket, section::Section};

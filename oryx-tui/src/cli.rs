@@ -1,9 +1,8 @@
 use clap::{
-    arg,
+    Command, arg,
     builder::ValueParser,
     crate_description, crate_version,
     error::{ContextValue, ErrorKind},
-    Command,
 };
 
 use crate::interface::NetworkInterface;

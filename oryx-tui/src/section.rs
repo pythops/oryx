@@ -13,11 +13,11 @@ use firewall::{Firewall, FirewallSignal};
 use inspection::Inspection;
 use metrics::Metrics;
 use ratatui::{
+    Frame,
     layout::{Alignment, Constraint, Direction, Layout, Margin, Rect},
     style::{Color, Style, Stylize},
     text::{Line, Span, Text},
     widgets::{Block, BorderType, Borders, Padding},
-    Frame,
 };
 use stats::Stats;
 

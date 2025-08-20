@@ -7,7 +7,7 @@ use crate::{
     app::{ActivePopup, App, AppResult},
     event::Event,
     filter::FocusedBlock,
-    section::{stats::Stats, FocusedSection},
+    section::{FocusedSection, stats::Stats},
 };
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 

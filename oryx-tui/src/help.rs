@@ -1,11 +1,11 @@
 use ratatui::{
+    Frame,
     layout::{Alignment, Constraint, Direction, Layout, Margin},
     style::{Color, Style, Stylize},
     widgets::{
         Block, BorderType, Borders, Cell, Clear, Padding, Row, Scrollbar, ScrollbarOrientation,
         ScrollbarState, Table, TableState,
     },
-    Frame,
 };
 
 #[derive(Debug, Clone, Default)]

@@ -2,6 +2,7 @@ use std::sync::{Arc, Mutex, RwLock};
 
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
+    Frame,
     layout::{Alignment, Constraint, Direction, Flex, Layout, Margin, Rect},
     style::{Style, Stylize},
     text::{Line, Span},
@@ -9,7 +10,6 @@ use ratatui::{
         Block, BorderType, Borders, Cell, Clear, HighlightSpacing, Padding, Paragraph, Row,
         Scrollbar, ScrollbarOrientation, ScrollbarState, Table, TableState,
     },
-    Frame,
 };
 use tui_input::backend::crossterm::EventHandler;
 
@@ -19,9 +19,9 @@ use crate::{
     filter::fuzzy::{self, Fuzzy},
     notification::{Notification, NotificationLevel},
     packet::{
+        AppPacket, NetworkPacket,
         eth_frame::EthFrameHeader,
         network::{IpPacket, IpProto},
-        AppPacket, NetworkPacket,
     },
 };
 

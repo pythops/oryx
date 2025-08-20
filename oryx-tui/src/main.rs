@@ -11,7 +11,7 @@ use oryx_tui::{
     handler::handle_key_events,
     tui::Tui,
 };
-use ratatui::{backend::CrosstermBackend, Terminal};
+use ratatui::{Terminal, backend::CrosstermBackend};
 
 fn main() -> AppResult<()> {
     env_logger::init();

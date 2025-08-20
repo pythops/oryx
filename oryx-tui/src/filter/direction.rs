@@ -1,13 +1,13 @@
 use std::sync::{
-    atomic::{AtomicBool, Ordering},
     Arc,
+    atomic::{AtomicBool, Ordering},
 };
 
 use ratatui::{
+    Frame,
     layout::{Alignment, Constraint, Direction, Flex, Layout, Rect},
     style::{Color, Style, Stylize},
     widgets::{Block, BorderType, Borders, Row, Table, TableState},
-    Frame,
 };
 
 use crate::packet::direction::TrafficDirection;

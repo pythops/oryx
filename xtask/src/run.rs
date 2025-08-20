@@ -4,7 +4,7 @@ use anyhow::Context as _;
 use clap::Parser;
 
 use crate::{
-    build::{build, Options as BuildOptions},
+    build::{Options as BuildOptions, build},
     build_ebpf::Architecture,
 };
 

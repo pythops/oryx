@@ -1,20 +1,19 @@
 use std::{
     net::IpAddr,
     os::fd::AsRawFd,
-    sync::{atomic::AtomicBool, Arc},
+    sync::{Arc, atomic::AtomicBool},
     thread,
     time::Duration,
 };
 
 use aya::{
-    include_bytes_aligned,
+    EbpfLoader, include_bytes_aligned,
     maps::{Array, HashMap},
-    programs::{tc, SchedClassifier, TcAttachType},
+    programs::{SchedClassifier, TcAttachType, tc},
     util::KernelVersion,
-    EbpfLoader,
 };
 use log::error;
-use oryx_common::{protocols::Protocol, RawData, MAX_RULES_PORT};
+use oryx_common::{MAX_RULES_PORT, RawData, protocols::Protocol};
 
 use crate::{
     event::Event,
@@ -23,11 +22,11 @@ use crate::{
     packet::direction::TrafficDirection,
     section::firewall::FirewallSignal,
 };
-use mio::{unix::SourceFd, Events, Interest, Poll, Token};
+use mio::{Events, Interest, Poll, Token, unix::SourceFd};
 
 use super::{
-    firewall::{update_ipv4_blocklist, update_ipv6_blocklist},
     EbpfTrafficDirection, RingBuffer,
+    firewall::{update_ipv4_blocklist, update_ipv6_blocklist},
 };
 
 fn is_pid_helper_available() -> bool {
@@ -156,51 +155,55 @@ pub fn load_egress(
                 HashMap::try_from(bpf.take_map("BLOCKLIST_IPV6").unwrap()).unwrap();
 
             // firewall thread
-            thread::spawn(move || loop {
-                if let Ok(signal) = firewall_egress_receiver.recv() {
-                    match signal {
-                        FirewallSignal::Rule(rule) => match rule.ip {
-                            IpAddr::V4(addr) => update_ipv4_blocklist(
-                                &mut ipv4_firewall,
-                                addr,
-                                rule.port,
-                                rule.enabled,
-                            ),
+            thread::spawn(move || {
+                loop {
+                    if let Ok(signal) = firewall_egress_receiver.recv() {
+                        match signal {
+                            FirewallSignal::Rule(rule) => match rule.ip {
+                                IpAddr::V4(addr) => update_ipv4_blocklist(
+                                    &mut ipv4_firewall,
+                                    addr,
+                                    rule.port,
+                                    rule.enabled,
+                                ),
 
-                            IpAddr::V6(addr) => update_ipv6_blocklist(
-                                &mut ipv6_firewall,
-                                addr,
-                                rule.port,
-                                rule.enabled,
-                            ),
-                        },
-                        FirewallSignal::Kill => {
-                            break;
+                                IpAddr::V6(addr) => update_ipv6_blocklist(
+                                    &mut ipv6_firewall,
+                                    addr,
+                                    rule.port,
+                                    rule.enabled,
+                                ),
+                            },
+                            FirewallSignal::Kill => {
+                                break;
+                            }
                         }
                     }
                 }
             });
 
             // packets filters thread
-            thread::spawn(move || loop {
-                if let Ok(signal) = filter_channel_receiver.recv() {
-                    match signal {
-                        FilterChannelSignal::ProtoUpdate((filter, flag)) => match filter {
-                            Protocol::Transport(p) => {
-                                let _ = transport_filters.set(p as u32, flag as u32, 0);
+            thread::spawn(move || {
+                loop {
+                    if let Ok(signal) = filter_channel_receiver.recv() {
+                        match signal {
+                            FilterChannelSignal::ProtoUpdate((filter, flag)) => match filter {
+                                Protocol::Transport(p) => {
+                                    let _ = transport_filters.set(p as u32, flag as u32, 0);
+                                }
+                                Protocol::Network(p) => {
+                                    let _ = network_filters.set(p as u32, flag as u32, 0);
+                                }
+                                Protocol::Link(p) => {
+                                    let _ = link_filters.set(p as u32, flag as u32, 0);
+                                }
+                            },
+                            FilterChannelSignal::DirectionUpdate(flag) => {
+                                let _ = traffic_direction_filter.set(0, flag as u8, 0);
                             }
-                            Protocol::Network(p) => {
-                                let _ = network_filters.set(p as u32, flag as u32, 0);
+                            FilterChannelSignal::Kill => {
+                                break;
                             }
-                            Protocol::Link(p) => {
-                                let _ = link_filters.set(p as u32, flag as u32, 0);
-                            }
-                        },
-                        FilterChannelSignal::DirectionUpdate(flag) => {
-                            let _ = traffic_direction_filter.set(0, flag as u8, 0);
-                        }
-                        FilterChannelSignal::Kill => {
-                            break;
                         }
                     }
                 }

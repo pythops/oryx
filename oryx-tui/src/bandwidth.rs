@@ -10,8 +10,8 @@ use ratatui::style::{Style, Stylize};
 use ratatui::symbols;
 use ratatui::widgets::{Axis, Chart, Dataset, GraphType};
 use ratatui::{
-    widgets::{Block, Padding},
     Frame,
+    widgets::{Block, Padding},
 };
 
 #[derive(Clone, Debug)]
@@ -217,17 +217,21 @@ impl Bandwidth {
             }
         };
 
-        let incomig_dataset = vec![Dataset::default()
-            .marker(symbols::Marker::Braille)
-            .graph_type(GraphType::Line)
-            .style(Style::default().cyan())
-            .data(&incoming_data)];
+        let incomig_dataset = vec![
+            Dataset::default()
+                .marker(symbols::Marker::Braille)
+                .graph_type(GraphType::Line)
+                .style(Style::default().cyan())
+                .data(&incoming_data),
+        ];
 
-        let outgoing_dataset = vec![Dataset::default()
-            .marker(symbols::Marker::Braille)
-            .graph_type(GraphType::Line)
-            .style(Style::default().magenta())
-            .data(&outgoing_data)];
+        let outgoing_dataset = vec![
+            Dataset::default()
+                .marker(symbols::Marker::Braille)
+                .graph_type(GraphType::Line)
+                .style(Style::default().magenta())
+                .data(&outgoing_data),
+        ];
 
         let x_axis = Axis::default()
             .style(Style::default().white())

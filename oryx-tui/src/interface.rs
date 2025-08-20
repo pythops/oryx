@@ -1,10 +1,10 @@
 use libc::{AF_INET, AF_INET6, IFF_UP};
 use ratatui::{
+    Frame,
     layout::{Alignment, Constraint, Direction, Flex, Layout, Rect},
     style::{Color, Style, Stylize},
     text::{Line, Span},
     widgets::{Block, BorderType, Borders, Padding, Row, Table, TableState},
-    Frame,
 };
 
 use std::{

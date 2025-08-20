@@ -1,9 +1,9 @@
 use ratatui::{
+    Frame,
     layout::{Constraint, Direction, Layout, Rect},
     style::{Style, Stylize},
     text::Span,
     widgets::{Block, Borders, Padding, Paragraph, Row, Table},
-    Frame,
 };
 
 #[derive(Debug, Copy, Clone)]

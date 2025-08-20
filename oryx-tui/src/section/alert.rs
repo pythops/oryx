@@ -1,12 +1,12 @@
 mod syn_flood;
 
 use ratatui::{
+    Frame,
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Style, Stylize},
     text::{Span, Text},
-    Frame,
 };
-use std::sync::{atomic::Ordering, Arc, RwLock};
+use std::sync::{Arc, RwLock, atomic::Ordering};
 use syn_flood::SynFlood;
 
 use crate::packet::AppPacket;

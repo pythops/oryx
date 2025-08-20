@@ -1,9 +1,9 @@
-use oryx_common::protocols::{NetworkProtocol, NB_NETWORK_PROTOCOL};
+use oryx_common::protocols::{NB_NETWORK_PROTOCOL, NetworkProtocol};
 use ratatui::{
+    Frame,
     layout::{Alignment, Constraint, Direction, Flex, Layout, Rect},
     style::{Color, Style, Stylize},
     widgets::{Block, BorderType, Borders, Row, Table, TableState},
-    Frame,
 };
 
 #[derive(Debug)]

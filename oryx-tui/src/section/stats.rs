@@ -7,20 +7,20 @@ use std::{
 };
 
 use ratatui::{
+    Frame,
     layout::{Alignment, Constraint, Direction, Flex, Layout, Rect},
     style::{Color, Style},
     text::Line,
     widgets::{Bar, BarChart, BarGroup, Block, Padding},
-    Frame,
 };
 
 use crate::{
     bandwidth::Bandwidth,
     dns::get_hostname,
     packet::{
+        AppPacket, NetworkPacket,
         direction::TrafficDirection,
         network::{IpPacket, IpProto},
-        AppPacket, NetworkPacket,
     },
 };
 
@@ -156,7 +156,7 @@ impl Stats {
         addresses: HashMap<IpAddr, (Option<String>, usize)>,
     ) -> Vec<(IpAddr, (Option<String>, usize))> {
         let mut items: Vec<(IpAddr, (Option<String>, usize))> = addresses.into_iter().collect();
-        items.sort_by(|a, b| b.1 .1.cmp(&a.1 .1));
+        items.sort_by(|a, b| b.1.1.cmp(&a.1.1));
         items.into_iter().take(10).collect()
     }
 
