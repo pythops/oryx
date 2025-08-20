@@ -50,7 +50,9 @@ impl Alert {
                 .margin(2)
                 .split(block)[1];
 
-            let text = Text::from("No alerts").bold().centered();
+            let text = Text::from("No threats or attacks have been detected.")
+                .bold()
+                .centered();
             frame.render_widget(text, text_block);
             return;
         }
