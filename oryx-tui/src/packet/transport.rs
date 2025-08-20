@@ -188,3 +188,64 @@ impl UdpPacket {
         frame.render_widget(title, title_block);
     }
 }
+
+#[derive(Debug, Copy, Clone)]
+pub struct SctpPacket {
+    pub src_port: u16,
+    pub dst_port: u16,
+    pub verification_tag: u32,
+    pub checksum: u32,
+}
+
+impl SctpPacket {
+    pub fn render(self, block: Rect, frame: &mut Frame) {
+        let (title_block, data_block) = {
+            let chunks = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([Constraint::Length(10), Constraint::Fill(1)])
+                .margin(2)
+                .split(block);
+
+            (chunks[0], chunks[1])
+        };
+        let title = Paragraph::new("SCTP")
+            .bold()
+            .block(Block::new().padding(Padding::top({
+                if title_block.height.is_multiple_of(2) {
+                    (title_block.height / 2).saturating_sub(1)
+                } else {
+                    title_block.height / 2
+                }
+            })));
+
+        let widths = [Constraint::Length(23), Constraint::Fill(1)];
+        let infos = [
+            Row::new(vec![
+                Span::styled("Source Port", Style::new().bold()),
+                Span::from(self.src_port.to_string()),
+            ]),
+            Row::new(vec![
+                Span::styled("Destination Port", Style::new().bold()),
+                Span::from(self.dst_port.to_string()),
+            ]),
+            Row::new(vec![
+                Span::styled("verification Tag", Style::new().bold()),
+                Span::from(format!("{:#0x}", self.verification_tag)),
+            ]),
+            Row::new(vec![
+                Span::styled("Checksum", Style::new().bold()),
+                Span::from(format!("{:#0x}", self.checksum)),
+            ]),
+        ];
+
+        let table = Table::new(infos, widths).column_spacing(2).block(
+            Block::default()
+                .borders(Borders::LEFT)
+                .border_style(Style::new().bold().yellow())
+                .border_type(ratatui::widgets::BorderType::Thick)
+                .style(Style::default()),
+        );
+        frame.render_widget(table, data_block);
+        frame.render_widget(title, title_block);
+    }
+}

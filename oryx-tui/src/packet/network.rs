@@ -10,7 +10,7 @@ use ratatui::{
     widgets::{Block, Borders, Padding, Paragraph, Row, Table},
 };
 
-use super::transport::{TcpPacket, UdpPacket};
+use super::transport::{SctpPacket, TcpPacket, UdpPacket};
 
 #[derive(Debug, Copy, Clone)]
 pub enum IpPacket {
@@ -50,6 +50,20 @@ impl IpPacket {
                     };
                     ip_packet.render(network_block, frame);
                     udp_packet.render(transport_block, frame);
+                }
+                IpProto::Sctp(sctp_packet) => {
+                    let (transport_block, network_block) = {
+                        let chunks = Layout::default()
+                            .direction(Direction::Vertical)
+                            .constraints([Constraint::Length(8), Constraint::Length(13)])
+                            .flex(ratatui::layout::Flex::SpaceAround)
+                            .margin(2)
+                            .split(block);
+
+                        (chunks[0], chunks[1])
+                    };
+                    ip_packet.render(network_block, frame);
+                    sctp_packet.render(transport_block, frame);
                 }
                 IpProto::Icmp(icmp_packet) => {
                     let (transport_block, network_block) = {
@@ -95,6 +109,20 @@ impl IpPacket {
                     };
                     ip_packet.render(network_block, frame);
                     udp_packet.render(transport_block, frame);
+                }
+                IpProto::Sctp(sctp_packet) => {
+                    let (transport_block, network_block) = {
+                        let chunks = Layout::default()
+                            .direction(Direction::Vertical)
+                            .constraints([Constraint::Length(8), Constraint::Length(10)])
+                            .flex(ratatui::layout::Flex::SpaceAround)
+                            .margin(2)
+                            .split(block);
+
+                        (chunks[0], chunks[1])
+                    };
+                    ip_packet.render(network_block, frame);
+                    sctp_packet.render(transport_block, frame);
                 }
                 IpProto::Icmp(icmp_packet) => {
                     let (transport_block, network_block) = {
@@ -289,6 +317,7 @@ impl Ipv6Packet {
 pub enum IpProto {
     Tcp(TcpPacket),
     Udp(UdpPacket),
+    Sctp(SctpPacket),
     Icmp(IcmpPacket),
 }
 
@@ -436,6 +465,16 @@ impl Display for IpPacket {
                         udp_packet.dst_port
                     )
                 }
+                IpProto::Sctp(sctp_packet) => {
+                    write!(
+                        f,
+                        "{} {} {} {} SCTP",
+                        ipv4_packet.src_ip,
+                        sctp_packet.src_port,
+                        ipv4_packet.dst_ip,
+                        sctp_packet.dst_port
+                    )
+                }
                 IpProto::Icmp(_) => {
                     write!(f, "{} {} ICMP", ipv4_packet.src_ip, ipv4_packet.dst_ip)
                 }
@@ -459,6 +498,16 @@ impl Display for IpPacket {
                         udp_packet.src_port,
                         ipv6_packet.dst_ip,
                         udp_packet.dst_port
+                    )
+                }
+                IpProto::Sctp(sctp_packet) => {
+                    write!(
+                        f,
+                        "{} {} {} {} SCTP",
+                        ipv6_packet.src_ip,
+                        sctp_packet.src_port,
+                        ipv6_packet.dst_ip,
+                        sctp_packet.dst_port
                     )
                 }
                 IpProto::Icmp(_) => {

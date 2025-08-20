@@ -14,6 +14,7 @@ use network_types::{
     eth::{EthHdr, EtherType},
     icmp::IcmpHdr,
     ip::{IpHdr, IpProto, Ipv4Hdr, Ipv6Hdr},
+    sctp::SctpHdr,
     tcp::TcpHdr,
     udp::UdpHdr,
 };
@@ -250,6 +251,39 @@ fn process(ctx: TcContext) -> Result<i32, ()> {
                         });
                     }
                 }
+                IpProto::Sctp => {
+                    let sctp_header: *const SctpHdr = ptr_at(&ctx, EthHdr::LEN + Ipv4Hdr::LEN)?;
+
+                    let port = if is_ingress() {
+                        u16::from_be_bytes(unsafe { (*sctp_header).src })
+                    } else {
+                        u16::from_be_bytes(unsafe { (*sctp_header).dst })
+                    };
+
+                    if block_ipv4(addr, port) {
+                        return Ok(TC_ACT_SHOT); //block packet
+                    }
+
+                    if filter_packet(Protocol::Network(NetworkProtocol::Ipv4))
+                        || filter_packet(Protocol::Transport(TransportProtocol::SCTP))
+                        || filter_direction()
+                    {
+                        return Ok(TC_ACT_PIPE);
+                    }
+
+                    unsafe {
+                        submit(RawData {
+                            frame: RawFrame {
+                                header: *eth_header,
+                                payload: RawPacket::Ip(
+                                    IpHdr::V4(*ipv4_header),
+                                    ProtoHdr::Sctp(*sctp_header),
+                                ),
+                            },
+                            pid,
+                        });
+                    }
+                }
                 IpProto::Icmp => {
                     if filter_packet(Protocol::Network(NetworkProtocol::Icmp)) {
                         return Ok(TC_ACT_PIPE);
@@ -348,6 +382,39 @@ fn process(ctx: TcContext) -> Result<i32, ()> {
                                 payload: RawPacket::Ip(
                                     IpHdr::V6(*ipv6_header),
                                     ProtoHdr::Udp(*udp_header),
+                                ),
+                            },
+                            pid,
+                        });
+                    }
+                }
+                IpProto::Sctp => {
+                    let sctp_header: *const SctpHdr = ptr_at(&ctx, EthHdr::LEN + Ipv4Hdr::LEN)?;
+
+                    let port = if is_ingress() {
+                        u16::from_be_bytes(unsafe { (*sctp_header).src })
+                    } else {
+                        u16::from_be_bytes(unsafe { (*sctp_header).dst })
+                    };
+
+                    if block_ipv6(addr, port) {
+                        return Ok(TC_ACT_SHOT); //block packet
+                    }
+
+                    if filter_packet(Protocol::Network(NetworkProtocol::Ipv4))
+                        || filter_packet(Protocol::Transport(TransportProtocol::SCTP))
+                        || filter_direction()
+                    {
+                        return Ok(TC_ACT_PIPE);
+                    }
+
+                    unsafe {
+                        submit(RawData {
+                            frame: RawFrame {
+                                header: *eth_header,
+                                payload: RawPacket::Ip(
+                                    IpHdr::V6(*ipv6_header),
+                                    ProtoHdr::Sctp(*sctp_header),
                                 ),
                             },
                             pid,

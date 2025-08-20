@@ -95,6 +95,19 @@ pub fn export(packets: &[AppPacket]) -> AppResult<()> {
                             date
                         )?;
                     }
+                    IpProto::Sctp(p) => {
+                        writeln!(
+                            file,
+                            "{:39}  {:<11}  {:39}  {:<11}  {:10}  {:10}  {:10}",
+                            ipv4_packet.src_ip,
+                            p.src_port,
+                            ipv4_packet.dst_ip,
+                            p.dst_port,
+                            "SCTP",
+                            pid,
+                            date
+                        )?;
+                    }
                     IpProto::Icmp(_) => {
                         writeln!(
                             file,
@@ -126,6 +139,19 @@ pub fn export(packets: &[AppPacket]) -> AppResult<()> {
                             ipv6_packet.dst_ip,
                             p.dst_port,
                             "UDP",
+                            pid,
+                            date
+                        )?;
+                    }
+                    IpProto::Sctp(p) => {
+                        writeln!(
+                            file,
+                            "{:39}  {:<11}  {:39}  {:<11}  {:10}  {:10}  {:10}",
+                            ipv6_packet.src_ip,
+                            p.src_port,
+                            ipv6_packet.dst_ip,
+                            p.dst_port,
+                            "SCTP",
                             pid,
                             date
                         )?;

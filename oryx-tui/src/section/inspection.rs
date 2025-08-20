@@ -371,6 +371,16 @@ impl Inspection {
                                     fuzzy::highlight(pattern, "UDP".to_string()).cyan(),
                                     pid,
                                 ]),
+                                IpProto::Sctp(p) => Row::new(vec![
+                                    fuzzy::highlight(pattern, ipv4_packet.src_ip.to_string())
+                                        .blue(),
+                                    fuzzy::highlight(pattern, p.src_port.to_string()).yellow(),
+                                    fuzzy::highlight(pattern, ipv4_packet.dst_ip.to_string())
+                                        .blue(),
+                                    fuzzy::highlight(pattern, p.dst_port.to_string()).yellow(),
+                                    fuzzy::highlight(pattern, "SCTP".to_string()).cyan(),
+                                    pid,
+                                ]),
                                 IpProto::Icmp(_) => Row::new(vec![
                                     fuzzy::highlight(pattern, ipv4_packet.src_ip.to_string())
                                         .blue(),
@@ -401,6 +411,16 @@ impl Inspection {
                                         .blue(),
                                     fuzzy::highlight(pattern, p.dst_port.to_string()).yellow(),
                                     fuzzy::highlight(pattern, "UDP".to_string()).cyan(),
+                                    pid,
+                                ]),
+                                IpProto::Sctp(p) => Row::new(vec![
+                                    fuzzy::highlight(pattern, ipv6_packet.src_ip.to_string())
+                                        .blue(),
+                                    fuzzy::highlight(pattern, p.src_port.to_string()).yellow(),
+                                    fuzzy::highlight(pattern, ipv6_packet.dst_ip.to_string())
+                                        .blue(),
+                                    fuzzy::highlight(pattern, p.dst_port.to_string()).yellow(),
+                                    fuzzy::highlight(pattern, "SCTP".to_string()).cyan(),
                                     pid,
                                 ]),
                                 IpProto::Icmp(_) => Row::new(vec![
@@ -474,6 +494,22 @@ impl Inspection {
                                     Span::from("UDP".to_string()).into_centered_line().cyan(),
                                     pid,
                                 ]),
+                                IpProto::Sctp(p) => Row::new(vec![
+                                    Span::from(ipv4_packet.src_ip.to_string())
+                                        .into_centered_line()
+                                        .blue(),
+                                    Span::from(p.src_port.to_string())
+                                        .into_centered_line()
+                                        .yellow(),
+                                    Span::from(ipv4_packet.dst_ip.to_string())
+                                        .into_centered_line()
+                                        .blue(),
+                                    Span::from(p.dst_port.to_string())
+                                        .into_centered_line()
+                                        .yellow(),
+                                    Span::from("SCTP".to_string()).into_centered_line().cyan(),
+                                    pid,
+                                ]),
                                 IpProto::Icmp(_) => Row::new(vec![
                                     Span::from(ipv4_packet.src_ip.to_string())
                                         .into_centered_line()
@@ -518,6 +554,22 @@ impl Inspection {
                                         .into_centered_line()
                                         .yellow(),
                                     Span::from("UDP".to_string()).into_centered_line().cyan(),
+                                    pid,
+                                ]),
+                                IpProto::Sctp(p) => Row::new(vec![
+                                    Span::from(ipv6_packet.src_ip.to_string())
+                                        .into_centered_line()
+                                        .blue(),
+                                    Span::from(p.src_port.to_string())
+                                        .into_centered_line()
+                                        .yellow(),
+                                    Span::from(ipv6_packet.dst_ip.to_string())
+                                        .into_centered_line()
+                                        .blue(),
+                                    Span::from(p.dst_port.to_string())
+                                        .into_centered_line()
+                                        .yellow(),
+                                    Span::from("SCTP".to_string()).into_centered_line().cyan(),
                                     pid,
                                 ]),
                                 IpProto::Icmp(_) => Row::new(vec![

@@ -12,7 +12,7 @@ use link::{ArpPacket, ArpType, MacAddr};
 use network::{IcmpPacket, IcmpType, IpPacket, IpProto, Ipv4Packet, Ipv6Packet};
 use network_types::{eth::EthHdr, ip::IpHdr};
 use oryx_common::{ProtoHdr, RawFrame, RawPacket};
-use transport::{TcpPacket, UdpPacket};
+use transport::{SctpPacket, TcpPacket, UdpPacket};
 
 #[derive(Debug, Copy, Clone)]
 pub struct AppPacket {
@@ -79,6 +79,12 @@ impl From<RawFrame> for EthFrame {
                             dst_port: u16::from_be_bytes(udp_header.dst),
                             length: u16::from_be_bytes(udp_header.len),
                             checksum: u16::from_be_bytes(udp_header.check),
+                        }),
+                        ProtoHdr::Sctp(sctp_header) => IpProto::Sctp(SctpPacket {
+                            src_port: u16::from_be_bytes(sctp_header.src),
+                            dst_port: u16::from_be_bytes(sctp_header.dst),
+                            verification_tag: u32::from_be_bytes(sctp_header.verification_tag),
+                            checksum: u32::from_be_bytes(sctp_header.checksum),
                         }),
                         ProtoHdr::Icmp(icmp_header) => {
                             let icmp_type = match u8::from_be(icmp_header.type_) {
@@ -148,6 +154,12 @@ impl From<RawFrame> for EthFrame {
                             dst_port: u16::from_be_bytes(udp_header.dst),
                             length: u16::from_be_bytes(udp_header.len),
                             checksum: u16::from_be_bytes(udp_header.check),
+                        }),
+                        ProtoHdr::Sctp(sctp_header) => IpProto::Sctp(SctpPacket {
+                            src_port: u16::from_be_bytes(sctp_header.src),
+                            dst_port: u16::from_be_bytes(sctp_header.dst),
+                            verification_tag: u32::from_be_bytes(sctp_header.verification_tag),
+                            checksum: u32::from_be_bytes(sctp_header.checksum),
                         }),
                         ProtoHdr::Icmp(icmp_header) => {
                             let icmp_type = match u8::from_be(icmp_header.type_) {

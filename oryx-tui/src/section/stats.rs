@@ -95,6 +95,9 @@ impl Stats {
                                         IpProto::Udp(_) => {
                                             packet_stats.transport.udp += 1;
                                         }
+                                        IpProto::Sctp(_) => {
+                                            packet_stats.transport.sctp += 1;
+                                        }
                                         IpProto::Icmp(_) => {
                                             packet_stats.network.icmp += 1;
                                         }
@@ -129,6 +132,9 @@ impl Stats {
                                         }
                                         IpProto::Udp(_) => {
                                             packet_stats.transport.udp += 1;
+                                        }
+                                        IpProto::Sctp(_) => {
+                                            packet_stats.transport.sctp += 1;
                                         }
                                         IpProto::Icmp(_) => {
                                             packet_stats.network.icmp += 1;
@@ -177,7 +183,7 @@ impl Stats {
                     [
                         Constraint::Max(60),
                         Constraint::Length(12),
-                        Constraint::Length(20),
+                        Constraint::Length(24),
                         Constraint::Length(10),
                     ]
                     .as_ref(),
@@ -246,9 +252,26 @@ impl Stats {
                             0
                         }),
                     Bar::default()
+                        .label("SCTP".into())
+                        .style(Style::new().fg(Color::LightRed))
+                        .value_style(Style::new().fg(Color::Black).bg(Color::LightRed))
+                        .text_value(if packet_stats.total != 0 {
+                            format!(
+                                "{}%",
+                                packet_stats.transport.sctp * 100 / packet_stats.total
+                            )
+                        } else {
+                            "0%".to_string()
+                        })
+                        .value(if packet_stats.total != 0 {
+                            (packet_stats.transport.sctp * 100 / packet_stats.total) as u64
+                        } else {
+                            0
+                        }),
+                    Bar::default()
                         .label("ICMP".into())
-                        .style(Style::new().fg(Color::LightGreen))
-                        .value_style(Style::new().fg(Color::Black).bg(Color::LightGreen))
+                        .style(Style::new().fg(Color::LightCyan))
+                        .value_style(Style::new().fg(Color::Black).bg(Color::LightCyan))
                         .text_value(if packet_stats.total != 0 {
                             format!("{}%", packet_stats.network.icmp * 100 / packet_stats.total)
                         } else {
@@ -352,6 +375,7 @@ pub struct NetworkStats {
 pub struct TransportStats {
     pub tcp: usize,
     pub udp: usize,
+    pub sctp: usize,
 }
 
 #[derive(Debug, Default)]

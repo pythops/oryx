@@ -13,7 +13,7 @@ pub struct ParseProtocolError;
 
 // Transport Protocols
 
-pub const NB_TRANSPORT_PROTOCOL: u16 = 2;
+pub const NB_TRANSPORT_PROTOCOL: u16 = 3;
 
 #[derive(Debug, Copy, Clone, PartialEq, AsRefStr, Display, EnumString)]
 #[repr(C)]
@@ -23,11 +23,18 @@ pub enum TransportProtocol {
 
     #[strum(ascii_case_insensitive)]
     UDP = 1,
+
+    #[strum(ascii_case_insensitive)]
+    SCTP = 2,
 }
 
 impl TransportProtocol {
-    pub fn all() -> [TransportProtocol; 2] {
-        [TransportProtocol::TCP, TransportProtocol::UDP]
+    pub fn all() -> [TransportProtocol; 3] {
+        [
+            TransportProtocol::TCP,
+            TransportProtocol::UDP,
+            TransportProtocol::SCTP,
+        ]
     }
 }
 

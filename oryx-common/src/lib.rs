@@ -3,7 +3,9 @@
 
 use core::mem;
 
-use network_types::{arp::ArpHdr, eth::EthHdr, icmp::IcmpHdr, ip::IpHdr, tcp::TcpHdr, udp::UdpHdr};
+use network_types::{
+    arp::ArpHdr, eth::EthHdr, icmp::IcmpHdr, ip::IpHdr, sctp::SctpHdr, tcp::TcpHdr, udp::UdpHdr,
+};
 
 pub mod protocols;
 
@@ -61,5 +63,6 @@ impl Clone for RawPacket {
 pub enum ProtoHdr {
     Tcp(TcpHdr),
     Udp(UdpHdr),
+    Sctp(SctpHdr),
     Icmp(IcmpHdr),
 }

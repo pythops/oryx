@@ -26,7 +26,8 @@ impl TransportFilter {
         if let Some(i) = self.state.selected() {
             let protocol = match i {
                 0 => TransportProtocol::TCP,
-                _ => TransportProtocol::UDP,
+                1 => TransportProtocol::UDP,
+                _ => TransportProtocol::SCTP,
             };
 
             if self.selected_protocols.contains(&protocol) {
@@ -103,6 +104,16 @@ impl TransportFilter {
                     }
                 },
                 "UDP",
+            ]),
+            Row::new(vec![
+                {
+                    if self.selected_protocols.contains(&TransportProtocol::SCTP) {
+                        " "
+                    } else {
+                        ""
+                    }
+                },
+                "SCTP",
             ]),
         ];
 
