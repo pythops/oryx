@@ -18,7 +18,7 @@ pub fn update_ipv4_blocklist(
                     if let Some((first_zero_index, _)) = blocked_ports
                         .iter()
                         .enumerate()
-                        .find(|(_, &value)| value == 0)
+                        .find(|&(_, &value)| value == 0)
                     {
                         blocked_ports[first_zero_index] = port;
                         ipv4_firewall
@@ -84,7 +84,7 @@ pub fn update_ipv6_blocklist(
                     if let Some((first_zero_index, _)) = blocked_ports
                         .iter()
                         .enumerate()
-                        .find(|(_, &value)| value == 0)
+                        .find(|&(_, &value)| value == 0)
                     {
                         blocked_ports[first_zero_index] = port;
                         ipv6_firewall

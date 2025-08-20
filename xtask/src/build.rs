@@ -3,7 +3,7 @@ use std::{path::Path, process::Command};
 use anyhow::Context as _;
 use clap::Parser;
 
-use crate::build_ebpf::{build_ebpf, Architecture, Options as BuildOptions};
+use crate::build_ebpf::{Architecture, Options as BuildOptions, build_ebpf};
 
 #[derive(Debug, Parser)]
 pub struct Options {
@@ -20,7 +20,9 @@ fn set_ebpf_build_base_dir(build_type: &str) {
     let path = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join(format!("../target/bpfel-unknown-none/{build_type}/oryx"))
         .to_path_buf();
-    std::env::set_var("ORYX_BIN_PATH", &path);
+    unsafe {
+        std::env::set_var("ORYX_BIN_PATH", &path);
+    }
 }
 
 /// Build the project

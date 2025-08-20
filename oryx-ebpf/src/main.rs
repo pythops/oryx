@@ -18,8 +18,8 @@ use network_types::{
     udp::UdpHdr,
 };
 use oryx_common::{
+    MAX_FIREWALL_RULES, MAX_RULES_PORT, ProtoHdr, RawData, RawFrame, RawPacket,
     protocols::{LinkProtocol, NetworkProtocol, Protocol, TransportProtocol},
-    ProtoHdr, RawData, RawFrame, RawPacket, MAX_FIREWALL_RULES, MAX_RULES_PORT,
 };
 
 #[map]
@@ -45,10 +45,10 @@ static BLOCKLIST_IPV6: HashMap<u128, [u16; MAX_RULES_PORT]> =
 static BLOCKLIST_IPV4: HashMap<u32, [u16; MAX_RULES_PORT]> =
     HashMap::<u32, [u16; MAX_RULES_PORT]>::with_max_entries(MAX_FIREWALL_RULES, 0);
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 static PID_HELPER_AVAILABILITY: u8 = 0;
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 static TRAFFIC_DIRECTION: i32 = 0;
 
 #[classifier]

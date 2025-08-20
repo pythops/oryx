@@ -19,6 +19,9 @@ run-debug:
     echo "" > log-file
     RUST_LOG=info RUST_BACKTRACE=1 cargo xtask run 2> log-file
 
+update:
+    cargo update
+    pushd oryx-ebpf; cargo update; popd
 run:
     cargo xtask run
 

@@ -1,23 +1,23 @@
 use std::{
     collections::HashMap,
     net::IpAddr,
-    sync::{atomic::AtomicBool, Arc, Mutex, RwLock},
+    sync::{Arc, Mutex, RwLock, atomic::AtomicBool},
     thread,
     time::Duration,
 };
 
 use ratatui::{
+    Frame,
     layout::{Alignment, Constraint, Flex, Rect},
     style::{Style, Stylize},
     text::Line,
     widgets::{Block, Borders, Row, Table},
-    Frame,
 };
 
 use crate::packet::{
+    AppPacket, NetworkPacket,
     direction::TrafficDirection,
     network::{IpPacket, IpProto},
-    AppPacket, NetworkPacket,
 };
 
 const WIN_SIZE: usize = 100_000;
@@ -69,9 +69,11 @@ impl SynFlood {
                     .iter()
                     .for_each(|app_packet| {
                         if let NetworkPacket::Ip(ip_packet) = app_packet.frame.payload {
-                            if let IpPacket::V4(ipv4_packet) = ip_packet {
-                                if let IpProto::Tcp(tcp_packet) = ipv4_packet.proto {
-                                    if tcp_packet.syn == 1 {
+                            match ip_packet {
+                                IpPacket::V4(ipv4_packet) => {
+                                    if let IpProto::Tcp(tcp_packet) = ipv4_packet.proto
+                                        && tcp_packet.syn == 1
+                                    {
                                         nb_syn_packets += 1;
                                         if let Some(count) =
                                             map.get_mut(&IpAddr::V4(ipv4_packet.src_ip))
@@ -82,10 +84,10 @@ impl SynFlood {
                                         }
                                     }
                                 }
-                            }
-                            if let IpPacket::V6(ipv6_packet) = ip_packet {
-                                if let IpProto::Tcp(tcp_packet) = ipv6_packet.proto {
-                                    if tcp_packet.syn == 1 {
+                                IpPacket::V6(ipv6_packet) => {
+                                    if let IpProto::Tcp(tcp_packet) = ipv6_packet.proto
+                                        && tcp_packet.syn == 1
+                                    {
                                         nb_syn_packets += 1;
                                         if let Some(count) =
                                             map.get_mut(&IpAddr::V6(ipv6_packet.src_ip))
