@@ -9,7 +9,7 @@ use crate::{
     filter::FocusedBlock,
     section::{FocusedSection, stats::Stats},
 };
-use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 pub fn handle_key_events(
     key_event: KeyEvent,

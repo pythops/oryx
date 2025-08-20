@@ -12,6 +12,9 @@ edition = "2024"
 repository = "https://github.com/pythops/oryx"
 homepage = "https://github.com/pythops/oryx"
 
+[workspace.dependencies]
+network-types = "0.1.0"
+
 [profile.release]
 lto = "fat"
 strip = true

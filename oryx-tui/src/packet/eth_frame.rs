@@ -1,5 +1,3 @@
-use core::fmt::Display;
-
 use network_types::eth::{EthHdr, EtherType};
 use ratatui::{
     Frame,
@@ -14,7 +12,7 @@ use super::link::MacAddr;
 pub struct EthFrameHeader {
     pub src: MacAddr,
     pub dst: MacAddr,
-    pub ether_type: EtherTypeWrapper,
+    pub ether_type: EtherType,
 }
 
 pub struct EtherTypeWrapper(pub EtherType);
@@ -24,7 +22,7 @@ impl From<EthHdr> for EthFrameHeader {
         Self {
             src: MacAddr(value.src_addr),
             dst: MacAddr(value.dst_addr),
-            ether_type: EtherTypeWrapper(value.ether_type),
+            ether_type: EtherType::try_from(value.ether_type).unwrap(),
         }
     }
 }
@@ -77,29 +75,5 @@ impl EthFrameHeader {
         );
         frame.render_widget(table, data_block);
         frame.render_widget(title, title_block);
-    }
-}
-
-impl Display for EthFrameHeader {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(
-            f,
-            "{} {} {} EthFrameHeader",
-            self.src, self.dst, self.ether_type
-        )
-    }
-}
-
-impl Display for EtherTypeWrapper {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.0 {
-            EtherType::Loop => write!(f, "Loop"),
-            EtherType::Ipv4 => write!(f, "Ipv4"),
-            EtherType::Arp => write!(f, "Arp"),
-            EtherType::Ipv6 => write!(f, "Ipv6"),
-            EtherType::FibreChannel => write!(f, "FibreChannel"),
-            EtherType::Infiniband => write!(f, "Infiniband"),
-            EtherType::LoopbackIeee8023 => write!(f, "LoopbackIeee8023"),
-        }
     }
 }

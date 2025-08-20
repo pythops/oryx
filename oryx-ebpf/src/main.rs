@@ -169,15 +169,17 @@ fn process(ctx: TcContext) -> Result<i32, ()> {
         }
     };
 
-    match unsafe { (*eth_header).ether_type } {
+    let ether_type = EtherType::try_from(unsafe { (*eth_header).ether_type }).map_err(|_| ())?;
+
+    match ether_type {
         EtherType::Ipv4 => {
             let ipv4_header: *const Ipv4Hdr = ptr_at(&ctx, EthHdr::LEN)?;
 
             let addr = unsafe {
                 if is_ingress() {
-                    u32::from_be((*ipv4_header).src_addr)
+                    u32::from_be_bytes((*ipv4_header).src_addr)
                 } else {
-                    u32::from_be((*ipv4_header).dst_addr)
+                    u32::from_be_bytes((*ipv4_header).dst_addr)
                 }
             };
 
@@ -186,9 +188,9 @@ fn process(ctx: TcContext) -> Result<i32, ()> {
                     let tcp_header: *const TcpHdr = ptr_at(&ctx, EthHdr::LEN + Ipv4Hdr::LEN)?;
 
                     let port = if is_ingress() {
-                        u16::from_be(unsafe { (*tcp_header).source })
+                        u16::from_be_bytes(unsafe { (*tcp_header).source })
                     } else {
-                        u16::from_be(unsafe { (*tcp_header).dest })
+                        u16::from_be_bytes(unsafe { (*tcp_header).dest })
                     };
 
                     if block_ipv4(addr, port) {
@@ -219,9 +221,9 @@ fn process(ctx: TcContext) -> Result<i32, ()> {
                     let udp_header: *const UdpHdr = ptr_at(&ctx, EthHdr::LEN + Ipv4Hdr::LEN)?;
 
                     let port = if is_ingress() {
-                        u16::from_be(unsafe { (*udp_header).source })
+                        u16::from_be_bytes(unsafe { (*udp_header).src })
                     } else {
-                        u16::from_be(unsafe { (*udp_header).dest })
+                        u16::from_be_bytes(unsafe { (*udp_header).dst })
                     };
 
                     if block_ipv4(addr, port) {
@@ -287,9 +289,9 @@ fn process(ctx: TcContext) -> Result<i32, ()> {
 
                     let port = unsafe {
                         if is_ingress() {
-                            u16::from_be((*tcp_header).source)
+                            u16::from_be_bytes((*tcp_header).source)
                         } else {
-                            u16::from_be((*tcp_header).dest)
+                            u16::from_be_bytes((*tcp_header).dest)
                         }
                     };
 
@@ -322,9 +324,9 @@ fn process(ctx: TcContext) -> Result<i32, ()> {
 
                     let port = unsafe {
                         if is_ingress() {
-                            u16::from_be((*udp_header).source)
+                            u16::from_be_bytes((*udp_header).src)
                         } else {
-                            u16::from_be((*udp_header).dest)
+                            u16::from_be_bytes((*udp_header).dst)
                         }
                     };
 

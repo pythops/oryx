@@ -9,10 +9,10 @@ homepage.workspace = true
 edition.workspace = true
 
 [dependencies]
-crossterm = { version = "0.28", default-features = false }
+crossterm = "0.29"
 ratatui = "0.29"
 tui-big-text = "0.7"
-tui-input = "0.11"
+tui-input = "0.12"
 libc = "0.2"
 aya = "0.13"
 oryx-common = { path = "../oryx-common" }
@@ -22,7 +22,7 @@ dirs = "6"
 kanal = "0.1"
 mimalloc = "0.1"
 clap = { version = "4", features = ["derive", "cargo"] }
-network-types = "0.0.7"
+network-types = { workspace = true }
 uuid = { version = "1", default-features = false, features = ["v4", "serde"] }
 log = "0.4"
 env_logger = "0.11"

@@ -23,7 +23,7 @@ impl<B: Backend> Tui<B> {
 
     pub fn init(&mut self) -> AppResult<()> {
         terminal::enable_raw_mode()?;
-        ratatui::crossterm::execute!(io::stdout(), EnterAlternateScreen, EnableMouseCapture)?;
+        crossterm::execute!(io::stdout(), EnterAlternateScreen, EnableMouseCapture)?;
 
         let panic_hook = panic::take_hook();
         panic::set_hook(Box::new(move |panic| {
@@ -43,7 +43,7 @@ impl<B: Backend> Tui<B> {
 
     fn reset() -> AppResult<()> {
         terminal::disable_raw_mode()?;
-        ratatui::crossterm::execute!(io::stdout(), LeaveAlternateScreen, DisableMouseCapture)?;
+        crossterm::execute!(io::stdout(), LeaveAlternateScreen, DisableMouseCapture)?;
         Ok(())
     }
 

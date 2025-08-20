@@ -207,8 +207,9 @@ impl Ipv4Packet {
 
 #[derive(Debug, Copy, Clone)]
 pub struct Ipv6Packet {
-    pub traffic_class: u8,
-    pub flow_label: [u8; 3usize],
+    pub ds: u8,
+    pub ecn: u8,
+    pub flow_label: u32,
     pub payload_length: u16,
     pub hop_limit: u8,
     pub src_ip: Ipv6Addr,
@@ -250,21 +251,20 @@ impl Ipv6Packet {
                 Span::from(self.dst_ip.to_string()),
             ]),
             Row::new(vec![
-                Span::styled("Traffic Class", Style::new().bold()),
-                Span::from(self.traffic_class.to_string()),
+                Span::styled("Differentiated services ", Style::new().bold()),
+                Span::from(self.ds.to_string()),
+            ]),
+            Row::new(vec![
+                Span::styled("ECN", Style::new().bold()),
+                Span::from(self.ecn.to_string()),
             ]),
             Row::new(vec![
                 Span::styled("Flow Label", Style::new().bold()),
-                Span::from(format!(
-                    "{:#0x}",
-                    ((self.flow_label[0] as u32) << 16)
-                        | ((self.flow_label[1] as u32) << 8)
-                        | (self.flow_label[2] as u32)
-                )),
+                Span::from(format!("{:#0x}", self.flow_label)),
             ]),
             Row::new(vec![
                 Span::styled("Payload Length", Style::new().bold()),
-                Span::from(self.traffic_class.to_string()),
+                Span::from(self.payload_length.to_string()),
             ]),
             Row::new(vec![
                 Span::styled("Hop Limit", Style::new().bold()),

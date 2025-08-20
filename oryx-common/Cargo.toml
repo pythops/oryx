@@ -13,5 +13,5 @@ edition.workspace = true
 path = "src/lib.rs"
 
 [dependencies]
-network-types = "0.0.7"
+network-types = { workspace = true }
 strum = { version = "0.27", default-features = false, features = ["derive"] }

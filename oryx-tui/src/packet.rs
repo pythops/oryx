@@ -52,15 +52,15 @@ impl From<RawFrame> for EthFrame {
         match value.payload {
             RawPacket::Ip(packet, proto) => match packet {
                 IpHdr::V4(ipv4_packet) => {
-                    let src_ip = Ipv4Addr::from(u32::from_be(ipv4_packet.src_addr));
-                    let dst_ip = Ipv4Addr::from(u32::from_be(ipv4_packet.dst_addr));
+                    let src_ip = ipv4_packet.src_addr();
+                    let dst_ip = ipv4_packet.dst_addr();
 
                     let proto = match proto {
                         ProtoHdr::Tcp(tcp_header) => IpProto::Tcp(TcpPacket {
-                            src_port: u16::from_be(tcp_header.source),
-                            dst_port: u16::from_be(tcp_header.dest),
-                            seq: u32::from_be(tcp_header.seq),
-                            ack_seq: u32::from_be(tcp_header.ack_seq),
+                            src_port: u16::from_be_bytes(tcp_header.source),
+                            dst_port: u16::from_be_bytes(tcp_header.dest),
+                            seq: u32::from_be_bytes(tcp_header.seq),
+                            ack_seq: u32::from_be_bytes(tcp_header.ack_seq),
                             data_offset: tcp_header.doff(),
                             cwr: tcp_header.cwr(),
                             ece: tcp_header.ece(),
@@ -70,15 +70,15 @@ impl From<RawFrame> for EthFrame {
                             rst: tcp_header.rst(),
                             syn: tcp_header.syn(),
                             fin: tcp_header.fin(),
-                            window: u16::from_be(tcp_header.window),
-                            checksum: u16::from_be(tcp_header.check),
-                            urg_ptr: u16::from_be(tcp_header.urg_ptr),
+                            window: u16::from_be_bytes(tcp_header.window),
+                            checksum: u16::from_be_bytes(tcp_header.check),
+                            urg_ptr: u16::from_be_bytes(tcp_header.urg_ptr),
                         }),
                         ProtoHdr::Udp(udp_header) => IpProto::Udp(UdpPacket {
-                            src_port: u16::from_be(udp_header.source),
-                            dst_port: u16::from_be(udp_header.dest),
-                            length: u16::from_be(udp_header.len),
-                            checksum: u16::from_be(udp_header.check),
+                            src_port: u16::from_be_bytes(udp_header.src),
+                            dst_port: u16::from_be_bytes(udp_header.dst),
+                            length: u16::from_be_bytes(udp_header.len),
+                            checksum: u16::from_be_bytes(udp_header.check),
                         }),
                         ProtoHdr::Icmp(icmp_header) => {
                             let icmp_type = match u8::from_be(icmp_header.type_) {
@@ -99,7 +99,7 @@ impl From<RawFrame> for EthFrame {
                             IpProto::Icmp(IcmpPacket {
                                 icmp_type,
                                 code: u8::from_be(icmp_header.code),
-                                checksum: u16::from_be(icmp_header.checksum),
+                                checksum: u16::from_be_bytes(icmp_header.check),
                             })
                         }
                     };
@@ -111,11 +111,11 @@ impl From<RawFrame> for EthFrame {
                             dst_ip,
                             ihl: u8::from_be(ipv4_packet.ihl()),
                             tos: u8::from_be(ipv4_packet.tos),
-                            total_length: u16::from_be(ipv4_packet.tot_len),
-                            id: u16::from_be(ipv4_packet.id),
-                            fragment_offset: u16::from_be(ipv4_packet.frag_off),
+                            total_length: u16::from_be_bytes(ipv4_packet.tot_len),
+                            id: u16::from_be_bytes(ipv4_packet.id),
+                            fragment_offset: ipv4_packet.frag_offset(),
                             ttl: u8::from_be(ipv4_packet.ttl),
-                            checksum: u16::from_be(ipv4_packet.check),
+                            checksum: u16::from_be_bytes(ipv4_packet.check),
                             proto,
                         })),
                     }
@@ -126,10 +126,10 @@ impl From<RawFrame> for EthFrame {
 
                     let proto = match proto {
                         ProtoHdr::Tcp(tcp_header) => IpProto::Tcp(TcpPacket {
-                            src_port: u16::from_be(tcp_header.source),
-                            dst_port: u16::from_be(tcp_header.dest),
-                            seq: u32::from_be(tcp_header.seq),
-                            ack_seq: u32::from_be(tcp_header.ack_seq),
+                            src_port: u16::from_be_bytes(tcp_header.source),
+                            dst_port: u16::from_be_bytes(tcp_header.dest),
+                            seq: u32::from_be_bytes(tcp_header.seq),
+                            ack_seq: u32::from_be_bytes(tcp_header.ack_seq),
                             data_offset: tcp_header.doff(),
                             cwr: tcp_header.cwr(),
                             ece: tcp_header.ece(),
@@ -139,15 +139,15 @@ impl From<RawFrame> for EthFrame {
                             rst: tcp_header.rst(),
                             syn: tcp_header.syn(),
                             fin: tcp_header.fin(),
-                            window: u16::from_be(tcp_header.window),
-                            checksum: u16::from_be(tcp_header.check),
-                            urg_ptr: u16::from_be(tcp_header.urg_ptr),
+                            window: u16::from_be_bytes(tcp_header.window),
+                            checksum: u16::from_be_bytes(tcp_header.check),
+                            urg_ptr: u16::from_be_bytes(tcp_header.urg_ptr),
                         }),
                         ProtoHdr::Udp(udp_header) => IpProto::Udp(UdpPacket {
-                            src_port: u16::from_be(udp_header.source),
-                            dst_port: u16::from_be(udp_header.dest),
-                            length: u16::from_be(udp_header.len),
-                            checksum: u16::from_be(udp_header.check),
+                            src_port: u16::from_be_bytes(udp_header.src),
+                            dst_port: u16::from_be_bytes(udp_header.dst),
+                            length: u16::from_be_bytes(udp_header.len),
+                            checksum: u16::from_be_bytes(udp_header.check),
                         }),
                         ProtoHdr::Icmp(icmp_header) => {
                             let icmp_type = match u8::from_be(icmp_header.type_) {
@@ -168,7 +168,7 @@ impl From<RawFrame> for EthFrame {
                             IpProto::Icmp(IcmpPacket {
                                 icmp_type,
                                 code: u8::from_be(icmp_header.code),
-                                checksum: u16::from_be(icmp_header.checksum),
+                                checksum: u16::from_be_bytes(icmp_header.check),
                             })
                         }
                     };
@@ -176,9 +176,10 @@ impl From<RawFrame> for EthFrame {
                     EthFrame {
                         header: value.header,
                         payload: NetworkPacket::Ip(IpPacket::V6(Ipv6Packet {
-                            traffic_class: ipv6_packet.priority(),
-                            flow_label: ipv6_packet.flow_label,
-                            payload_length: u16::from_be(ipv6_packet.payload_len),
+                            ds: ipv6_packet.dscp(),
+                            ecn: ipv6_packet.ecn(),
+                            flow_label: ipv6_packet.flow_label(),
+                            payload_length: u16::from_be_bytes(ipv6_packet.payload_len),
                             hop_limit: u8::from_be(ipv6_packet.hop_limit),
                             src_ip,
                             dst_ip,
@@ -188,7 +189,7 @@ impl From<RawFrame> for EthFrame {
                 }
             },
             RawPacket::Arp(packet) => {
-                let arp_type = match u16::from_be(packet.oper) {
+                let arp_type = match u16::from_be_bytes(packet.oper) {
                     1 => ArpType::Request,
                     2 => ArpType::Reply,
                     _ => unreachable!(),
@@ -197,8 +198,8 @@ impl From<RawFrame> for EthFrame {
                 EthFrame {
                     header: value.header,
                     payload: NetworkPacket::Arp(ArpPacket {
-                        htype: packet.ptype,
-                        ptype: packet.ptype,
+                        htype: u16::from_be_bytes(packet.htype),
+                        ptype: u16::from_be_bytes(packet.ptype),
                         hlen: u8::from_be(packet.hlen),
                         plen: u8::from_be(packet.plen),
                         arp_type,

@@ -22,8 +22,14 @@ run-debug:
 update:
     cargo update
     pushd oryx-ebpf; cargo update; popd
+
 run:
     cargo xtask run
+
+fmt:
+    pushd oryx-ebpf; cargo fmt --all; popd
+    pushd oryx-tui; cargo fmt --all; popd
+    pushd oryx-common; cargo fmt --all; popd
 
 # Run oryx debug
 release:
