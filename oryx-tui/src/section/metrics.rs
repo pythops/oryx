@@ -108,6 +108,23 @@ impl Metrics {
     }
 
     pub fn render(&mut self, frame: &mut Frame, block: Rect) {
+        if self.metrics.is_empty() {
+            let block = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([
+                    Constraint::Fill(1),
+                    Constraint::Length(3),
+                    Constraint::Fill(1),
+                ])
+                .flex(ratatui::layout::Flex::SpaceBetween)
+                .split(block)[1];
+            let message = Text::from("No metrics defined. Press `n` to add a new one.")
+                .bold()
+                .centered();
+            frame.render_widget(message, block);
+            return;
+        }
+
         self.window_height = block.height.saturating_sub(4) as usize / 8;
 
         let constraints = (0..self.window_height).map(|_| Constraint::Length(8));
