@@ -631,7 +631,9 @@ impl Firewall {
                 .margin(2)
                 .split(block)[1];
 
-            let text = Text::from("No Rules").bold().centered();
+            let text = Text::from("No firewall rules defined. Press `n` to add a new one.")
+                .bold()
+                .centered();
             frame.render_widget(text, text_block);
             return;
         }
