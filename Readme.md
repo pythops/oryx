@@ -4,7 +4,7 @@
 
 ## 📸 Demo
 
-![](https://github.com/user-attachments/assets/69ec6cf2-c498-4e87-b686-b4b6eb47799d)
+![](https://github.com/user-attachments/assets/565466c7-996c-4bf5-972b-06d8bb1e8d97)
 
 ## ✨ Features
 

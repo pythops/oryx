@@ -73,7 +73,7 @@ dependencies = [
 
 [[package]]
 name = "oryx-common"
-version = "0.6.1"
+version = "0.7.0"
 dependencies = [
  "network-types",
  "strum",
@@ -81,7 +81,7 @@ dependencies = [
 
 [[package]]
 name = "oryx-ebpf"
-version = "0.6.1"
+version = "0.7.0"
 dependencies = [
  "aya-ebpf",
  "network-types",

@@ -1,3 +1,12 @@
+## v0.7.0 - 2025-08-21
+
+- Fix crash when reading bandwidth file
+- Bump dependencies
+- Bump rust edition
+- Enhance alerts and firewall section message
+- Update filters layout
+- Add support for SCTP protocol
+
 ## v0.6.1 - 2025-06-07
 
 - Fix ebpf load crash

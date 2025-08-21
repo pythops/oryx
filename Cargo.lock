@@ -1146,7 +1146,7 @@ dependencies = [
 
 [[package]]
 name = "oryx-common"
-version = "0.6.1"
+version = "0.7.0"
 dependencies = [
  "network-types",
  "strum 0.27.2",
@@ -1154,7 +1154,7 @@ dependencies = [
 
 [[package]]
 name = "oryx-tui"
-version = "0.6.1"
+version = "0.7.0"
 dependencies = [
  "aya",
  "chrono",
