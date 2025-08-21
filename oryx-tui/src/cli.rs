@@ -44,7 +44,7 @@ pub fn cli() -> Command {
                 .value_delimiter(',')
                 .num_args(1..)
                 .default_value("all")
-                .value_parser(["tcp", "udp", "all"]),
+                .value_parser(["tcp", "udp", "sctp", "all"]),
         )
         .arg(
             arg!(--network <network>)
