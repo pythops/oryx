@@ -528,11 +528,11 @@ impl Filter {
             let chunks = Layout::default()
                 .direction(Direction::Vertical)
                 .constraints([
-                    Constraint::Length(self.interface.interfaces.len() as u16 + 6),
-                    Constraint::Length(NB_TRANSPORT_PROTOCOL + 4),
-                    Constraint::Length(NB_NETWORK_PROTOCOL + 4),
-                    Constraint::Length(NB_LINK_PROTOCOL + 4),
-                    Constraint::Length(6),
+                    Constraint::Length(self.interface.interfaces.len() as u16),
+                    Constraint::Length(NB_TRANSPORT_PROTOCOL),
+                    Constraint::Length(NB_NETWORK_PROTOCOL),
+                    Constraint::Length(NB_LINK_PROTOCOL),
+                    Constraint::Length(2),
                     Constraint::Length(4),
                 ])
                 .margin(1)
@@ -553,24 +553,28 @@ impl Filter {
             frame,
             network_filter_block,
             self.focused_block == FocusedBlock::NetworkFilter,
+            false,
         );
 
         self.transport.render(
             frame,
             transport_filter_block,
             self.focused_block == FocusedBlock::TransportFilter,
+            false,
         );
 
         self.link.render(
             frame,
             link_filter_block,
             self.focused_block == FocusedBlock::LinkFilter,
+            false,
         );
 
         self.traffic_direction.render(
             frame,
             traffic_direction_block,
             self.focused_block == FocusedBlock::TrafficDirection,
+            false,
         );
 
         let start = BigText::builder()
@@ -743,7 +747,7 @@ impl Filter {
             .direction(Direction::Vertical)
             .constraints([
                 Constraint::Fill(1),
-                Constraint::Length(40),
+                Constraint::Length(30),
                 Constraint::Fill(1),
             ])
             .flex(ratatui::layout::Flex::SpaceBetween)
@@ -753,7 +757,7 @@ impl Filter {
             .direction(Direction::Horizontal)
             .constraints([
                 Constraint::Fill(1),
-                Constraint::Max(82),
+                Constraint::Min(50),
                 Constraint::Fill(1),
             ])
             .flex(ratatui::layout::Flex::SpaceBetween)
@@ -770,10 +774,10 @@ impl Filter {
                 .direction(Direction::Vertical)
                 .constraints([
                     Constraint::Length(1),
-                    Constraint::Length(NB_TRANSPORT_PROTOCOL + 4),
-                    Constraint::Length(NB_NETWORK_PROTOCOL + 4),
-                    Constraint::Length(NB_LINK_PROTOCOL + 4),
-                    Constraint::Length(6),
+                    Constraint::Length(NB_TRANSPORT_PROTOCOL),
+                    Constraint::Length(NB_NETWORK_PROTOCOL),
+                    Constraint::Length(NB_LINK_PROTOCOL),
+                    Constraint::Length(2),
                     Constraint::Length(4),
                 ])
                 .margin(1)
@@ -796,24 +800,28 @@ impl Filter {
             frame,
             network_filter_block,
             self.focused_block == FocusedBlock::NetworkFilter,
+            true,
         );
 
         self.transport.render(
             frame,
             transport_filter_block,
             self.focused_block == FocusedBlock::TransportFilter,
+            true,
         );
 
         self.link.render(
             frame,
             link_filter_block,
             self.focused_block == FocusedBlock::LinkFilter,
+            true,
         );
 
         self.traffic_direction.render(
             frame,
             traffic_direction_block,
             self.focused_block == FocusedBlock::TrafficDirection,
+            true,
         );
 
         let apply = BigText::builder()

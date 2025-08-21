@@ -1,8 +1,9 @@
 use oryx_common::protocols::{LinkProtocol, NB_LINK_PROTOCOL};
 use ratatui::{
     Frame,
-    layout::{Alignment, Constraint, Direction, Flex, Layout, Rect},
+    layout::{Constraint, Direction, Flex, Layout, Rect},
     style::{Color, Style, Stylize},
+    text::Text,
     widgets::{Block, BorderType, Borders, Row, Table, TableState},
 };
 
@@ -61,13 +62,14 @@ impl LinkFilter {
         self.selected_protocols.clear();
     }
 
-    pub fn render(&mut self, frame: &mut Frame, block: Rect, is_focused: bool) {
+    pub fn render(&mut self, frame: &mut Frame, block: Rect, is_focused: bool, update: bool) {
         let layout = Layout::default()
             .direction(Direction::Horizontal)
             .constraints(
                 [
                     Constraint::Fill(1),
-                    Constraint::Length(55),
+                    Constraint::Length(25),
+                    Constraint::Length(if update { 20 } else { 55 }),
                     Constraint::Fill(1),
                 ]
                 .as_ref(),
@@ -75,7 +77,30 @@ impl LinkFilter {
             .flex(Flex::Center)
             .split(block);
 
-        let area = layout[1];
+        // title
+
+        let title_block = layout[1];
+
+        let title_block = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Fill(1),
+                Constraint::Length(1),
+                Constraint::Fill(1),
+            ])
+            .flex(Flex::Center)
+            .split(title_block)[1];
+
+        let title = if is_focused {
+            Text::from("Link Filters 󱪤  ").bold()
+        } else {
+            Text::from("Link Filters 󱪤  ")
+        };
+        frame.render_widget(title, title_block);
+
+        //
+
+        let area = layout[2];
 
         let widths = [Constraint::Length(2), Constraint::Fill(1)];
         let link_filters = vec![Row::new(vec![
@@ -94,12 +119,9 @@ impl LinkFilter {
 
         frame.render_widget(
             Block::new()
-                .title(" Link Filters 󱪤 ")
-                .title_style(Style::default().bold().fg(Color::Green))
-                .title_alignment(Alignment::Center)
                 .borders(Borders::LEFT)
                 .border_type(if is_focused {
-                    BorderType::Thick
+                    BorderType::QuadrantInside
                 } else {
                     BorderType::default()
                 })
@@ -110,8 +132,8 @@ impl LinkFilter {
         frame.render_stateful_widget(
             table,
             area.inner(ratatui::layout::Margin {
-                horizontal: 6,
-                vertical: 2,
+                horizontal: 2,
+                vertical: 0,
             }),
             &mut self.state,
         );

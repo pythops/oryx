@@ -3,7 +3,7 @@ use ratatui::{
     Frame,
     layout::{Alignment, Constraint, Direction, Flex, Layout, Rect},
     style::{Color, Style, Stylize},
-    text::{Line, Span},
+    text::{Line, Span, Text},
     widgets::{Block, BorderType, Borders, Padding, Row, Table, TableState},
 };
 
@@ -154,13 +154,36 @@ impl Interface {
             .direction(Direction::Horizontal)
             .constraints([
                 Constraint::Fill(1),
+                Constraint::Length(25),
                 Constraint::Length(55),
                 Constraint::Fill(1),
             ])
             .flex(Flex::Center)
             .split(block);
 
-        let area = layout[1];
+        // title
+
+        let title_block = layout[1];
+
+        let title_block = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Fill(1),
+                Constraint::Length(1),
+                Constraint::Fill(1),
+            ])
+            .flex(Flex::Center)
+            .split(title_block)[1];
+
+        let title = if is_focused {
+            Text::from("Interfaces 󰛳  ").bold()
+        } else {
+            Text::from("Interfaces 󰛳  ")
+        };
+        frame.render_widget(title, title_block);
+
+        //
+        let area = layout[2];
 
         let widths = [
             Constraint::Length(2),
@@ -201,22 +224,14 @@ impl Interface {
         });
 
         let table = Table::new(interfaces, widths)
-            .header(
-                Row::new(vec!["", "Name", "State", "Address"])
-                    .style(Style::new().bold())
-                    .bottom_margin(1),
-            )
             .row_highlight_style(Style::new().bg(ratatui::style::Color::DarkGray))
             .column_spacing(3);
 
         frame.render_widget(
             Block::new()
-                .title(" Interfaces   ")
-                .title_style(Style::default().bold().fg(Color::Green))
-                .title_alignment(Alignment::Center)
                 .borders(Borders::LEFT)
                 .border_type(if is_focused {
-                    BorderType::Thick
+                    BorderType::QuadrantOutside
                 } else {
                     BorderType::default()
                 })
@@ -227,8 +242,8 @@ impl Interface {
         frame.render_stateful_widget(
             table,
             area.inner(ratatui::layout::Margin {
-                horizontal: 5,
-                vertical: 2,
+                horizontal: 2,
+                vertical: 0,
             }),
             &mut self.state,
         );
