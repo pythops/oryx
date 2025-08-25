@@ -65,8 +65,7 @@ dependencies = [
 [[package]]
 name = "network-types"
 version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f06f1863cb5565864300c6bfb012312969908878d2ca5881eaf0bbdb8b519c23"
+source = "git+https://github.com/vadorovsky/network-types?rev=b78424c#b78424c582951ac0af4392bce595d0cb236280e8"
 dependencies = [
  "memoffset",
 ]

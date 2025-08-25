@@ -26,7 +26,7 @@ use crate::{
     packet::{
         AppPacket, NetworkPacket,
         direction::TrafficDirection,
-        network::{IpPacket, IpProto},
+        network::{IpPacket, ip::IpProto},
     },
 };
 

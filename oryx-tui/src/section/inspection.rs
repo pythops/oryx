@@ -21,7 +21,7 @@ use crate::{
     packet::{
         AppPacket, NetworkPacket,
         eth_frame::EthFrameHeader,
-        network::{IpPacket, IpProto},
+        network::{IpPacket, ip::IpProto},
     },
 };
 
@@ -388,7 +388,7 @@ impl Inspection {
                                     fuzzy::highlight(pattern, ipv4_packet.dst_ip.to_string())
                                         .blue(),
                                     Cell::from(Line::from("-").centered()).yellow(),
-                                    fuzzy::highlight(pattern, "ICMP".to_string()).cyan(),
+                                    fuzzy::highlight(pattern, "ICMPv4".to_string()).cyan(),
                                     pid,
                                 ]),
                             },
@@ -430,7 +430,7 @@ impl Inspection {
                                     fuzzy::highlight(pattern, ipv6_packet.dst_ip.to_string())
                                         .blue(),
                                     Cell::from(Line::from("-").centered()).yellow(),
-                                    fuzzy::highlight(pattern, "ICMP".to_string()).cyan(),
+                                    fuzzy::highlight(pattern, "ICMPv6".to_string()).cyan(),
                                     pid,
                                 ]),
                             },
@@ -519,7 +519,7 @@ impl Inspection {
                                         .into_centered_line()
                                         .blue(),
                                     Span::from("-").into_centered_line().yellow(),
-                                    Span::from("ICMP".to_string()).into_centered_line().cyan(),
+                                    Span::from("ICMPv4".to_string()).into_centered_line().cyan(),
                                     pid,
                                 ]),
                             },
@@ -581,7 +581,7 @@ impl Inspection {
                                         .into_centered_line()
                                         .blue(),
                                     Span::from("-").into_centered_line().yellow(),
-                                    Span::from("ICMP".to_string()).into_centered_line().cyan(),
+                                    Span::from("ICMPv6".to_string()).into_centered_line().cyan(),
                                     pid,
                                 ]),
                             },

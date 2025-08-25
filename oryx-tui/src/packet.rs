@@ -9,10 +9,15 @@ use std::{fmt::Display, mem, net::Ipv4Addr};
 use chrono::{DateTime, Utc};
 use direction::TrafficDirection;
 use link::{ArpPacket, ArpType, MacAddr};
-use network::{IcmpPacket, IcmpType, IpPacket, IpProto, Ipv4Packet, Ipv6Packet};
-use network_types::{eth::EthHdr, ip::IpHdr};
+use network::{IpPacket, icmp::IcmpPacket, icmp::icmpv4, icmp::icmpv6, ip::IpProto};
+use network_types::{eth::EthHdr, icmp::Icmp, ip::IpHdr};
 use oryx_common::{ProtoHdr, RawFrame, RawPacket};
 use transport::{SctpPacket, TcpPacket, UdpPacket};
+
+use crate::packet::network::{
+    icmp::icmpv4::Icmpv4Packet, icmp::icmpv6::Icmpv6Packet, ip::ipv4::Ipv4Packet,
+    ip::ipv6::Ipv6Packet,
+};
 
 #[derive(Debug, Copy, Clone)]
 pub struct AppPacket {
@@ -86,28 +91,14 @@ impl From<RawFrame> for EthFrame {
                             verification_tag: u32::from_be_bytes(sctp_header.verification_tag),
                             checksum: u32::from_be_bytes(sctp_header.checksum),
                         }),
-                        ProtoHdr::Icmp(icmp_header) => {
-                            let icmp_type = match u8::from_be(icmp_header.type_) {
-                                0 => IcmpType::EchoReply,
-                                3 => IcmpType::DestinationUnreachable,
-                                5 => IcmpType::RedirectMessage,
-                                8 => IcmpType::EchoRequest,
-                                9 => IcmpType::RouterAdvertisement,
-                                10 => IcmpType::RouterSolicitation,
-                                11 => IcmpType::TimeExceeded,
-                                12 => IcmpType::BadIPheader,
-                                13 => IcmpType::Timestamp,
-                                14 => IcmpType::TimestampReply,
-                                42 => IcmpType::ExtendedEchoRequest,
-                                43 => IcmpType::ExtendedEchoReply,
-                                _ => IcmpType::Deprecated,
-                            };
-                            IpProto::Icmp(IcmpPacket {
-                                icmp_type,
+                        ProtoHdr::Icmp(Icmp::V4(icmp_header)) => {
+                            IpProto::Icmp(IcmpPacket::V4(Icmpv4Packet {
+                                icmp_type: icmpv4::IcmpType::from(u8::from_be(icmp_header.type_)),
                                 code: u8::from_be(icmp_header.code),
                                 checksum: u16::from_be_bytes(icmp_header.check),
-                            })
+                            }))
                         }
+                        _ => unreachable!(),
                     };
 
                     EthFrame {
@@ -161,28 +152,14 @@ impl From<RawFrame> for EthFrame {
                             verification_tag: u32::from_be_bytes(sctp_header.verification_tag),
                             checksum: u32::from_be_bytes(sctp_header.checksum),
                         }),
-                        ProtoHdr::Icmp(icmp_header) => {
-                            let icmp_type = match u8::from_be(icmp_header.type_) {
-                                0 => IcmpType::EchoReply,
-                                3 => IcmpType::DestinationUnreachable,
-                                5 => IcmpType::RedirectMessage,
-                                8 => IcmpType::EchoRequest,
-                                9 => IcmpType::RouterAdvertisement,
-                                10 => IcmpType::RouterSolicitation,
-                                11 => IcmpType::TimeExceeded,
-                                12 => IcmpType::BadIPheader,
-                                13 => IcmpType::Timestamp,
-                                14 => IcmpType::TimestampReply,
-                                42 => IcmpType::ExtendedEchoRequest,
-                                43 => IcmpType::ExtendedEchoReply,
-                                _ => IcmpType::Deprecated,
-                            };
-                            IpProto::Icmp(IcmpPacket {
-                                icmp_type,
+                        ProtoHdr::Icmp(Icmp::V6(icmp_header)) => {
+                            IpProto::Icmp(IcmpPacket::V6(Icmpv6Packet {
+                                icmp_type: icmpv6::IcmpType::from(u8::from_be(icmp_header.type_)),
                                 code: u8::from_be(icmp_header.code),
                                 checksum: u16::from_be_bytes(icmp_header.check),
-                            })
+                            }))
                         }
+                        _ => unreachable!(),
                     };
 
                     EthFrame {
