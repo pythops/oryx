@@ -17,7 +17,7 @@ use ratatui::{
 use crate::packet::{
     AppPacket, NetworkPacket,
     direction::TrafficDirection,
-    network::{IpPacket, IpProto},
+    network::{IpPacket, ip::IpProto},
 };
 
 const WIN_SIZE: usize = 100_000;

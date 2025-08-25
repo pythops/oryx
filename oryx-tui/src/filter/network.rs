@@ -28,7 +28,8 @@ impl NetworkFilter {
             let protocol = match i {
                 0 => NetworkProtocol::Ipv4,
                 1 => NetworkProtocol::Ipv6,
-                _ => NetworkProtocol::Icmp,
+                2 => NetworkProtocol::Icmpv4,
+                _ => NetworkProtocol::Icmpv6,
             };
 
             if self.selected_protocols.contains(&protocol) {
@@ -131,13 +132,23 @@ impl NetworkFilter {
             ]),
             Row::new(vec![
                 {
-                    if self.selected_protocols.contains(&NetworkProtocol::Icmp) {
+                    if self.selected_protocols.contains(&NetworkProtocol::Icmpv4) {
                         " "
                     } else {
                         ""
                     }
                 },
-                "ICMP",
+                "ICMPv4",
+            ]),
+            Row::new(vec![
+                {
+                    if self.selected_protocols.contains(&NetworkProtocol::Icmpv6) {
+                        " "
+                    } else {
+                        ""
+                    }
+                },
+                "ICMPv6",
             ]),
         ];
 

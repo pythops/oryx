@@ -1,16 +1,15 @@
-use core::{
-    fmt::Display,
-    net::{Ipv4Addr, Ipv6Addr},
-};
+pub mod icmp;
+pub mod ip;
+
+use core::fmt::Display;
 use ratatui::{
     Frame,
     layout::{Constraint, Direction, Layout, Rect},
-    style::{Style, Stylize},
-    text::Span,
-    widgets::{Block, Borders, Padding, Paragraph, Row, Table},
 };
 
-use super::transport::{SctpPacket, TcpPacket, UdpPacket};
+use ip::{ipv4::Ipv4Packet, ipv6::Ipv6Packet};
+
+use crate::packet::network::{icmp::IcmpPacket, ip::IpProto};
 
 #[derive(Debug, Copy, Clone)]
 pub enum IpPacket {
@@ -65,7 +64,7 @@ impl IpPacket {
                     ip_packet.render(network_block, frame);
                     sctp_packet.render(transport_block, frame);
                 }
-                IpProto::Icmp(icmp_packet) => {
+                IpProto::Icmp(IcmpPacket::V4(icmp_packet)) => {
                     let (transport_block, network_block) = {
                         let chunks = Layout::default()
                             .direction(Direction::Vertical)
@@ -79,6 +78,7 @@ impl IpPacket {
                     ip_packet.render(network_block, frame);
                     icmp_packet.render(transport_block, frame);
                 }
+                _ => unreachable!(),
             },
             IpPacket::V6(ip_packet) => match ip_packet.proto {
                 IpProto::Tcp(tcp_packet) => {
@@ -124,7 +124,7 @@ impl IpPacket {
                     ip_packet.render(network_block, frame);
                     sctp_packet.render(transport_block, frame);
                 }
-                IpProto::Icmp(icmp_packet) => {
+                IpProto::Icmp(IcmpPacket::V6(icmp_packet)) => {
                     let (transport_block, network_block) = {
                         let chunks = Layout::default()
                             .direction(Direction::Vertical)
@@ -138,305 +138,8 @@ impl IpPacket {
                     ip_packet.render(network_block, frame);
                     icmp_packet.render(transport_block, frame);
                 }
+                _ => unreachable!(),
             },
-        }
-    }
-}
-
-#[derive(Debug, Copy, Clone)]
-pub struct Ipv4Packet {
-    pub src_ip: Ipv4Addr,
-    pub dst_ip: Ipv4Addr,
-    pub ihl: u8,
-    pub tos: u8,
-    pub total_length: u16,
-    pub id: u16,
-    pub fragment_offset: u16,
-    pub ttl: u8,
-    pub proto: IpProto,
-    pub checksum: u16,
-}
-
-impl Ipv4Packet {
-    pub fn render(self, block: Rect, frame: &mut Frame) {
-        let (title_block, data_block) = {
-            let chunks = Layout::default()
-                .direction(Direction::Horizontal)
-                .constraints([Constraint::Length(10), Constraint::Fill(1)])
-                .margin(2)
-                .split(block);
-
-            (chunks[0], chunks[1])
-        };
-        // Title
-        let title = Paragraph::new("IPv4")
-            .bold()
-            .block(Block::new().padding(Padding::top({
-                if title_block.height.is_multiple_of(2) {
-                    (title_block.height / 2).saturating_sub(1)
-                } else {
-                    title_block.height / 2
-                }
-            })));
-
-        // IP
-        let widths = [Constraint::Length(23), Constraint::Fill(1)];
-        let infos = [
-            Row::new(vec![
-                Span::styled("Source IP", Style::new().bold()),
-                Span::from(self.src_ip.to_string()),
-            ]),
-            Row::new(vec![
-                Span::styled("Destination IP", Style::new().bold()),
-                Span::from(self.dst_ip.to_string()),
-            ]),
-            Row::new(vec![
-                Span::styled("Internet Header Length", Style::new().bold()),
-                Span::from(format!("{} bytes", self.ihl * 4)),
-            ]),
-            Row::new(vec![
-                Span::styled("Type Of Service", Style::new().bold()),
-                Span::from(self.tos.to_string()),
-            ]),
-            Row::new(vec![
-                Span::styled("Total Length", Style::new().bold()),
-                Span::from(format!("{} bytes", self.total_length)),
-            ]),
-            Row::new(vec![
-                Span::styled("ID", Style::new().bold()),
-                Span::from(self.id.to_string()),
-            ]),
-            Row::new(vec![
-                Span::styled("Fragment Offset", Style::new().bold()),
-                Span::from(self.fragment_offset.to_string()),
-            ]),
-            Row::new(vec![
-                Span::styled("TTL", Style::new().bold()),
-                Span::from(self.ttl.to_string()),
-            ]),
-            Row::new(vec![
-                Span::styled("Checksum", Style::new().bold()),
-                Span::from(format!("{:#0x}", self.checksum)),
-            ]),
-        ];
-
-        let table = Table::new(infos, widths).column_spacing(2).block(
-            Block::default()
-                .borders(Borders::LEFT)
-                .border_style(Style::new().bold().magenta())
-                .border_type(ratatui::widgets::BorderType::Thick)
-                .style(Style::default()),
-        );
-
-        frame.render_widget(table, data_block);
-        frame.render_widget(title, title_block);
-    }
-}
-
-#[derive(Debug, Copy, Clone)]
-pub struct Ipv6Packet {
-    pub ds: u8,
-    pub ecn: u8,
-    pub flow_label: u32,
-    pub payload_length: u16,
-    pub hop_limit: u8,
-    pub src_ip: Ipv6Addr,
-    pub dst_ip: Ipv6Addr,
-    pub proto: IpProto,
-}
-
-impl Ipv6Packet {
-    pub fn render(self, block: Rect, frame: &mut Frame) {
-        let (title_block, data_block) = {
-            let chunks = Layout::default()
-                .direction(Direction::Horizontal)
-                .constraints([Constraint::Length(10), Constraint::Fill(1)])
-                .margin(2)
-                .split(block);
-
-            (chunks[0], chunks[1])
-        };
-        // Title
-        let title = Paragraph::new("IPv6")
-            .bold()
-            .block(Block::new().padding(Padding::top({
-                if title_block.height.is_multiple_of(2) {
-                    (title_block.height / 2).saturating_sub(1)
-                } else {
-                    title_block.height / 2
-                }
-            })));
-
-        // IP
-        let widths = [Constraint::Length(23), Constraint::Fill(1)];
-        let infos = [
-            Row::new(vec![
-                Span::styled("Source IP", Style::new().bold()),
-                Span::from(self.src_ip.to_string()),
-            ]),
-            Row::new(vec![
-                Span::styled("Destination IP", Style::new().bold()),
-                Span::from(self.dst_ip.to_string()),
-            ]),
-            Row::new(vec![
-                Span::styled("Differentiated services ", Style::new().bold()),
-                Span::from(self.ds.to_string()),
-            ]),
-            Row::new(vec![
-                Span::styled("ECN", Style::new().bold()),
-                Span::from(self.ecn.to_string()),
-            ]),
-            Row::new(vec![
-                Span::styled("Flow Label", Style::new().bold()),
-                Span::from(format!("{:#0x}", self.flow_label)),
-            ]),
-            Row::new(vec![
-                Span::styled("Payload Length", Style::new().bold()),
-                Span::from(self.payload_length.to_string()),
-            ]),
-            Row::new(vec![
-                Span::styled("Hop Limit", Style::new().bold()),
-                Span::from(self.hop_limit.to_string()),
-            ]),
-        ];
-
-        let table = Table::new(infos, widths).column_spacing(2).block(
-            Block::default()
-                .borders(Borders::LEFT)
-                .border_style(Style::new().bold().magenta())
-                .border_type(ratatui::widgets::BorderType::Thick)
-                .style(Style::default()),
-        );
-
-        frame.render_widget(table, data_block);
-        frame.render_widget(title, title_block);
-    }
-}
-
-#[derive(Debug, Copy, Clone)]
-pub enum IpProto {
-    Tcp(TcpPacket),
-    Udp(UdpPacket),
-    Sctp(SctpPacket),
-    Icmp(IcmpPacket),
-}
-
-#[derive(Debug, Copy, Clone)]
-pub struct IcmpPacket {
-    pub icmp_type: IcmpType,
-    pub code: u8,
-    pub checksum: u16,
-}
-
-impl IcmpPacket {
-    pub fn render(self, block: Rect, frame: &mut Frame) {
-        let (title_block, data_block) = {
-            let chunks = Layout::default()
-                .direction(Direction::Horizontal)
-                .constraints([Constraint::Length(10), Constraint::Fill(1)])
-                .margin(2)
-                .split(block);
-
-            (chunks[0], chunks[1])
-        };
-        let title = Paragraph::new("ICMP")
-            .bold()
-            .block(Block::new().padding(Padding::top({
-                if title_block.height.is_multiple_of(2) {
-                    (title_block.height / 2).saturating_sub(1)
-                } else {
-                    title_block.height / 2
-                }
-            })));
-
-        let widths = [Constraint::Length(23), Constraint::Fill(1)];
-        let infos = [
-            Row::new(vec![
-                Span::styled("Type", Style::new().bold()),
-                Span::from(self.icmp_type.to_string()),
-            ]),
-            Row::new(vec![
-                Span::styled("Code", Style::new().bold()),
-                Span::from(self.code.to_string()),
-            ]),
-            Row::new(vec![
-                Span::styled("Checksum", Style::new().bold()),
-                Span::from(format!("{:#0x}", self.checksum)),
-            ]),
-        ];
-
-        let table = Table::new(infos, widths).column_spacing(2).block(
-            Block::default()
-                .borders(Borders::LEFT)
-                .border_style(Style::new().bold().yellow())
-                .border_type(ratatui::widgets::BorderType::Thick)
-                .style(Style::default()),
-        );
-
-        frame.render_widget(table, data_block);
-        frame.render_widget(title, title_block);
-    }
-}
-
-#[derive(Debug, Copy, Clone)]
-pub enum IcmpType {
-    EchoRequest,
-    EchoReply,
-    DestinationUnreachable,
-    RedirectMessage,
-    RouterAdvertisement,
-    RouterSolicitation,
-    TimeExceeded,
-    BadIPheader,
-    Timestamp,
-    TimestampReply,
-    ExtendedEchoRequest,
-    ExtendedEchoReply,
-    Deprecated,
-}
-
-impl Display for IcmpType {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        match self {
-            IcmpType::EchoReply => {
-                write!(f, "Echo Reply")
-            }
-            IcmpType::EchoRequest => {
-                write!(f, "Echo Request")
-            }
-            IcmpType::DestinationUnreachable => {
-                write!(f, "Destination Unreachable")
-            }
-            IcmpType::RedirectMessage => {
-                write!(f, "Redirect Message")
-            }
-            IcmpType::RouterAdvertisement => {
-                write!(f, "Router Advertisement")
-            }
-            IcmpType::RouterSolicitation => {
-                write!(f, "Router Solicitation")
-            }
-            IcmpType::TimeExceeded => {
-                write!(f, "Time Exceeded")
-            }
-            IcmpType::BadIPheader => {
-                write!(f, "Bad IP header")
-            }
-            IcmpType::Timestamp => {
-                write!(f, "Timestamp")
-            }
-            IcmpType::TimestampReply => {
-                write!(f, "Timestamp Reply")
-            }
-            IcmpType::ExtendedEchoRequest => {
-                write!(f, "Extended Echo Request")
-            }
-            IcmpType::ExtendedEchoReply => {
-                write!(f, "Extended Echo Reply")
-            }
-            IcmpType::Deprecated => {
-                write!(f, "Deprecated")
-            }
         }
     }
 }

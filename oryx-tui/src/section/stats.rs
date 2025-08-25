@@ -20,7 +20,7 @@ use crate::{
     packet::{
         AppPacket, NetworkPacket,
         direction::TrafficDirection,
-        network::{IpPacket, IpProto},
+        network::{IpPacket, ip::IpProto},
     },
 };
 
@@ -99,7 +99,7 @@ impl Stats {
                                             packet_stats.transport.sctp += 1;
                                         }
                                         IpProto::Icmp(_) => {
-                                            packet_stats.network.icmp += 1;
+                                            packet_stats.network.icmpv4 += 1;
                                         }
                                     }
                                 }
@@ -137,7 +137,7 @@ impl Stats {
                                             packet_stats.transport.sctp += 1;
                                         }
                                         IpProto::Icmp(_) => {
-                                            packet_stats.network.icmp += 1;
+                                            packet_stats.network.icmpv6 += 1;
                                         }
                                     }
                                 }
@@ -183,7 +183,7 @@ impl Stats {
                     [
                         Constraint::Max(60),
                         Constraint::Length(12),
-                        Constraint::Length(24),
+                        Constraint::Length(38),
                         Constraint::Length(10),
                     ]
                     .as_ref(),
@@ -219,7 +219,7 @@ impl Stats {
             .max(100);
 
         let transport_chart = BarChart::default()
-            .bar_width(4)
+            .bar_width(6)
             .bar_gap(1)
             .data(
                 BarGroup::default().bars(&[
@@ -269,16 +269,36 @@ impl Stats {
                             0
                         }),
                     Bar::default()
-                        .label("ICMP".into())
+                        .label("ICMPv4".into())
                         .style(Style::new().fg(Color::LightCyan))
                         .value_style(Style::new().fg(Color::Black).bg(Color::LightCyan))
                         .text_value(if packet_stats.total != 0 {
-                            format!("{}%", packet_stats.network.icmp * 100 / packet_stats.total)
+                            format!(
+                                "{}%",
+                                packet_stats.network.icmpv4 * 100 / packet_stats.total
+                            )
                         } else {
                             "0%".to_string()
                         })
                         .value(if packet_stats.total != 0 {
-                            (packet_stats.network.icmp * 100 / packet_stats.total) as u64
+                            (packet_stats.network.icmpv4 * 100 / packet_stats.total) as u64
+                        } else {
+                            0
+                        }),
+                    Bar::default()
+                        .label("ICMPv6".into())
+                        .style(Style::new().fg(Color::LightCyan))
+                        .value_style(Style::new().fg(Color::Black).bg(Color::LightCyan))
+                        .text_value(if packet_stats.total != 0 {
+                            format!(
+                                "{}%",
+                                packet_stats.network.icmpv6 * 100 / packet_stats.total
+                            )
+                        } else {
+                            "0%".to_string()
+                        })
+                        .value(if packet_stats.total != 0 {
+                            (packet_stats.network.icmpv6 * 100 / packet_stats.total) as u64
                         } else {
                             0
                         }),
@@ -368,7 +388,8 @@ pub struct NetworkStats {
     pub total: usize,
     pub ipv4: usize,
     pub ipv6: usize,
-    pub icmp: usize,
+    pub icmpv4: usize,
+    pub icmpv6: usize,
 }
 
 #[derive(Debug, Default)]

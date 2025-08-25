@@ -12,7 +12,7 @@ use core::mem;
 use network_types::{
     arp::ArpHdr,
     eth::{EthHdr, EtherType},
-    icmp::IcmpHdr,
+    icmp::{Icmp, IcmpHdr, IcmpV6Hdr},
     ip::{IpHdr, IpProto, Ipv4Hdr, Ipv6Hdr},
     sctp::SctpHdr,
     tcp::TcpHdr,
@@ -285,7 +285,7 @@ fn process(ctx: TcContext) -> Result<i32, ()> {
                     }
                 }
                 IpProto::Icmp => {
-                    if filter_packet(Protocol::Network(NetworkProtocol::Icmp)) {
+                    if filter_packet(Protocol::Network(NetworkProtocol::Icmpv4)) {
                         return Ok(TC_ACT_PIPE);
                     }
                     let icmp_header: *const IcmpHdr = ptr_at(&ctx, EthHdr::LEN + Ipv4Hdr::LEN)?;
@@ -296,7 +296,7 @@ fn process(ctx: TcContext) -> Result<i32, ()> {
                                 header: *eth_header,
                                 payload: RawPacket::Ip(
                                     IpHdr::V4(*ipv4_header),
-                                    ProtoHdr::Icmp(*icmp_header),
+                                    ProtoHdr::Icmp(Icmp::V4(*icmp_header)),
                                 ),
                             },
                             pid,
@@ -421,11 +421,11 @@ fn process(ctx: TcContext) -> Result<i32, ()> {
                         });
                     }
                 }
-                IpProto::Icmp => {
-                    if filter_packet(Protocol::Network(NetworkProtocol::Icmp)) {
+                IpProto::Ipv6Icmp => {
+                    if filter_packet(Protocol::Network(NetworkProtocol::Icmpv6)) {
                         return Ok(TC_ACT_PIPE);
                     }
-                    let icmp_header: *const IcmpHdr = ptr_at(&ctx, EthHdr::LEN + Ipv6Hdr::LEN)?;
+                    let icmp_header: *const IcmpV6Hdr = ptr_at(&ctx, EthHdr::LEN + Ipv6Hdr::LEN)?;
 
                     unsafe {
                         submit(RawData {
@@ -433,7 +433,7 @@ fn process(ctx: TcContext) -> Result<i32, ()> {
                                 header: *eth_header,
                                 payload: RawPacket::Ip(
                                     IpHdr::V6(*ipv6_header),
-                                    ProtoHdr::Icmp(*icmp_header),
+                                    ProtoHdr::Icmp(Icmp::V6(*icmp_header)),
                                 ),
                             },
                             pid,

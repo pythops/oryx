@@ -10,7 +10,7 @@ use crate::{
     app::AppResult,
     packet::{
         AppPacket, NetworkPacket,
-        network::{IpPacket, IpProto},
+        network::{IpPacket, ip::IpProto},
     },
 };
 
@@ -112,7 +112,7 @@ pub fn export(packets: &[AppPacket]) -> AppResult<()> {
                         writeln!(
                             file,
                             "{:39}  {:^11}  {:39}  {:^11}  {:10}  {:10}  {:10}",
-                            ipv4_packet.src_ip, "-", ipv4_packet.dst_ip, "-", "ICMP", pid, date
+                            ipv4_packet.src_ip, "-", ipv4_packet.dst_ip, "-", "ICMPv4", pid, date
                         )?;
                     }
                 },
@@ -160,7 +160,7 @@ pub fn export(packets: &[AppPacket]) -> AppResult<()> {
                         writeln!(
                             file,
                             "{:39}  {:^11}  {:39}  {:^11}  {:10}  {:10}  {:10}",
-                            ipv6_packet.src_ip, "-", ipv6_packet.dst_ip, "-", "ICMP", pid, date
+                            ipv6_packet.src_ip, "-", ipv6_packet.dst_ip, "-", "ICMPv6", pid, date
                         )?;
                     }
                 },
