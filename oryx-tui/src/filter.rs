@@ -536,7 +536,7 @@ impl Filter {
                     Constraint::Length(4),
                 ])
                 .margin(1)
-                .flex(Flex::SpaceAround)
+                .flex(Flex::SpaceBetween)
                 .split(filters_block);
             (
                 chunks[0], chunks[1], chunks[2], chunks[3], chunks[4], chunks[5],
@@ -773,17 +773,16 @@ impl Filter {
             let chunks = Layout::default()
                 .direction(Direction::Vertical)
                 .constraints([
-                    Constraint::Length(1),
                     Constraint::Length(NB_TRANSPORT_PROTOCOL),
                     Constraint::Length(NB_NETWORK_PROTOCOL),
                     Constraint::Length(NB_LINK_PROTOCOL),
                     Constraint::Length(2),
                     Constraint::Length(4),
                 ])
-                .margin(1)
+                .margin(2)
                 .flex(Flex::SpaceBetween)
                 .split(block);
-            (chunks[1], chunks[2], chunks[3], chunks[4], chunks[5])
+            (chunks[0], chunks[1], chunks[2], chunks[3], chunks[4])
         };
 
         frame.render_widget(Clear, block);
