@@ -1,3 +1,8 @@
+## v0.7.1 - 2025-08-28
+
+- Add support for ICMPv6
+- Update filter layout margins
+
 ## v0.7.0 - 2025-08-21
 
 - Fix crash when reading bandwidth file
