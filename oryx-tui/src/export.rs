@@ -1,29 +1,47 @@
 use std::{
+    ffi::CString,
     fs::{OpenOptions, create_dir},
     io::prelude::*,
     os::unix::fs::chown,
+    path::PathBuf,
 };
 
 use chrono::Local;
 
-use crate::{
-    app::AppResult,
-    packet::{
-        AppPacket, NetworkPacket,
-        network::{IpPacket, ip::IpProto},
-    },
+use crate::packet::{
+    AppPacket, NetworkPacket,
+    network::{IpPacket, ip::IpProto},
 };
 
-pub fn export(packets: &[AppPacket]) -> AppResult<()> {
-    let uid = unsafe { libc::geteuid() };
+use anyhow::{Result, bail};
 
+pub fn export(packets: &[AppPacket]) -> Result<()> {
     let local_date = Local::now().format("%Y-%m-%d_%H-%M");
 
-    let oryx_export_dir = dirs::home_dir().unwrap().join("oryx");
+    let user = match std::env::var("SUDO_USER") {
+        Ok(user) => user,
+        Err(std::env::VarError::NotPresent) => String::from("root"),
+        Err(e) => bail!(e),
+    };
+
+    let (uid, gid) = unsafe {
+        let user = CString::new(user.clone()).unwrap();
+        let passwd_ptr = libc::getpwnam(user.as_ptr());
+        if passwd_ptr.is_null() {
+            bail!("");
+        } else {
+            ((*passwd_ptr).pw_uid, (*passwd_ptr).pw_gid)
+        }
+    };
+
+    let oryx_export_dir = match uid {
+        0 => PathBuf::from("/root/oryx"),
+        _ => PathBuf::from(format!("/home/{user}/oryx")),
+    };
 
     if !oryx_export_dir.exists() {
         create_dir(&oryx_export_dir)?;
-        chown(&oryx_export_dir, Some(uid), Some(uid))?;
+        chown(&oryx_export_dir, Some(uid), Some(gid))?;
     }
 
     let oryx_export_file = oryx_export_dir.join(format!("capture-{local_date}"));
