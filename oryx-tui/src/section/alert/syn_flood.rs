@@ -1,7 +1,7 @@
 use std::{
     collections::HashMap,
     net::IpAddr,
-    sync::{Arc, Mutex, RwLock, atomic::AtomicBool},
+    sync::{Arc, RwLock, atomic::AtomicBool},
     thread,
     time::Duration,
 };
@@ -25,12 +25,12 @@ const WIN_SIZE: usize = 100_000;
 #[derive(Debug)]
 pub struct SynFlood {
     pub detected: Arc<AtomicBool>,
-    pub map: Arc<Mutex<HashMap<IpAddr, usize>>>,
+    pub map: Arc<RwLock<HashMap<IpAddr, usize>>>,
 }
 
 impl SynFlood {
     pub fn new(packets: Arc<RwLock<Vec<AppPacket>>>) -> Self {
-        let map: Arc<Mutex<HashMap<IpAddr, usize>>> = Arc::new(Mutex::new(HashMap::new()));
+        let map: Arc<RwLock<HashMap<IpAddr, usize>>> = Arc::new(RwLock::new(HashMap::new()));
 
         let detected = Arc::new(AtomicBool::new(false));
 
@@ -41,7 +41,12 @@ impl SynFlood {
             move || loop {
                 let start_index = {
                     let packets = packets.read().unwrap();
-                    packets.len().saturating_sub(1)
+                    let count = packets
+                        .iter()
+                        .filter(|packet| packet.direction == TrafficDirection::Ingress)
+                        .count();
+
+                    count.saturating_sub(1)
                 };
 
                 thread::sleep(Duration::from_secs(5));
@@ -56,7 +61,7 @@ impl SynFlood {
                     .filter(|packet| packet.direction == TrafficDirection::Ingress)
                     .collect();
 
-                let mut map = map.lock().unwrap();
+                let mut map = map.write().unwrap();
                 map.clear();
 
                 if app_packets.len() < WIN_SIZE {
@@ -116,7 +121,7 @@ impl SynFlood {
 
     pub fn render(&self, frame: &mut Frame, block: Rect) {
         let mut ips: Vec<(IpAddr, usize)> = {
-            let map = self.map.lock().unwrap();
+            let map = self.map.read().unwrap();
             map.clone().into_iter().collect()
         };
         ips.sort_by(|a, b| b.1.cmp(&a.1));
