@@ -716,7 +716,7 @@ impl Inspection {
             .direction(Direction::Vertical)
             .constraints([
                 Constraint::Fill(1),
-                Constraint::Length(36),
+                Constraint::Length(50),
                 Constraint::Fill(1),
             ])
             .flex(ratatui::layout::Flex::SpaceBetween)
