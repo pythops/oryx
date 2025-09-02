@@ -1,3 +1,9 @@
+## v0.7.2 - 2025-09-03
+
+- Improve the readability of the help banner.
+- Fix the SYN flood crash.
+- WResize packet infos popup to show all the available infos
+
 ## v0.7.1 - 2025-08-28
 
 - Add support for ICMPv6
