@@ -265,6 +265,34 @@ impl UserInput {
 
         frame.render_widget(Clear, block);
         frame.render_widget(table, block);
+
+        match self.focus_input {
+            FocusedInput::Name => {
+                let content_width = self.name.field.visual_cursor() as u16;
+                let cursor_x = block.x + 2 + content_width;
+                let cursor_y = block.y + 4;
+                frame.set_cursor_position((cursor_x, cursor_y));
+            }
+            FocusedInput::Ip => {
+                let content_width = self.ip.field.visual_cursor() as u16;
+                let mut cursor_x = block.x + block.width / 4 + 1 + content_width;
+                if !block.width.is_multiple_of(2) {
+                    cursor_x += 1;
+                }
+                let cursor_y = block.y + 4;
+                frame.set_cursor_position((cursor_x, cursor_y));
+            }
+            FocusedInput::Port => {
+                let content_width = self.port.field.visual_cursor() as u16;
+                let mut cursor_x = block.x + block.width / 2 + 1 + content_width;
+                if !block.width.is_multiple_of(2) {
+                    cursor_x += 1;
+                }
+                let cursor_y = block.y + 4;
+                frame.set_cursor_position((cursor_x, cursor_y));
+            }
+            _ => {}
+        };
     }
 }
 

@@ -476,6 +476,16 @@ impl Metrics {
                 vertical: 0,
             }),
         );
+
+        let content_width = self.user_input.input.visual_cursor() as u16;
+        let mut cursor_x = form_block.x + block.width / 2 + 1 + content_width;
+        if !block.width.is_multiple_of(2) {
+            cursor_x += 1;
+        }
+
+        let cursor_y = form_block.y + 2;
+        frame.set_cursor_position((cursor_x, cursor_y));
+
         frame.render_widget(
             help_message,
             message_block.inner(Margin {
