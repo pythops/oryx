@@ -1,44 +1,142 @@
-mod syn_flood;
+mod threat;
 
 use ratatui::{
     Frame,
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Style, Stylize},
     text::{Span, Text},
+    widgets::WidgetRef,
 };
-use std::sync::{Arc, RwLock, atomic::Ordering};
-use syn_flood::SynFlood;
+use std::{
+    collections::HashMap,
+    net::IpAddr,
+    sync::{Arc, RwLock},
+    thread,
+    time::Duration,
+};
 
-use crate::packet::AppPacket;
+use crate::{
+    packet::{
+        AppPacket, NetworkPacket,
+        direction::TrafficDirection,
+        network::{IpPacket, ip::IpProto},
+    },
+    section::alert::threat::synflood::SynFlood,
+};
+
+use std::fmt::Debug;
+
+pub trait Threat: Send + Sync + Debug + WidgetRef {}
+
+const WIN_SIZE: usize = 100_000;
 
 #[derive(Debug)]
 pub struct Alert {
-    syn_flood: SynFlood,
     pub flash_count: usize,
-    pub detected: bool,
+    pub threats: Arc<RwLock<Vec<Box<dyn Threat>>>>,
 }
 
 impl Alert {
     pub fn new(packets: Arc<RwLock<Vec<AppPacket>>>) -> Self {
+        let threats: Arc<RwLock<Vec<Box<dyn Threat>>>> = Arc::new(RwLock::new(Vec::new()));
+
+        thread::spawn({
+            let threats = threats.clone();
+            move || loop {
+                let start_index = {
+                    let packets = packets.read().unwrap();
+                    let count = packets
+                        .iter()
+                        .filter(|packet| packet.direction == TrafficDirection::Ingress)
+                        .count();
+
+                    count.saturating_sub(1)
+                };
+
+                thread::sleep(Duration::from_secs(5));
+
+                let mut syn_flood_map: HashMap<IpAddr, usize> = HashMap::new();
+
+                let app_packets = {
+                    let packets = packets.read().unwrap();
+                    packets.clone()
+                };
+
+                let app_packets: Vec<AppPacket> = app_packets
+                    .into_iter()
+                    .filter(|packet| packet.direction == TrafficDirection::Ingress)
+                    .collect();
+
+                if app_packets.len() < WIN_SIZE {
+                    continue;
+                }
+
+                let mut nb_syn_packets = 0;
+
+                app_packets[start_index..app_packets.len().saturating_sub(1)]
+                    .iter()
+                    .for_each(|app_packet| {
+                        if let NetworkPacket::Ip(ip_packet) = app_packet.frame.payload {
+                            match ip_packet {
+                                IpPacket::V4(ipv4_packet) => {
+                                    if let IpProto::Tcp(tcp_packet) = ipv4_packet.proto
+                                        && tcp_packet.syn == 1
+                                    {
+                                        nb_syn_packets += 1;
+                                        if let Some(count) =
+                                            syn_flood_map.get_mut(&IpAddr::V4(ipv4_packet.src_ip))
+                                        {
+                                            *count += 1;
+                                        } else {
+                                            syn_flood_map.insert(IpAddr::V4(ipv4_packet.src_ip), 1);
+                                        }
+                                    }
+                                }
+                                IpPacket::V6(ipv6_packet) => {
+                                    if let IpProto::Tcp(tcp_packet) = ipv6_packet.proto
+                                        && tcp_packet.syn == 1
+                                    {
+                                        nb_syn_packets += 1;
+                                        if let Some(count) =
+                                            syn_flood_map.get_mut(&IpAddr::V6(ipv6_packet.src_ip))
+                                        {
+                                            *count += 1;
+                                        } else {
+                                            syn_flood_map.insert(IpAddr::V6(ipv6_packet.src_ip), 1);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    });
+                let threats = threats.clone();
+                threats.write().unwrap().clear();
+
+                // 90% of incoming packets
+                if (nb_syn_packets as f64 / WIN_SIZE as f64) > 0.95 {
+                    let syn_flood = Box::new(SynFlood { map: syn_flood_map });
+                    threats.write().unwrap().push(syn_flood);
+                }
+            }
+        });
+
         Self {
-            syn_flood: SynFlood::new(packets),
+            threats,
             flash_count: 1,
-            detected: false,
         }
     }
 
     pub fn check(&mut self) {
-        if self.syn_flood.detected.load(Ordering::Relaxed) {
-            self.detected = true;
+        if !self.threats.read().unwrap().is_empty() {
             self.flash_count += 1;
         } else {
-            self.detected = false;
             self.flash_count = 1;
         }
     }
 
     pub fn render(&self, frame: &mut Frame, block: Rect) {
-        if !self.detected {
+        let threats = self.threats.read().unwrap();
+        if threats.is_empty() {
             let text_block = Layout::default()
                 .direction(Direction::Vertical)
                 .constraints([
@@ -75,12 +173,17 @@ impl Alert {
             .margin(2)
             .split(syn_flood_block)[1];
 
-        self.syn_flood.render(frame, syn_flood_block);
+        // FIX: why ?
+        // frame.render_widget_ref(x, syn_flood_block);
+        for threat in threats.iter() {
+            threat.render_ref(syn_flood_block, frame.buffer_mut());
+        }
     }
 
     pub fn title_span(&self, is_focused: bool) -> Span<'_> {
+        let threats = self.threats.read().unwrap();
         if is_focused {
-            if self.detected {
+            if !threats.is_empty() {
                 if self.flash_count.is_multiple_of(12) {
                     Span::from("  Alert 󰐼   ").fg(Color::White).bg(Color::Red)
                 } else {
@@ -92,7 +195,7 @@ impl Alert {
                     Style::default().bg(Color::Green).fg(Color::White).bold(),
                 )
             }
-        } else if self.detected {
+        } else if !threats.is_empty() {
             if self.flash_count.is_multiple_of(12) {
                 Span::from("  Alert 󰐼   ").fg(Color::White).bg(Color::Red)
             } else {
