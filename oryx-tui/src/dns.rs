@@ -17,7 +17,7 @@ fn get_hostname_v4(ip: &Ipv4Addr) -> AppResult<String> {
         sin_family: libc::AF_INET as u16,
         sin_port: 0,
         sin_addr: libc::in_addr {
-            s_addr: ip.to_bits(),
+            s_addr: u32::from_ne_bytes(ip.octets()),
         },
         sin_zero: [0; 8],
     };
