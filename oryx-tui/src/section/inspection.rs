@@ -30,7 +30,7 @@ pub struct Inspection {
     pub packets: Arc<RwLock<Vec<AppPacket>>>,
     pub state: TableState,
     pub fuzzy: Arc<Mutex<Fuzzy>>,
-    pub manuall_scroll: bool,
+    pub manual_scroll: bool,
     pub packet_end_index: usize,
     pub packet_window_size: usize,
     pub packet_index: Option<usize>,
@@ -42,7 +42,7 @@ impl Inspection {
             packets: packets.clone(),
             state: TableState::default(),
             fuzzy: Fuzzy::new(packets.clone()),
-            manuall_scroll: false,
+            manual_scroll: false,
             packet_end_index: 0,
             packet_window_size: 0,
             packet_index: None,
@@ -73,8 +73,8 @@ impl Inspection {
                 KeyCode::Esc => {
                     if !fuzzy.is_paused() {
                         fuzzy.pause();
-                    } else if self.manuall_scroll {
-                        self.manuall_scroll = false;
+                    } else if self.manual_scroll {
+                        self.manual_scroll = false;
                     } else {
                         fuzzy.disable();
                     }
@@ -87,8 +87,8 @@ impl Inspection {
                     } else {
                         match key_event.code {
                             KeyCode::Char('j') | KeyCode::Down => {
-                                if !self.manuall_scroll {
-                                    self.manuall_scroll = true;
+                                if !self.manual_scroll {
+                                    self.manual_scroll = true;
                                     fuzzy.packet_end_index = fuzzy.packets.len();
                                 }
                                 fuzzy.scroll_down(self.packet_window_size);
@@ -100,8 +100,8 @@ impl Inspection {
                             }
 
                             KeyCode::Char('k') | KeyCode::Up => {
-                                if !self.manuall_scroll {
-                                    self.manuall_scroll = true;
+                                if !self.manual_scroll {
+                                    self.manual_scroll = true;
                                     fuzzy.packet_end_index = fuzzy.packets.len();
                                 }
                                 fuzzy.scroll_up(self.packet_window_size);
@@ -115,8 +115,8 @@ impl Inspection {
         } else {
             match key_event.code {
                 KeyCode::Esc => {
-                    if self.manuall_scroll {
-                        self.manuall_scroll = false;
+                    if self.manual_scroll {
+                        self.manual_scroll = false;
                     }
                 }
 
@@ -170,9 +170,9 @@ impl Inspection {
 
     pub fn scroll_up(&mut self) {
         let app_packets = self.packets.read().unwrap();
-        if !self.manuall_scroll {
-            self.manuall_scroll = true;
-            // Record the last position. Usefull for selecting the packets to display
+        if !self.manual_scroll {
+            self.manual_scroll = true;
+            // Record the last position. Useful for selecting the packets to display
             self.packet_end_index = app_packets.len();
         }
         let i = match self.state.selected() {
@@ -196,8 +196,8 @@ impl Inspection {
     pub fn scroll_down(&mut self) {
         let app_packets = self.packets.read().unwrap();
 
-        if !self.manuall_scroll {
-            self.manuall_scroll = true;
+        if !self.manual_scroll {
+            self.manual_scroll = true;
             self.packet_end_index = app_packets.len();
         }
         let i = match self.state.selected() {
@@ -277,7 +277,7 @@ impl Inspection {
             fuzzy.packet_end_index = window_size;
         }
 
-        let packets_to_display = match self.manuall_scroll {
+        let packets_to_display = match self.manual_scroll {
             true => {
                 if fuzzy.is_enabled() & !fuzzy.filter.value().is_empty() {
                     if fuzzy_packets.len() > window_size {
@@ -592,7 +592,7 @@ impl Inspection {
         };
 
         // Always select the last packet
-        if !self.manuall_scroll {
+        if !self.manual_scroll {
             if fuzzy.is_enabled() {
                 fuzzy.scroll_state.select(Some(packets_to_display.len()));
             } else {
@@ -610,7 +610,7 @@ impl Inspection {
                     Line::from("Protocol").centered(),
                     Line::from("Pid").centered(),
                     {
-                        if self.manuall_scroll {
+                        if self.manual_scroll {
                             Line::from("󰹆").centered().yellow()
                         } else {
                             Line::from("").centered()
@@ -640,7 +640,7 @@ impl Inspection {
 
         let mut scrollbar_state = if fuzzy.is_enabled() && fuzzy_packets.len() > window_size {
             ScrollbarState::new(fuzzy_packets.len()).position({
-                if self.manuall_scroll {
+                if self.manual_scroll {
                     if fuzzy.packet_end_index == window_size {
                         0
                     } else {
@@ -652,7 +652,7 @@ impl Inspection {
             })
         } else if !fuzzy.is_enabled() && app_packets.len() > window_size {
             ScrollbarState::new(app_packets.len()).position({
-                if self.manuall_scroll {
+                if self.manual_scroll {
                     if self.packet_end_index == window_size {
                         0
                     } else {

@@ -279,7 +279,7 @@ impl Section {
         &mut self,
         frame: &mut Frame,
         block: Rect,
-        network_interace: &str,
+        network_interface: &str,
         active_popup: Option<&ActivePopup>,
     ) {
         let (section_block, help_block) = {
@@ -299,7 +299,7 @@ impl Section {
             FocusedSection::Inspection => self.inspection.render(frame, section_block),
             FocusedSection::Stats => {
                 if let Some(stats) = &self.stats {
-                    stats.render(frame, section_block, network_interace)
+                    stats.render(frame, section_block, network_interface)
                 }
             }
             FocusedSection::Metrics => self.metrics.render(frame, section_block),
