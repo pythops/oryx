@@ -1,4 +1,5 @@
 <div align="center">
+  <img height="125" src="assets/logo.svg"/>
   <h2> TUI for sniffing network traffic using eBPF </h2>
 </div>
 
@@ -116,6 +117,10 @@ sudo oryx
 `s`: Save firewall rules to `~/oryx/firewall.json`
 
 `Enter`: Create or Save a firewall rule.
+
+## ✍️ Credits
+
+Logo designed by [@ling0x](https://github.com/ling0x)
 
 ## ⚖️ License
 
