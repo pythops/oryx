@@ -118,6 +118,10 @@ sudo oryx
 
 `Enter`: Create or Save a firewall rule.
 
+## ✍️ Credits
+
+Logo designed by [@ling0x](https://github.com/ling0x)
+
 ## ⚖️ License
 
 GPLv3
