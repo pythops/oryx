@@ -1,4 +1,5 @@
 <div align="center">
+  <img height="125" src="assets/logo.svg"/>
   <h2> TUI for sniffing network traffic using eBPF </h2>
 </div>
 
