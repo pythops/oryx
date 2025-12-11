@@ -232,9 +232,17 @@ impl PacketStore {
             let start_in_latest = i % BUFFER_SIZE;
             let end_in_latest = (start_in_latest + (end - i)).min(latest.len());
 
-            for packet in &latest[start_in_latest..end_in_latest] {
-                f(packet)?;
-            }
+            THREAD_BUFFER.with(move |buffer| {
+                let mut buffer = buffer.borrow_mut();
+                buffer.extend_from_slice(&latest[start_in_latest..end_in_latest]);
+                drop(latest);
+                for packet in buffer.iter() {
+                    f(packet)?;
+                }
+                buffer.clear();
+                Ok::<(), anyhow::Error>(())
+            })?;
+
             i += end_in_latest - start_in_latest;
             return Ok(i - start);
         }
