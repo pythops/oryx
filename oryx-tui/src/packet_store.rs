@@ -7,7 +7,6 @@ use std::sync::{Arc, Mutex, RwLock};
 // The double edged sword, Too high increases copy time and contention, Too low increases number of allocations
 const BUFFER_SIZE: usize = 32 * 1024;
 
-// TODO: archive must be clonable as references so it is growable while someone is reading it.
 #[derive(Debug)]
 pub struct PacketStoreInner {
     // Recent packets stored here
@@ -25,6 +24,12 @@ pub struct PacketStoreInner {
 #[derive(Debug)]
 pub struct PacketStore {
     inner: Arc<PacketStoreInner>,
+}
+
+impl Default for PacketStore {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Deref for PacketStore {
@@ -82,7 +87,7 @@ impl PacketStore {
     #[inline]
     pub fn write(&self, packet: &AppPacket) {
         let mut latest = self.latest.lock().unwrap();
-        latest.push(packet.clone());
+        latest.push(*packet);
         if latest.len() >= BUFFER_SIZE {
             assert!(latest.len() == BUFFER_SIZE);
             let latest_cloned = latest.clone();
@@ -158,7 +163,7 @@ impl PacketStore {
             _ => 0,
         });
         self.for_each_range(range, |packet| {
-            packets.push(packet.clone());
+            packets.push(*packet);
             Ok(())
         })
         .unwrap();

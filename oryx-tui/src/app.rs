@@ -71,7 +71,7 @@ impl App {
                 if receiver.drain_into(&mut recv_buffer).is_err() {
                     return;
                 }
-                if recv_buffer.len() > 0 {
+                if !recv_buffer.is_empty() {
                     for unprocessed in &recv_buffer {
                         let raw = RawData::from(unprocessed.0);
                         packet_buffer.push(AppPacket {

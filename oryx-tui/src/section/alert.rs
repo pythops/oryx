@@ -63,7 +63,7 @@ impl Alert {
 
                 _ = packets.for_each_range(start_index.., |app_packet| {
                     if app_packet.direction == TrafficDirection::Ingress {
-                        ingress_packets.push(app_packet.clone());
+                        ingress_packets.push(*app_packet);
                     }
                     Ok(())
                 });
