@@ -8,14 +8,17 @@ use std::{
 
 use chrono::Local;
 
-use crate::packet::{
-    AppPacket, NetworkPacket,
-    network::{IpPacket, ip::IpProto},
+use crate::{
+    packet::{
+        NetworkPacket,
+        network::{IpPacket, ip::IpProto},
+    },
+    packet_store::PacketStore,
 };
 
 use anyhow::{Result, bail};
 
-pub fn export(packets: &[AppPacket]) -> Result<()> {
+pub fn export(packets: &PacketStore) -> Result<()> {
     let local_date = Local::now().format("%Y-%m-%d_%H-%M");
 
     let user = match std::env::var("SUDO_USER") {
@@ -62,7 +65,7 @@ pub fn export(packets: &[AppPacket]) -> Result<()> {
         "{:39}  {:11}  {:39}  {:11}  {:8}    {:10}  {:10}\n",
         headers.0, headers.1, headers.2, headers.3, headers.4, headers.5, headers.6
     )?;
-    for app_packet in packets {
+    packets.for_each(|app_packet| {
         let pid = if let Some(pid) = app_packet.pid {
             pid.to_string()
         } else {
@@ -184,7 +187,8 @@ pub fn export(packets: &[AppPacket]) -> Result<()> {
                 },
             },
         }
-    }
+        Ok(())
+    })?;
 
     Ok(())
 }

@@ -1,7 +1,7 @@
 use std::{
     collections::HashMap,
     net::IpAddr,
-    sync::{Arc, Mutex, RwLock},
+    sync::{Arc, Mutex},
     thread,
     time::Duration,
 };
@@ -18,10 +18,11 @@ use crate::{
     bandwidth::Bandwidth,
     dns::get_hostname,
     packet::{
-        AppPacket, NetworkPacket,
+        NetworkPacket,
         direction::TrafficDirection,
         network::{IpPacket, ip::IpProto},
     },
+    packet_store::PacketStore,
 };
 
 #[derive(Debug, Default)]
@@ -41,113 +42,111 @@ pub struct Stats {
 }
 
 impl Stats {
-    pub fn new(packets: Arc<RwLock<Vec<AppPacket>>>) -> Self {
+    pub fn new(packets: PacketStore) -> Self {
         let packet_stats: Arc<Mutex<PacketStats>> = Arc::new(Mutex::new(PacketStats::default()));
 
         thread::spawn({
             let packet_stats = packet_stats.clone();
             move || {
-                let mut last_index = 0;
+                let mut last_index: usize = 0;
                 loop {
                     thread::sleep(Duration::from_millis(500));
 
-                    let app_packets = { packets.read().unwrap().clone() };
-
-                    if app_packets.is_empty() {
+                    if packets.is_empty() {
                         continue;
                     }
-
                     let mut packet_stats = packet_stats.lock().unwrap();
+                    last_index += packets
+                        .for_each_range(last_index.., |app_packet| {
+                            match app_packet.frame.payload {
+                                NetworkPacket::Arp(_) => {
+                                    packet_stats.link.arp += 1;
+                                }
+                                NetworkPacket::Ip(packet) => match packet {
+                                    IpPacket::V4(ipv4_packet) => {
+                                        packet_stats.network.ipv4 += 1;
 
-                    for app_packet in app_packets[last_index..].iter() {
-                        match app_packet.frame.payload {
-                            NetworkPacket::Arp(_) => {
-                                packet_stats.link.arp += 1;
+                                        if app_packet.direction == TrafficDirection::Egress {
+                                            if let Some((_, counts)) = packet_stats
+                                                .addresses
+                                                .get_mut(&IpAddr::V4(ipv4_packet.dst_ip))
+                                            {
+                                                *counts += 1;
+                                            } else if let Ok(host) =
+                                                get_hostname(&IpAddr::V4(ipv4_packet.dst_ip))
+                                            {
+                                                packet_stats.addresses.insert(
+                                                    IpAddr::V4(ipv4_packet.dst_ip),
+                                                    (Some(host), 1),
+                                                );
+                                            } else {
+                                                packet_stats.addresses.insert(
+                                                    IpAddr::V4(ipv4_packet.dst_ip),
+                                                    (None, 1),
+                                                );
+                                            }
+                                        }
+
+                                        match ipv4_packet.proto {
+                                            IpProto::Tcp(_) => {
+                                                packet_stats.transport.tcp += 1;
+                                            }
+                                            IpProto::Udp(_) => {
+                                                packet_stats.transport.udp += 1;
+                                            }
+                                            IpProto::Sctp(_) => {
+                                                packet_stats.transport.sctp += 1;
+                                            }
+                                            IpProto::Icmp(_) => {
+                                                packet_stats.network.icmpv4 += 1;
+                                            }
+                                        }
+                                    }
+                                    IpPacket::V6(ipv6_packet) => {
+                                        packet_stats.network.ipv6 += 1;
+
+                                        if app_packet.direction == TrafficDirection::Egress {
+                                            if let Some((_, counts)) = packet_stats
+                                                .addresses
+                                                .get_mut(&IpAddr::V6(ipv6_packet.dst_ip))
+                                            {
+                                                *counts += 1;
+                                            } else if let Ok(host) =
+                                                get_hostname(&IpAddr::V6(ipv6_packet.dst_ip))
+                                            {
+                                                packet_stats.addresses.insert(
+                                                    IpAddr::V6(ipv6_packet.dst_ip),
+                                                    (Some(host), 1),
+                                                );
+                                            } else {
+                                                packet_stats.addresses.insert(
+                                                    IpAddr::V6(ipv6_packet.dst_ip),
+                                                    (None, 1),
+                                                );
+                                            }
+                                        }
+
+                                        match ipv6_packet.proto {
+                                            IpProto::Tcp(_) => {
+                                                packet_stats.transport.tcp += 1;
+                                            }
+                                            IpProto::Udp(_) => {
+                                                packet_stats.transport.udp += 1;
+                                            }
+                                            IpProto::Sctp(_) => {
+                                                packet_stats.transport.sctp += 1;
+                                            }
+                                            IpProto::Icmp(_) => {
+                                                packet_stats.network.icmpv6 += 1;
+                                            }
+                                        }
+                                    }
+                                },
                             }
-                            NetworkPacket::Ip(packet) => match packet {
-                                IpPacket::V4(ipv4_packet) => {
-                                    packet_stats.network.ipv4 += 1;
-
-                                    if app_packet.direction == TrafficDirection::Egress {
-                                        if let Some((_, counts)) = packet_stats
-                                            .addresses
-                                            .get_mut(&IpAddr::V4(ipv4_packet.dst_ip))
-                                        {
-                                            *counts += 1;
-                                        } else if let Ok(host) =
-                                            get_hostname(&IpAddr::V4(ipv4_packet.dst_ip))
-                                        {
-                                            packet_stats.addresses.insert(
-                                                IpAddr::V4(ipv4_packet.dst_ip),
-                                                (Some(host), 1),
-                                            );
-                                        } else {
-                                            packet_stats
-                                                .addresses
-                                                .insert(IpAddr::V4(ipv4_packet.dst_ip), (None, 1));
-                                        }
-                                    }
-
-                                    match ipv4_packet.proto {
-                                        IpProto::Tcp(_) => {
-                                            packet_stats.transport.tcp += 1;
-                                        }
-                                        IpProto::Udp(_) => {
-                                            packet_stats.transport.udp += 1;
-                                        }
-                                        IpProto::Sctp(_) => {
-                                            packet_stats.transport.sctp += 1;
-                                        }
-                                        IpProto::Icmp(_) => {
-                                            packet_stats.network.icmpv4 += 1;
-                                        }
-                                    }
-                                }
-                                IpPacket::V6(ipv6_packet) => {
-                                    packet_stats.network.ipv6 += 1;
-
-                                    if app_packet.direction == TrafficDirection::Egress {
-                                        if let Some((_, counts)) = packet_stats
-                                            .addresses
-                                            .get_mut(&IpAddr::V6(ipv6_packet.dst_ip))
-                                        {
-                                            *counts += 1;
-                                        } else if let Ok(host) =
-                                            get_hostname(&IpAddr::V6(ipv6_packet.dst_ip))
-                                        {
-                                            packet_stats.addresses.insert(
-                                                IpAddr::V6(ipv6_packet.dst_ip),
-                                                (Some(host), 1),
-                                            );
-                                        } else {
-                                            packet_stats
-                                                .addresses
-                                                .insert(IpAddr::V6(ipv6_packet.dst_ip), (None, 1));
-                                        }
-                                    }
-
-                                    match ipv6_packet.proto {
-                                        IpProto::Tcp(_) => {
-                                            packet_stats.transport.tcp += 1;
-                                        }
-                                        IpProto::Udp(_) => {
-                                            packet_stats.transport.udp += 1;
-                                        }
-                                        IpProto::Sctp(_) => {
-                                            packet_stats.transport.sctp += 1;
-                                        }
-                                        IpProto::Icmp(_) => {
-                                            packet_stats.network.icmpv6 += 1;
-                                        }
-                                    }
-                                }
-                            },
-                        }
-
-                        packet_stats.total += 1;
-                    }
-
-                    last_index = app_packets.len() - 1;
+                            packet_stats.total += 1;
+                            Ok(())
+                        })
+                        .unwrap();
                 }
             }
         });

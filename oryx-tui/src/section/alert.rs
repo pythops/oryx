@@ -21,6 +21,7 @@ use crate::{
         direction::TrafficDirection,
         network::{IpPacket, ip::IpProto},
     },
+    packet_store::PacketStore,
     section::alert::threat::synflood::SynFlood,
 };
 
@@ -37,19 +38,20 @@ pub struct Alert {
 }
 
 impl Alert {
-    pub fn new(packets: Arc<RwLock<Vec<AppPacket>>>) -> Self {
+    pub fn new(packets: PacketStore) -> Self {
         let threats: Arc<RwLock<Vec<Box<dyn Threat>>>> = Arc::new(RwLock::new(Vec::new()));
 
         thread::spawn({
             let threats = threats.clone();
             move || loop {
                 let start_index = {
-                    let packets = packets.read().unwrap();
-                    let count = packets
-                        .iter()
-                        .filter(|packet| packet.direction == TrafficDirection::Ingress)
-                        .count();
-
+                    let mut count = 0usize;
+                    _ = packets.for_each(|packet| {
+                        if packet.direction == TrafficDirection::Ingress {
+                            count += 1;
+                        }
+                        Ok(())
+                    });
                     count.saturating_sub(1)
                 };
 
@@ -57,23 +59,22 @@ impl Alert {
 
                 let mut syn_flood_map: HashMap<IpAddr, usize> = HashMap::new();
 
-                let app_packets = {
-                    let packets = packets.read().unwrap();
-                    packets.clone()
-                };
+                let mut ingress_packets: Vec<AppPacket> = Vec::new();
 
-                let app_packets: Vec<AppPacket> = app_packets
-                    .into_iter()
-                    .filter(|packet| packet.direction == TrafficDirection::Ingress)
-                    .collect();
+                _ = packets.for_each_range(start_index.., |app_packet| {
+                    if app_packet.direction == TrafficDirection::Ingress {
+                        ingress_packets.push(app_packet.clone());
+                    }
+                    Ok(())
+                });
 
-                if app_packets.len() < WIN_SIZE {
+                if ingress_packets.len() < WIN_SIZE {
                     continue;
                 }
 
                 let mut nb_syn_packets = 0;
 
-                app_packets[start_index..app_packets.len().saturating_sub(1)]
+                ingress_packets[start_index..ingress_packets.len().saturating_sub(1)]
                     .iter()
                     .for_each(|app_packet| {
                         if let NetworkPacket::Ip(ip_packet) = app_packet.frame.payload {

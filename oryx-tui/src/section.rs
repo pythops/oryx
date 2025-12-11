@@ -4,8 +4,6 @@ pub mod inspection;
 pub mod metrics;
 pub mod stats;
 
-use std::sync::{Arc, RwLock};
-
 use alert::Alert;
 use crossterm::event::{KeyCode, KeyEvent};
 use firewall::{Firewall, FirewallSignal};
@@ -25,7 +23,7 @@ use crate::{
     app::{ActivePopup, AppResult},
     event::Event,
     filter::IoChannels,
-    packet::AppPacket,
+    packet_store::PacketStore,
 };
 
 #[derive(Debug, PartialEq)]
@@ -48,10 +46,7 @@ pub struct Section {
 }
 
 impl Section {
-    pub fn new(
-        packets: Arc<RwLock<Vec<AppPacket>>>,
-        firewall_chans: IoChannels<FirewallSignal>,
-    ) -> Self {
+    pub fn new(packets: PacketStore, firewall_chans: IoChannels<FirewallSignal>) -> Self {
         Self {
             focused_section: FocusedSection::Inspection,
             inspection: Inspection::new(packets.clone()),
