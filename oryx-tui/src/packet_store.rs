@@ -3,14 +3,14 @@ use anyhow::Result;
 use std::cell::RefCell;
 use std::ops::{Deref, RangeBounds};
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::{Arc, RwLock};
 // The double edged sword, Too high increases copy time and contention, Too low increases number of allocations
 const BUFFER_SIZE: usize = 32 * 1024;
 
 #[derive(Debug)]
 pub struct PacketStoreInner {
     // Recent packets stored here
-    latest: Mutex<Vec<AppPacket>>,
+    latest: RwLock<Vec<AppPacket>>,
     // It is here so user would know if archive that it read is changed while reading latest
     latest_token: AtomicUsize,
     // Old packets stored here in chunks of BUFFER_SIZE
@@ -58,7 +58,7 @@ impl PacketStore {
         PacketStore {
             inner: Arc::new(PacketStoreInner {
                 latest_token: AtomicUsize::new(0),
-                latest: Mutex::new(Vec::with_capacity(BUFFER_SIZE)),
+                latest: RwLock::new(Vec::with_capacity(BUFFER_SIZE)),
                 archives: RwLock::new(Vec::new()),
                 archives_token: AtomicUsize::new(0),
                 length: AtomicUsize::new(0),
@@ -86,7 +86,7 @@ impl PacketStore {
 
     #[inline]
     pub fn write(&self, packet: &AppPacket) {
-        let mut latest = self.latest.lock().unwrap();
+        let mut latest = self.latest.write().unwrap();
         latest.push(*packet);
         if latest.len() >= BUFFER_SIZE {
             assert!(latest.len() == BUFFER_SIZE);
@@ -111,7 +111,7 @@ impl PacketStore {
     pub fn write_many(&self, packets: &[AppPacket]) {
         let mut i = 0;
         while i < packets.len() {
-            let mut latest = self.latest.lock().unwrap();
+            let mut latest = self.latest.write().unwrap();
             let remaining_capacity = BUFFER_SIZE - latest.len();
             let to_copy = remaining_capacity.min(packets.len() - i);
             latest.extend_from_slice(&packets[i..i + to_copy]);
@@ -141,7 +141,7 @@ impl PacketStore {
                 return res.get(index_in_archive).cloned();
             }
         } else {
-            let latest = self.latest.lock().unwrap();
+            let latest = self.latest.read().unwrap();
             if i < processed_archive_length * BUFFER_SIZE + latest.len() {
                 return latest.get(index_in_archive).cloned();
             }
@@ -223,7 +223,7 @@ impl PacketStore {
                 return Ok(i - start);
             }
 
-            let latest = self.latest.lock().unwrap();
+            let latest = self.latest.read().unwrap();
             if latest_token != self.latest_token.load(Ordering::Acquire) {
                 drop(latest);
                 continue; // Retry, archive was updated
