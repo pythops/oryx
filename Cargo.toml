@@ -16,6 +16,9 @@ homepage = "https://github.com/pythops/oryx"
 network-types = { git = "https://github.com/vadorovsky/network-types", rev = "b78424c" }
 
 [profile.release]
-lto = "fat"
-strip = true
+opt-level = 3
+debug = false
+lto = 'fat'
+panic = 'abort'
 codegen-units = 1
+rpath = false

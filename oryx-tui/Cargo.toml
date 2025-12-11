@@ -19,7 +19,7 @@ oryx-common = { path = "../oryx-common" }
 mio = { version = "1", features = ["os-poll", "os-ext"] }
 itertools = "0.14"
 dirs = "6"
-kanal = "0.1"
+kanal = { version = "0.1", default-features = false }
 mimalloc = "0.1"
 clap = { version = "4", features = ["derive", "cargo"] }
 network-types = { workspace = true }
