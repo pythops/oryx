@@ -1,10 +1,6 @@
-use chrono::Utc;
 use clap::ArgMatches;
 use itertools::Itertools;
-use oryx_common::{
-    RawData, RawFrame,
-    protocols::{LinkProtocol, NetworkProtocol, TransportProtocol},
-};
+use oryx_common::protocols::{LinkProtocol, NetworkProtocol, TransportProtocol};
 use ratatui::{
     Frame,
     layout::{Constraint, Direction, Layout},
@@ -12,13 +8,9 @@ use ratatui::{
 use std::{error, str::FromStr, thread, time::Duration};
 
 use crate::{
-    filter::Filter,
-    help::Help,
-    packet::{EthFrame, direction::TrafficDirection},
-    packet_store::PacketStore,
+    filter::Filter, filter::IoChannels, help::Help, notification::Notification,
+    packet::direction::TrafficDirection, packet_store::PacketStore, section::Section,
 };
-use crate::{filter::IoChannels, notification::Notification};
-use crate::{packet::AppPacket, section::Section};
 
 pub type AppResult<T> = std::result::Result<T, Box<dyn error::Error>>;
 
@@ -35,7 +27,6 @@ pub enum ActivePopup {
 
 #[derive(Debug)]
 pub struct DataEventHandler {
-    pub sender: kanal::Sender<[u8; RawFrame::LEN]>,
     pub handler: thread::JoinHandle<()>,
 }
 
@@ -48,7 +39,6 @@ pub struct App {
     pub app_packets: PacketStore,
     pub notifications: Vec<Notification>,
     pub section: Section,
-    pub data_channel_sender: kanal::Sender<([u8; RawData::LEN], TrafficDirection)>,
     pub is_editing: bool,
     pub active_popup: Option<ActivePopup>,
     pub start_from_cli: bool,
@@ -57,51 +47,8 @@ pub struct App {
 impl App {
     pub fn new(cli_args: &ArgMatches) -> Self {
         let app_packets = PacketStore::new();
-        let (sender, receiver) = kanal::unbounded();
 
         let firewall_channels = IoChannels::new();
-
-        thread::spawn({
-            let app_packets = app_packets.clone();
-            let mut packet_buffer: Vec<AppPacket> = Vec::with_capacity(1024 * 10);
-            let mut recv_buffer: Vec<([u8; RawData::LEN], TrafficDirection)> =
-                Vec::with_capacity(1024 * 10);
-            move || loop {
-                // drain all available packets into the recv_buffer
-                if receiver.drain_into(&mut recv_buffer).is_err() {
-                    return;
-                }
-                if !recv_buffer.is_empty() {
-                    for unprocessed in &recv_buffer {
-                        let raw = RawData::from(unprocessed.0);
-                        packet_buffer.push(AppPacket {
-                            frame: EthFrame::from(raw.frame),
-                            direction: unprocessed.1,
-                            pid: raw.pid,
-                            timestamp: Utc::now(),
-                        })
-                    }
-                    // write all packets at once
-                    app_packets.write_many(&packet_buffer);
-                    // clear buffers for next use
-                    packet_buffer.clear();
-                    recv_buffer.clear();
-                } else {
-                    // wait for a single packet, then retry draining
-                    if let Ok(packet) = receiver.recv() {
-                        let raw = RawData::from(packet.0);
-                        app_packets.write(&AppPacket {
-                            frame: EthFrame::from(raw.frame),
-                            direction: packet.1,
-                            pid: raw.pid,
-                            timestamp: Utc::now(),
-                        });
-                    } else {
-                        return;
-                    }
-                }
-            }
-        });
 
         let (interface_name, transport_protocols, network_protocols, link_protocols, direction) = {
             if let Some(interface) = cli_args.get_one::<String>("interface") {
@@ -206,7 +153,6 @@ impl App {
             app_packets: app_packets.clone(),
             notifications: Vec::new(),
             section: Section::new(app_packets.clone(), firewall_channels.clone()),
-            data_channel_sender: sender,
             is_editing: false,
             active_popup: None,
             start_from_cli: interface_name.is_some(),

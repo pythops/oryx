@@ -11,6 +11,7 @@ use aya::{
     maps::{Array, HashMap},
     programs::{SchedClassifier, TcAttachType, tc},
 };
+use branches::{likely, unlikely};
 use log::error;
 use oryx_common::{MAX_RULES_PORT, RawData, protocols::Protocol};
 
@@ -18,7 +19,8 @@ use crate::{
     event::Event,
     filter::FilterChannelSignal,
     notification::{Notification, NotificationLevel},
-    packet::direction::TrafficDirection,
+    packet::{AppPacket, direction::TrafficDirection},
+    packet_store::PacketStore,
     section::firewall::FirewallSignal,
 };
 use mio::{Events, Interest, Poll, Token, unix::SourceFd};
@@ -31,7 +33,7 @@ use super::{
 pub fn load_ingress(
     iface: String,
     notification_sender: kanal::Sender<Event>,
-    data_sender: kanal::Sender<([u8; RawData::LEN], TrafficDirection)>,
+    packet_store: PacketStore,
     filter_channel_receiver: kanal::Receiver<FilterChannelSignal>,
     firewall_ingress_receiver: kanal::Receiver<FirewallSignal>,
     terminate: Arc<AtomicBool>,
@@ -202,26 +204,37 @@ pub fn load_ingress(
                 )
                 .unwrap();
 
+            let mut packet_buffer = Vec::with_capacity(64 * 1024);
             loop {
                 poll.poll(&mut events, Some(Duration::from_millis(100)))
                     .unwrap();
-                if terminate.load(std::sync::atomic::Ordering::Relaxed) {
+                if unlikely(terminate.load(std::sync::atomic::Ordering::Relaxed)) {
                     break;
                 }
                 for event in &events {
-                    if terminate.load(std::sync::atomic::Ordering::Relaxed) {
+                    if unlikely(terminate.load(std::sync::atomic::Ordering::Relaxed)) {
                         break;
                     }
-                    if event.token() == Token(0) && event.is_readable() {
-                        if terminate.load(std::sync::atomic::Ordering::Relaxed) {
+                    if likely(event.token() == Token(0) && event.is_readable()) {
+                        if unlikely(terminate.load(std::sync::atomic::Ordering::Relaxed)) {
                             break;
                         }
                         while let Some(item) = ring_buf.next() {
-                            if terminate.load(std::sync::atomic::Ordering::Relaxed) {
+                            if unlikely(terminate.load(std::sync::atomic::Ordering::Relaxed)) {
                                 break;
                             }
                             let data: [u8; RawData::LEN] = item.to_owned().try_into().unwrap();
-                            data_sender.send((data, TrafficDirection::Ingress)).ok();
+                            let raw = RawData::from(data);
+                            packet_buffer.push(AppPacket {
+                                frame: raw.frame.into(),
+                                direction: TrafficDirection::Ingress,
+                                pid: raw.pid,
+                                timestamp: chrono::Utc::now(),
+                            })
+                        }
+                        if likely(!packet_buffer.is_empty()) {
+                            packet_store.write_many(&packet_buffer);
+                            packet_buffer.clear();
                         }
                     }
                 }

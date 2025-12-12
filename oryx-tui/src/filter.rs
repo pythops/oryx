@@ -8,12 +8,9 @@ use crossterm::event::{KeyCode, KeyEvent};
 use direction::TrafficDirectionFilter;
 use link::LinkFilter;
 use network::NetworkFilter;
-use oryx_common::{
-    RawData,
-    protocols::{
-        LinkProtocol, NB_LINK_PROTOCOL, NB_NETWORK_PROTOCOL, NB_TRANSPORT_PROTOCOL,
-        NetworkProtocol, Protocol, TransportProtocol,
-    },
+use oryx_common::protocols::{
+    LinkProtocol, NB_LINK_PROTOCOL, NB_NETWORK_PROTOCOL, NB_TRANSPORT_PROTOCOL, NetworkProtocol,
+    Protocol, TransportProtocol,
 };
 use ratatui::{
     Frame,
@@ -31,6 +28,7 @@ use crate::{
     event::Event,
     interface::Interface,
     packet::direction::TrafficDirection,
+    packet_store::PacketStore,
     section::firewall::FirewallSignal,
 };
 
@@ -159,7 +157,7 @@ impl Filter {
     pub fn start(
         &mut self,
         notification_sender: kanal::Sender<Event>,
-        data_sender: kanal::Sender<([u8; RawData::LEN], TrafficDirection)>,
+        packet_store: PacketStore,
     ) -> AppResult<()> {
         let iface = self.interface.selected_interface.name.clone();
 
@@ -168,7 +166,7 @@ impl Filter {
         load_ingress(
             iface.clone(),
             notification_sender.clone(),
-            data_sender.clone(),
+            packet_store.clone(),
             self.filter_chans.ingress.receiver.clone(),
             self.firewall_chans.ingress.receiver.clone(),
             self.traffic_direction.terminate_ingress.clone(),
@@ -177,7 +175,7 @@ impl Filter {
         load_egress(
             iface,
             notification_sender,
-            data_sender,
+            packet_store,
             self.filter_chans.egress.receiver.clone(),
             self.firewall_chans.egress.receiver.clone(),
             self.traffic_direction.terminate_egress.clone(),
