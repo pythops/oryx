@@ -1,5 +1,6 @@
 use crate::packet::AppPacket;
 use anyhow::Result;
+use branches::{likely, unlikely};
 use std::cell::RefCell;
 use std::ops::{Deref, RangeBounds};
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -73,13 +74,13 @@ impl PacketStore {
 
     #[inline]
     pub fn is_empty(&self) -> bool {
-        self.len() == 0
+        unlikely(self.len() == 0)
     }
 
     #[inline]
     pub fn discard_archive(&self, index: usize) {
         let mut archives = self.archives.write().unwrap();
-        if index < archives.len() {
+        if likely(index < archives.len()) {
             archives[index] = Arc::new(Vec::new());
         }
     }
@@ -88,15 +89,14 @@ impl PacketStore {
     pub fn write(&self, packet: &AppPacket) {
         let mut latest = self.latest.write().unwrap();
         latest.push(*packet);
-        if latest.len() >= BUFFER_SIZE {
+        if unlikely(latest.len() >= BUFFER_SIZE) {
             assert!(latest.len() == BUFFER_SIZE);
-            let latest_cloned = latest.clone();
-            latest.clear();
-            self.latest_token.fetch_add(1, Ordering::Release);
+            let full_buffer = std::mem::replace(&mut *latest, Vec::with_capacity(BUFFER_SIZE));
+            self.latest_token.fetch_add(1, Ordering::SeqCst);
             drop(latest);
             let mut archive = self.archives.write().unwrap();
-            archive.push(Arc::new(latest_cloned));
-            self.archives_token.fetch_add(1, Ordering::Release);
+            archive.push(Arc::new(full_buffer));
+            self.archives_token.fetch_add(1, Ordering::SeqCst);
         }
         self.length.fetch_add(1, Ordering::Relaxed);
     }
@@ -110,14 +110,14 @@ impl PacketStore {
     #[inline]
     pub fn write_many(&self, packets: &[AppPacket]) {
         let mut i = 0;
-        while i < packets.len() {
+        while likely(i < packets.len()) {
             let mut latest = self.latest.write().unwrap();
             let remaining_capacity = BUFFER_SIZE - latest.len();
             let to_copy = remaining_capacity.min(packets.len() - i);
             latest.extend_from_slice(&packets[i..i + to_copy]);
             self.length.fetch_add(to_copy, Ordering::Relaxed);
             i += to_copy;
-            if latest.len() >= BUFFER_SIZE {
+            if unlikely(latest.len() >= BUFFER_SIZE) {
                 assert!(latest.len() == BUFFER_SIZE);
                 let latest_cloned = latest.clone();
                 latest.clear();
@@ -132,21 +132,7 @@ impl PacketStore {
 
     #[inline]
     pub fn get(&self, i: usize) -> Option<AppPacket> {
-        let archive_index = i / BUFFER_SIZE;
-        let index_in_archive = i % BUFFER_SIZE;
-        let processed_archive_length = self.archives_token.load(Ordering::Acquire);
-        if archive_index < processed_archive_length {
-            let res = self.archive_at(archive_index);
-            if let Some(res) = res.0 {
-                return res.get(index_in_archive).cloned();
-            }
-        } else {
-            let latest = self.latest.read().unwrap();
-            if i < processed_archive_length * BUFFER_SIZE + latest.len() {
-                return latest.get(index_in_archive).cloned();
-            }
-        }
-        None
+        self.clone_range(i..=i).into_iter().next()
     }
 
     // only use for small ranges
@@ -168,6 +154,17 @@ impl PacketStore {
         })
         .unwrap();
         packets
+    }
+
+    pub fn write_range_into<R>(&self, range: R, output: &mut Vec<AppPacket>)
+    where
+        R: RangeBounds<usize>,
+    {
+        self.for_each_range(range, |packet| {
+            output.push(*packet);
+            Ok(())
+        })
+        .unwrap();
     }
 
     #[inline]
@@ -198,10 +195,10 @@ impl PacketStore {
         };
 
         loop {
-            let latest_token = self.latest_token.load(Ordering::Acquire);
-            let current_archive_length = self.archives_token.load(Ordering::Acquire);
+            let current_archive_length = self.archives_token.load(Ordering::SeqCst);
+            let latest_token = self.latest_token.load(Ordering::SeqCst);
             // Process archives
-            while i < current_archive_length * BUFFER_SIZE && i < end {
+            while likely(i < current_archive_length * BUFFER_SIZE && i < end) {
                 let archive_index = i / BUFFER_SIZE;
                 let start_in_archive = i % BUFFER_SIZE;
                 let remaining = (end - i).min(BUFFER_SIZE - start_in_archive);
@@ -224,9 +221,16 @@ impl PacketStore {
             }
 
             let latest = self.latest.read().unwrap();
-            if latest_token != self.latest_token.load(Ordering::Acquire) {
+            if unlikely(latest_token != self.latest_token.load(Ordering::Acquire)) {
                 drop(latest);
+                while self.archives_token.load(Ordering::Acquire) == current_archive_length {
+                    std::thread::yield_now();
+                }
                 continue; // Retry, archive was updated
+            }
+
+            if unlikely(latest.is_empty()) {
+                return Ok(i - start);
             }
 
             let start_in_latest = i % BUFFER_SIZE;
