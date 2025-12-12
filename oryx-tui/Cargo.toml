@@ -32,6 +32,7 @@ regex = "1"
 chrono = "0.4"
 strum = { version = "0.27", features = ["derive"] }
 anyhow = "1"
+branches = "0.3"
 
 [[bin]]
 name = "oryx"
