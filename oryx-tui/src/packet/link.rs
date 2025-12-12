@@ -129,7 +129,7 @@ pub struct MacAddr(pub [u8; 6]);
 impl Display for MacAddr {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         //FIX: workaround for the moment
-        if self.0.iter().all(|&x| x == 0) {
+        if self.0.iter().all(|&x| x == 0xff) {
             write!(f, "ff:ff:ff:ff:ff:ff",)
         } else {
             write!(
