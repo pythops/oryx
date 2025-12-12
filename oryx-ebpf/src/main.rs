@@ -20,8 +20,8 @@ use network_types::{
     udp::UdpHdr,
 };
 use oryx_common::{
+    MAX_FIREWALL_RULES, MAX_RULES_PORT, ProtoHdr, RawData, RawFrame, RawPacket,
     protocols::{LinkProtocol, NetworkProtocol, Protocol, TransportProtocol},
-    ProtoHdr, RawData, RawFrame, RawPacket, MAX_FIREWALL_RULES, MAX_RULES_PORT,
 };
 
 #[map]
