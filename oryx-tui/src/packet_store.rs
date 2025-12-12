@@ -234,6 +234,10 @@ impl PacketStore {
             let start_in_latest = i % BUFFER_SIZE;
             let end_in_latest = (start_in_latest + (end - i)).min(latest.len());
 
+            if start_in_latest >= latest.len() {
+                return;
+            }
+
             output.extend_from_slice(&latest[start_in_latest..end_in_latest]);
             return;
         }
@@ -307,6 +311,10 @@ impl PacketStore {
 
             let start_in_latest = i % BUFFER_SIZE;
             let end_in_latest = (start_in_latest + (end - i)).min(latest.len());
+
+            if start_in_latest >= latest.len() {
+                return Ok(i - start);
+            }
 
             THREAD_BUFFER.with(move |buffer| {
                 let mut buffer = buffer.borrow_mut();
