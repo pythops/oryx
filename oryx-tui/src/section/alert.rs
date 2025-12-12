@@ -45,11 +45,13 @@ impl Alert {
 
         thread::spawn(move || {
             let mut last_index = 0;
+            let mut counting_index = 0;
+            let mut count = 0usize;
             loop {
                 thread::sleep(Duration::from_secs(5));
-                let mut count = 0usize;
-                packets
-                    .for_each_range(last_index.., |packet| {
+                // Phase 1: waiting for enough samples
+                counting_index += packets
+                    .for_each_range(last_index + counting_index.., |packet| {
                         if packet.direction == TrafficDirection::Ingress {
                             count += 1;
                         }
@@ -59,6 +61,11 @@ impl Alert {
                 if count < WIN_SIZE {
                     continue;
                 }
+                // clear counters
+                count = 0;
+                counting_index = 0;
+
+                // Phase 2: start statistics
                 let mut nb_syn_packets = 0;
                 let mut syn_flood_map: HashMap<IpAddr, usize> = HashMap::default();
                 syn_flood_map.reserve(128);
