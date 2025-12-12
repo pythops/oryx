@@ -1,6 +1,7 @@
 use crate::packet::AppPacket;
 use anyhow::Result;
 use branches::{likely, unlikely};
+use cacheguard::CacheGuard;
 use std::cell::RefCell;
 use std::ops::{Deref, RangeBounds};
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -10,16 +11,16 @@ const BUFFER_SIZE: usize = 32 * 1024;
 
 #[derive(Debug)]
 pub struct PacketStoreInner {
+    // It is here so user would know if archive that it read is changed while reading latest
+    latest_token: CacheGuard<AtomicUsize>,
+    // It is here so when new entry is geting added, user can spin over this instead of locking the RwLock
+    archives_token: CacheGuard<AtomicUsize>,
+    // Total number of packets stored
+    length: CacheGuard<AtomicUsize>,
     // Recent packets stored here
     latest: RwLock<Vec<AppPacket>>,
-    // It is here so user would know if archive that it read is changed while reading latest
-    latest_token: AtomicUsize,
     // Old packets stored here in chunks of BUFFER_SIZE
     archives: RwLock<Vec<Arc<Vec<AppPacket>>>>,
-    // It is here so when new entry is geting added, user can spin over this instead of locking the RwLock
-    archives_token: AtomicUsize,
-    // Total number of packets stored
-    length: AtomicUsize,
 }
 
 #[derive(Debug)]
@@ -58,11 +59,11 @@ impl PacketStore {
     pub fn new() -> Self {
         PacketStore {
             inner: Arc::new(PacketStoreInner {
-                latest_token: AtomicUsize::new(0),
+                latest_token: CacheGuard::new(AtomicUsize::new(0)),
                 latest: RwLock::new(Vec::with_capacity(BUFFER_SIZE)),
                 archives: RwLock::new(Vec::new()),
-                archives_token: AtomicUsize::new(0),
-                length: AtomicUsize::new(0),
+                archives_token: CacheGuard::new(AtomicUsize::new(0)),
+                length: CacheGuard::new(AtomicUsize::new(0)),
             }),
         }
     }
@@ -132,39 +133,110 @@ impl PacketStore {
 
     #[inline]
     pub fn get(&self, i: usize) -> Option<AppPacket> {
-        self.clone_range(i..=i).into_iter().next()
+        loop {
+            let current_archive_length = self.archives_token.load(Ordering::SeqCst);
+            let latest_token = self.latest_token.load(Ordering::SeqCst);
+
+            if i >= self.len() {
+                return None;
+            }
+
+            // Check if in archives
+            if likely(i < current_archive_length * BUFFER_SIZE) {
+                let archive_index = i / BUFFER_SIZE;
+                let index_in_archive = i % BUFFER_SIZE;
+
+                if let (Some(archive), _) = self.archive_at(archive_index) {
+                    return Some(archive[index_in_archive]);
+                }
+                // Discarded archive or out of bounds
+                return None;
+            }
+
+            // Check in latest
+            let latest = self.latest.read().unwrap();
+            if unlikely(latest_token != self.latest_token.load(Ordering::SeqCst)) {
+                drop(latest);
+                while self.archives_token.load(Ordering::Relaxed) == current_archive_length {
+                    std::thread::yield_now();
+                }
+                continue; // Retry, archive was updated
+            }
+
+            let index_in_latest = i % BUFFER_SIZE;
+            if index_in_latest < latest.len() {
+                return Some(latest[index_in_latest]);
+            }
+
+            return None;
+        }
     }
 
-    // only use for small ranges
     #[inline]
-    pub fn clone_range<R>(&self, range: R) -> Vec<AppPacket>
-    where
-        R: RangeBounds<usize>,
-    {
-        let mut packets = Vec::with_capacity(match (&range.start_bound(), &range.end_bound()) {
-            (std::ops::Bound::Included(s), std::ops::Bound::Included(e)) => *e - *s + 1,
-            (std::ops::Bound::Included(s), std::ops::Bound::Excluded(e)) => *e - *s,
-            (std::ops::Bound::Excluded(s), std::ops::Bound::Included(e)) => *e - *s,
-            (std::ops::Bound::Excluded(s), std::ops::Bound::Excluded(e)) => *e - *s - 1,
-            _ => 0,
-        });
-        self.for_each_range(range, |packet| {
-            packets.push(*packet);
-            Ok(())
-        })
-        .unwrap();
-        packets
-    }
-
     pub fn write_range_into<R>(&self, range: R, output: &mut Vec<AppPacket>)
     where
         R: RangeBounds<usize>,
     {
-        self.for_each_range(range, |packet| {
-            output.push(*packet);
-            Ok(())
-        })
-        .unwrap();
+        let start = match range.start_bound() {
+            std::ops::Bound::Included(b) => *b,
+            std::ops::Bound::Excluded(b) => *b + 1,
+            std::ops::Bound::Unbounded => 0,
+        };
+        let mut i = start;
+        let end = match range.end_bound() {
+            std::ops::Bound::Included(b) => *b + 1,
+            std::ops::Bound::Excluded(b) => *b,
+            std::ops::Bound::Unbounded => usize::MAX,
+        };
+
+        // reserve
+        if end != usize::MAX {
+            output.reserve(end - start);
+        }
+
+        loop {
+            let current_archive_length = self.archives_token.load(Ordering::SeqCst);
+            let latest_token = self.latest_token.load(Ordering::SeqCst);
+            // Process archives
+            while likely(i < current_archive_length * BUFFER_SIZE && i < end) {
+                let archive_index = i / BUFFER_SIZE;
+                let start_in_archive = i % BUFFER_SIZE;
+                let remaining = (end - i).min(BUFFER_SIZE - start_in_archive);
+
+                if let (Some(archive), _) = self.archive_at(archive_index) {
+                    let end_in_archive = (start_in_archive + remaining).min(archive.len());
+                    output.extend_from_slice(&archive[start_in_archive..end_in_archive]);
+                    i += end_in_archive - start_in_archive;
+                } else {
+                    // Discarded archive, skip it
+                    i += remaining;
+                }
+            }
+
+            if i >= end {
+                assert!(i == end);
+                return;
+            }
+
+            let latest = self.latest.read().unwrap();
+            if unlikely(latest_token != self.latest_token.load(Ordering::SeqCst)) {
+                drop(latest);
+                while self.archives_token.load(Ordering::Relaxed) == current_archive_length {
+                    std::thread::yield_now();
+                }
+                continue; // Retry, archive was updated
+            }
+
+            if unlikely(latest.is_empty()) {
+                return;
+            }
+
+            let start_in_latest = i % BUFFER_SIZE;
+            let end_in_latest = (start_in_latest + (end - i)).min(latest.len());
+
+            output.extend_from_slice(&latest[start_in_latest..end_in_latest]);
+            return;
+        }
     }
 
     #[inline]
@@ -221,9 +293,9 @@ impl PacketStore {
             }
 
             let latest = self.latest.read().unwrap();
-            if unlikely(latest_token != self.latest_token.load(Ordering::Acquire)) {
+            if unlikely(latest_token != self.latest_token.load(Ordering::SeqCst)) {
                 drop(latest);
-                while self.archives_token.load(Ordering::Acquire) == current_archive_length {
+                while self.archives_token.load(Ordering::Relaxed) == current_archive_length {
                     std::thread::yield_now();
                 }
                 continue; // Retry, archive was updated

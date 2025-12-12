@@ -33,6 +33,7 @@ chrono = "0.4"
 strum = { version = "0.27", features = ["derive"] }
 anyhow = "1"
 branches = "0.3"
+cacheguard = "0.1"
 
 [[bin]]
 name = "oryx"
