@@ -35,6 +35,7 @@ pub struct Inspection {
     pub packet_end_index: usize,
     pub packet_window_size: usize,
     pub packet_index: Option<usize>,
+    pub packets_display_buffer: Vec<AppPacket>,
 }
 
 impl Inspection {
@@ -47,6 +48,7 @@ impl Inspection {
             packet_end_index: 0,
             packet_window_size: 0,
             packet_index: None,
+            packets_display_buffer: Vec::with_capacity(128),
         }
     }
 
@@ -271,7 +273,9 @@ impl Inspection {
         }
 
         let packets_len = self.packets.len();
-        let packets_to_display: Vec<AppPacket> = match self.manual_scroll {
+        let pdb = &mut self.packets_display_buffer;
+        pdb.clear();
+        match self.manual_scroll {
             true => {
                 if fuzzy.is_enabled() & !fuzzy.filter.value().is_empty() {
                     if fuzzy_packets.len() > window_size {
@@ -280,16 +284,17 @@ impl Inspection {
                                 fuzzy.packet_end_index.saturating_sub(window_size) + selected_index,
                             );
                         }
-                        fuzzy_packets[fuzzy.packet_end_index.saturating_sub(window_size)
-                            ..fuzzy.packet_end_index]
-                            .to_vec()
+                        pdb.extend_from_slice(
+                            &fuzzy_packets[fuzzy.packet_end_index.saturating_sub(window_size)
+                                ..fuzzy.packet_end_index],
+                        );
                     } else {
                         if let Some(selected_index) = fuzzy.scroll_state.selected() {
                             self.packet_index = Some(selected_index);
                         } else {
                             self.packet_index = None;
                         }
-                        fuzzy_packets.clone()
+                        pdb.extend_from_slice(&fuzzy_packets)
                     }
                 } else if packets_len > window_size {
                     if let Some(selected_index) = self.state.selected() {
@@ -297,40 +302,42 @@ impl Inspection {
                             self.packet_end_index.saturating_sub(window_size) + selected_index,
                         );
                     }
-                    self.packets.clone_range(
+                    self.packets.write_range_into(
                         self.packet_end_index.saturating_sub(window_size)..self.packet_end_index,
-                    )
+                        pdb,
+                    );
                 } else {
                     if let Some(selected_index) = self.state.selected() {
                         self.packet_index = Some(selected_index);
                     }
-                    self.packets.clone_range(0..packets_len)
+                    self.packets.write_range_into(0..packets_len, pdb);
                 }
             }
             false => {
                 if fuzzy.is_enabled() & !fuzzy.filter.value().is_empty() {
                     if fuzzy_packets.len() > window_size {
                         self.packet_index = Some(fuzzy_packets.len().saturating_sub(1));
-                        fuzzy_packets[fuzzy_packets.len().saturating_sub(window_size)..].to_vec()
+                        pdb.extend_from_slice(
+                            &fuzzy_packets[fuzzy_packets.len().saturating_sub(window_size)..],
+                        )
                     } else {
                         self.packet_index = Some(fuzzy_packets.len().saturating_sub(1));
-                        fuzzy_packets.clone()
+                        pdb.extend_from_slice(&fuzzy_packets);
                     }
                 } else if packets_len > window_size {
                     self.packet_index = Some(packets_len.saturating_sub(1));
                     self.packets
-                        .clone_range(packets_len.saturating_sub(window_size)..)
+                        .write_range_into(packets_len.saturating_sub(window_size).., pdb);
                 } else {
                     self.packet_index = Some(packets_len.saturating_sub(1));
-                    self.packets.clone_range(0..packets_len)
+                    self.packets.write_range_into(0..packets_len, pdb);
                 }
             }
         };
 
         // Style the packets
         let packets: Vec<Row> = if fuzzy.is_enabled() & !fuzzy.filter.value().is_empty() {
-            packets_to_display
-                .iter()
+            pdb.iter()
                 .map(|app_packet| {
                     let pid = match app_packet.pid {
                         Some(pid) => fuzzy::highlight(pattern, pid.to_string()).blue(),
@@ -436,8 +443,7 @@ impl Inspection {
                 })
                 .collect()
         } else {
-            packets_to_display
-                .iter()
+            pdb.iter()
                 .map(|app_packet| {
                     let pid = match app_packet.pid {
                         Some(pid) => Span::from(pid.to_string()).into_centered_line().cyan(),
@@ -591,9 +597,9 @@ impl Inspection {
         // Always select the last packet
         if !self.manual_scroll {
             if fuzzy.is_enabled() {
-                fuzzy.scroll_state.select(Some(packets_to_display.len()));
+                fuzzy.scroll_state.select(Some(pdb.len()));
             } else {
-                self.state.select(Some(packets_to_display.len()));
+                self.state.select(Some(pdb.len()));
             }
         }
 
