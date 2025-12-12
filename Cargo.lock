@@ -1207,6 +1207,7 @@ dependencies = [
  "oryx-common",
  "ratatui 0.29.0",
  "regex",
+ "rustc-hash",
  "serde",
  "serde_json",
  "strum 0.27.2",
@@ -1553,6 +1554,12 @@ name = "regex-syntax"
 version = "0.8.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "caf4aa5b0f434c91fe5c7f1ecb6a5ece2130b02ad2a590589dda5146df959001"
+
+[[package]]
+name = "rustc-hash"
+version = "2.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "357703d41365b4b27c590e3ed91eabb1b663f07c4c084095e60cbed4362dff0d"
 
 [[package]]
 name = "rustc_version"

@@ -1,4 +1,4 @@
-use std::{collections::HashMap, net::IpAddr};
+use std::net::IpAddr;
 
 use ratatui::{
     buffer::Buffer,
@@ -7,6 +7,8 @@ use ratatui::{
     text::Line,
     widgets::{Block, Borders, Row, Table},
 };
+
+use rustc_hash::FxHashMap as HashMap;
 
 use crate::section::alert::Threat;
 
