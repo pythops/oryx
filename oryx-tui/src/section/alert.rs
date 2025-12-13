@@ -59,6 +59,7 @@ impl Alert {
                     })
                     .unwrap();
                 if count < WIN_SIZE {
+                    threats.write().unwrap().clear();
                     continue;
                 }
                 // clear counters
