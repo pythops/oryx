@@ -325,9 +325,9 @@ impl Inspection {
                         pdb.extend_from_slice(&fuzzy_packets);
                     }
                 } else if packets_len > window_size {
+                    let start_index = packets_len.saturating_sub(window_size);
                     self.packet_index = Some(packets_len.saturating_sub(1));
-                    self.packets
-                        .write_range_into(packets_len.saturating_sub(window_size).., pdb);
+                    self.packets.write_range_into(start_index.., pdb);
                 } else {
                     self.packet_index = Some(packets_len.saturating_sub(1));
                     self.packets.write_range_into(0..packets_len, pdb);
