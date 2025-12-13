@@ -35,6 +35,7 @@ anyhow = "1"
 branches = "0.3"
 cacheguard = "0.1"
 rustc-hash = "2.1.1"
+arrayvec = "0.7"
 
 [[bin]]
 name = "oryx"

@@ -1,5 +1,6 @@
 use crate::packet::AppPacket;
 use anyhow::Result;
+use arrayvec::ArrayVec;
 use branches::{likely, unlikely};
 use cacheguard::CacheGuard;
 use std::cell::RefCell;
@@ -8,6 +9,14 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, RwLock};
 // The double edged sword, Too high increases copy time and contention, Too low increases number of allocations
 const BUFFER_SIZE: usize = 32 * 1024;
+// Stack buffer size max should be as large as possible without causing stack overflow in all operation systems
+// for fallback when read range is too large we switch to thread local buffer with BUFFER_SIZE capacity
+const STACK_BUFFER_SIZE_MAX: usize = 4 * 1024;
+const STACK_BUFFER_SIZE: usize = if STACK_BUFFER_SIZE_MAX < BUFFER_SIZE {
+    STACK_BUFFER_SIZE_MAX
+} else {
+    BUFFER_SIZE
+};
 
 #[derive(Debug)]
 pub struct PacketStoreInner {
@@ -18,9 +27,9 @@ pub struct PacketStoreInner {
     // Total number of packets stored
     length: CacheGuard<AtomicUsize>,
     // Recent packets stored here
-    latest: RwLock<Vec<AppPacket>>,
+    latest: CacheGuard<RwLock<Vec<AppPacket>>>,
     // Old packets stored here in chunks of BUFFER_SIZE
-    archives: RwLock<Vec<Arc<Vec<AppPacket>>>>,
+    archives: CacheGuard<RwLock<Vec<Arc<Vec<AppPacket>>>>>,
 }
 
 #[derive(Debug)]
@@ -60,8 +69,8 @@ impl PacketStore {
         PacketStore {
             inner: Arc::new(PacketStoreInner {
                 latest_token: CacheGuard::new(AtomicUsize::new(0)),
-                latest: RwLock::new(Vec::with_capacity(BUFFER_SIZE)),
-                archives: RwLock::new(Vec::new()),
+                latest: CacheGuard::new(RwLock::new(Vec::with_capacity(BUFFER_SIZE))),
+                archives: CacheGuard::new(RwLock::new(Vec::new())),
                 archives_token: CacheGuard::new(AtomicUsize::new(0)),
                 length: CacheGuard::new(AtomicUsize::new(0)),
             }),
@@ -316,16 +325,27 @@ impl PacketStore {
                 return Ok(i - start);
             }
 
-            THREAD_BUFFER.with(move |buffer| {
-                let mut buffer = buffer.borrow_mut();
-                buffer.extend_from_slice(&latest[start_in_latest..end_in_latest]);
+            if end_in_latest - start_in_latest <= STACK_BUFFER_SIZE {
+                let mut buffer = ArrayVec::<AppPacket, STACK_BUFFER_SIZE>::new();
+                buffer
+                    .try_extend_from_slice(&latest[start_in_latest..end_in_latest])
+                    .unwrap();
                 drop(latest);
                 for packet in buffer.iter() {
                     f(packet)?;
                 }
-                buffer.clear();
-                Ok::<(), anyhow::Error>(())
-            })?;
+            } else {
+                THREAD_BUFFER.with(move |buffer| {
+                    let mut buffer = buffer.borrow_mut();
+                    buffer.extend_from_slice(&latest[start_in_latest..end_in_latest]);
+                    drop(latest);
+                    for packet in buffer.iter() {
+                        f(packet)?;
+                    }
+                    buffer.clear();
+                    Ok::<(), anyhow::Error>(())
+                })?;
+            }
 
             i += end_in_latest - start_in_latest;
             return Ok(i - start);
