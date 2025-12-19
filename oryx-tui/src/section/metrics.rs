@@ -1,7 +1,7 @@
 use std::{
     cmp,
     ops::Range,
-    sync::{Arc, Mutex, RwLock, atomic::AtomicBool},
+    sync::{Arc, Mutex, atomic::AtomicBool},
     thread,
     time::Duration,
 };
@@ -24,10 +24,11 @@ use ratatui::{
 use crate::{
     app::AppResult,
     packet::{
-        AppPacket, NetworkPacket,
+        NetworkPacket,
         direction::TrafficDirection,
         network::{IpPacket, ip::IpProto},
     },
+    packet_store::PacketStore,
 };
 
 #[derive(Debug, Default)]
@@ -39,7 +40,7 @@ struct ListState {
 #[derive(Debug)]
 pub struct Metrics {
     user_input: UserInput,
-    app_packets: Arc<RwLock<Vec<AppPacket>>>,
+    app_packets: PacketStore,
     metrics: Vec<Arc<Mutex<PortCountMetric>>>,
     terminate: Arc<AtomicBool>,
     state: ListState,
@@ -96,7 +97,7 @@ pub struct PortCountMetric {
 }
 
 impl Metrics {
-    pub fn new(packets: Arc<RwLock<Vec<AppPacket>>>) -> Self {
+    pub fn new(packets: PacketStore) -> Self {
         Self {
             user_input: UserInput::default(),
             app_packets: packets,
@@ -323,57 +324,55 @@ impl Metrics {
                     let packets = self.app_packets.clone();
                     move || {
                         let mut last_index = 0;
-                        'main: loop {
+                        loop {
                             thread::sleep(Duration::from_millis(100));
 
-                            let app_packets = { packets.read().unwrap().clone() };
-
-                            if app_packets.is_empty() {
+                            if packets.is_empty() {
                                 continue;
                             }
-                            let mut metric = port_count_metric.lock().unwrap();
-                            for app_packet in app_packets[last_index..].iter() {
-                                if terminate.load(std::sync::atomic::Ordering::Relaxed) {
-                                    break 'main;
-                                }
-                                if app_packet.direction == TrafficDirection::Ingress
-                                    && let NetworkPacket::Ip(packet) = app_packet.frame.payload
-                                {
-                                    match packet {
-                                        IpPacket::V4(ipv4_packet) => match ipv4_packet.proto {
-                                            IpProto::Tcp(tcp_packet) => {
-                                                if port_range.contains(&tcp_packet.dst_port) {
-                                                    metric.tcp_count += 1;
-                                                }
-                                            }
-                                            IpProto::Udp(udp_packet) => {
-                                                if port_range.contains(&udp_packet.dst_port) {
-                                                    metric.udp_count += 1;
-                                                }
-                                            }
-                                            _ => {}
-                                        },
-                                        IpPacket::V6(ipv6_packet) => match ipv6_packet.proto {
-                                            IpProto::Tcp(tcp_packet) => {
-                                                if port_range.contains(&tcp_packet.dst_port) {
-                                                    metric.tcp_count += 1;
-                                                }
-                                            }
-                                            IpProto::Udp(udp_packet) => {
-                                                if port_range.contains(&udp_packet.dst_port) {
-                                                    metric.udp_count += 1;
-                                                }
-                                            }
-                                            _ => {}
-                                        },
-                                    }
-                                }
-                            }
 
-                            last_index = app_packets.len();
+                            let mut metric = port_count_metric.lock().unwrap();
+
+                            last_index += packets
+                                .for_each_range(last_index.., |app_packet| {
+                                    if app_packet.direction == TrafficDirection::Ingress
+                                        && let NetworkPacket::Ip(packet) = app_packet.frame.payload
+                                    {
+                                        match packet {
+                                            IpPacket::V4(ipv4_packet) => match ipv4_packet.proto {
+                                                IpProto::Tcp(tcp_packet) => {
+                                                    if port_range.contains(&tcp_packet.dst_port) {
+                                                        metric.tcp_count += 1;
+                                                    }
+                                                }
+                                                IpProto::Udp(udp_packet) => {
+                                                    if port_range.contains(&udp_packet.dst_port) {
+                                                        metric.udp_count += 1;
+                                                    }
+                                                }
+                                                _ => {}
+                                            },
+                                            IpPacket::V6(ipv6_packet) => match ipv6_packet.proto {
+                                                IpProto::Tcp(tcp_packet) => {
+                                                    if port_range.contains(&tcp_packet.dst_port) {
+                                                        metric.tcp_count += 1;
+                                                    }
+                                                }
+                                                IpProto::Udp(udp_packet) => {
+                                                    if port_range.contains(&udp_packet.dst_port) {
+                                                        metric.udp_count += 1;
+                                                    }
+                                                }
+                                                _ => {}
+                                            },
+                                        }
+                                    }
+                                    Ok(())
+                                })
+                                .unwrap();
 
                             if terminate.load(std::sync::atomic::Ordering::Relaxed) {
-                                break 'main;
+                                break;
                             }
                         }
                     }

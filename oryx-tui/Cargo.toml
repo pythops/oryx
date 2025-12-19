@@ -19,7 +19,7 @@ oryx-common = { path = "../oryx-common" }
 mio = { version = "1", features = ["os-poll", "os-ext"] }
 itertools = "0.14"
 dirs = "6"
-kanal = "0.1"
+kanal = { version = "0.1", default-features = false }
 mimalloc = "0.1"
 clap = { version = "4", features = ["derive", "cargo"] }
 network-types = { workspace = true }
@@ -32,6 +32,10 @@ regex = "1"
 chrono = "0.4"
 strum = { version = "0.27", features = ["derive"] }
 anyhow = "1"
+branches = "0.3"
+cacheguard = "0.1"
+rustc-hash = "2.1.1"
+arrayvec = "0.7"
 
 [[bin]]
 name = "oryx"

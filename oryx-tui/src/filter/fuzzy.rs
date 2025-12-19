@@ -1,5 +1,5 @@
 use std::{
-    sync::{Arc, Mutex, RwLock},
+    sync::{Arc, Mutex},
     thread,
     time::Duration,
 };
@@ -11,7 +11,7 @@ use ratatui::{
 };
 use tui_input::Input;
 
-use crate::{app::TICK_RATE, packet::AppPacket};
+use crate::{app::TICK_RATE, packet::AppPacket, packet_store::PacketStore};
 
 #[derive(Debug, Clone, Default)]
 pub struct Fuzzy {
@@ -24,7 +24,7 @@ pub struct Fuzzy {
 }
 
 impl Fuzzy {
-    pub fn new(packets: Arc<RwLock<Vec<AppPacket>>>) -> Arc<Mutex<Self>> {
+    pub fn new(packets: PacketStore) -> Arc<Mutex<Self>> {
         let fuzzy = Arc::new(Mutex::new(Self::default()));
 
         thread::spawn({
@@ -38,15 +38,12 @@ impl Fuzzy {
                     let mut fuzzy = fuzzy.lock().unwrap();
 
                     if fuzzy.is_enabled() && !fuzzy.filter.value().is_empty() {
-                        let packets = packets.read().unwrap();
                         let current_pattern = fuzzy.filter.value().to_owned();
                         if current_pattern != pattern {
-                            fuzzy.find(packets.as_slice());
+                            last_index += fuzzy.find(&packets);
                             pattern = current_pattern;
-                            last_index = packets.len();
                         } else {
-                            fuzzy.append(&packets.as_slice()[last_index..]);
-                            last_index = packets.len();
+                            last_index += fuzzy.append(&packets, last_index);
                         }
                     }
                 }
@@ -94,30 +91,35 @@ impl Fuzzy {
         self.scroll_state.select(Some(i));
     }
 
-    pub fn find(&mut self, packets: &[AppPacket]) {
-        self.packets = packets
-            .iter()
-            .copied()
-            .filter(|p| {
-                p.frame.payload.to_string().contains(self.filter.value())
-                    | p.pid
+    // returns number of processed items
+    pub fn find(&mut self, packets: &PacketStore) -> usize {
+        self.packets = Vec::new();
+        packets
+            .for_each(|p| {
+                if p.frame.payload.to_string().contains(self.filter.value())
+                    || p.pid
                         .is_some_and(|v| v.to_string().contains(self.filter.value()))
+                {
+                    self.packets.push(*p);
+                }
+                Ok(())
             })
-            .collect::<Vec<AppPacket>>();
+            .unwrap()
     }
 
-    pub fn append(&mut self, packets: &[AppPacket]) {
-        self.packets.append(
-            &mut packets
-                .iter()
-                .copied()
-                .filter(|p| {
-                    p.frame.payload.to_string().contains(self.filter.value())
-                        | p.pid
-                            .is_some_and(|v| v.to_string().contains(self.filter.value()))
-                })
-                .collect::<Vec<AppPacket>>(),
-        );
+    // returns number of processed items
+    pub fn append(&mut self, packets: &PacketStore, last_index: usize) -> usize {
+        packets
+            .for_each_range(last_index.., |p| {
+                if p.frame.payload.to_string().contains(self.filter.value())
+                    | p.pid
+                        .is_some_and(|v| v.to_string().contains(self.filter.value()))
+                {
+                    self.packets.push(*p);
+                }
+                Ok(())
+            })
+            .unwrap()
     }
 
     pub fn enable(&mut self) {

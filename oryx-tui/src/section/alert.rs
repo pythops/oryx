@@ -8,7 +8,6 @@ use ratatui::{
     widgets::WidgetRef,
 };
 use std::{
-    collections::HashMap,
     net::IpAddr,
     sync::{Arc, RwLock},
     thread,
@@ -17,12 +16,15 @@ use std::{
 
 use crate::{
     packet::{
-        AppPacket, NetworkPacket,
+        NetworkPacket,
         direction::TrafficDirection,
         network::{IpPacket, ip::IpProto},
     },
+    packet_store::PacketStore,
     section::alert::threat::synflood::SynFlood,
 };
+
+use rustc_hash::FxHashMap as HashMap;
 
 use std::fmt::Debug;
 
@@ -37,45 +39,40 @@ pub struct Alert {
 }
 
 impl Alert {
-    pub fn new(packets: Arc<RwLock<Vec<AppPacket>>>) -> Self {
-        let threats: Arc<RwLock<Vec<Box<dyn Threat>>>> = Arc::new(RwLock::new(Vec::new()));
+    pub fn new(packets: PacketStore) -> Self {
+        let ret_threats: Arc<RwLock<Vec<Box<dyn Threat>>>> = Arc::new(RwLock::new(Vec::new()));
+        let threats = ret_threats.clone();
 
-        thread::spawn({
-            let threats = threats.clone();
-            move || loop {
-                let start_index = {
-                    let packets = packets.read().unwrap();
-                    let count = packets
-                        .iter()
-                        .filter(|packet| packet.direction == TrafficDirection::Ingress)
-                        .count();
-
-                    count.saturating_sub(1)
-                };
-
+        thread::spawn(move || {
+            let mut last_index = 0;
+            let mut counting_index = 0;
+            let mut count = 0usize;
+            loop {
                 thread::sleep(Duration::from_secs(5));
-
-                let mut syn_flood_map: HashMap<IpAddr, usize> = HashMap::new();
-
-                let app_packets = {
-                    let packets = packets.read().unwrap();
-                    packets.clone()
-                };
-
-                let app_packets: Vec<AppPacket> = app_packets
-                    .into_iter()
-                    .filter(|packet| packet.direction == TrafficDirection::Ingress)
-                    .collect();
-
-                if app_packets.len() < WIN_SIZE {
+                // Phase 1: waiting for enough samples
+                counting_index += packets
+                    .for_each_range(last_index + counting_index.., |packet| {
+                        if packet.direction == TrafficDirection::Ingress {
+                            count += 1;
+                        }
+                        Ok(())
+                    })
+                    .unwrap();
+                if count < WIN_SIZE {
+                    threats.write().unwrap().clear();
                     continue;
                 }
+                // clear counters
+                count = 0;
+                counting_index = 0;
 
+                // Phase 2: start statistics
                 let mut nb_syn_packets = 0;
+                let mut syn_flood_map: HashMap<IpAddr, usize> = HashMap::default();
+                syn_flood_map.reserve(128);
 
-                app_packets[start_index..app_packets.len().saturating_sub(1)]
-                    .iter()
-                    .for_each(|app_packet| {
+                last_index += packets
+                    .for_each_range(last_index.., |app_packet| {
                         if let NetworkPacket::Ip(ip_packet) = app_packet.frame.payload {
                             match ip_packet {
                                 IpPacket::V4(ipv4_packet) => {
@@ -108,8 +105,9 @@ impl Alert {
                                 }
                             }
                         }
-                    });
-                let threats = threats.clone();
+                        Ok(())
+                    })
+                    .unwrap();
                 threats.write().unwrap().clear();
 
                 // 90% of incoming packets
@@ -121,7 +119,7 @@ impl Alert {
         });
 
         Self {
-            threats,
+            threats: ret_threats,
             flash_count: 1,
         }
     }

@@ -1,29 +1,16 @@
-use chrono::Utc;
 use clap::ArgMatches;
 use itertools::Itertools;
-use oryx_common::{
-    RawData, RawFrame,
-    protocols::{LinkProtocol, NetworkProtocol, TransportProtocol},
-};
+use oryx_common::protocols::{LinkProtocol, NetworkProtocol, TransportProtocol};
 use ratatui::{
     Frame,
     layout::{Constraint, Direction, Layout},
 };
-use std::{
-    error,
-    str::FromStr,
-    sync::{Arc, RwLock},
-    thread,
-    time::Duration,
-};
+use std::{error, str::FromStr, thread, time::Duration};
 
 use crate::{
-    filter::Filter,
-    help::Help,
-    packet::{EthFrame, direction::TrafficDirection},
+    filter::Filter, filter::IoChannels, help::Help, notification::Notification,
+    packet::direction::TrafficDirection, packet_store::PacketStore, section::Section,
 };
-use crate::{filter::IoChannels, notification::Notification};
-use crate::{packet::AppPacket, section::Section};
 
 pub type AppResult<T> = std::result::Result<T, Box<dyn error::Error>>;
 
@@ -40,7 +27,6 @@ pub enum ActivePopup {
 
 #[derive(Debug)]
 pub struct DataEventHandler {
-    pub sender: kanal::Sender<[u8; RawFrame::LEN]>,
     pub handler: thread::JoinHandle<()>,
 }
 
@@ -50,10 +36,9 @@ pub struct App {
     pub help: Help,
     pub filter: Filter,
     pub start_sniffing: bool,
-    pub app_packets: Arc<RwLock<Vec<AppPacket>>>,
+    pub app_packets: PacketStore,
     pub notifications: Vec<Notification>,
     pub section: Section,
-    pub data_channel_sender: kanal::Sender<([u8; RawData::LEN], TrafficDirection)>,
     pub is_editing: bool,
     pub active_popup: Option<ActivePopup>,
     pub start_from_cli: bool,
@@ -61,34 +46,9 @@ pub struct App {
 
 impl App {
     pub fn new(cli_args: &ArgMatches) -> Self {
-        let app_packets = Arc::new(RwLock::new(Vec::with_capacity(
-            AppPacket::LEN * 1024 * 1024,
-        )));
-
-        let (sender, receiver) = kanal::unbounded();
+        let app_packets = PacketStore::new();
 
         let firewall_channels = IoChannels::new();
-
-        thread::spawn({
-            let app_packets = app_packets.clone();
-            move || loop {
-                if let Ok((raw_data, direction)) = receiver.recv() {
-                    let data = RawData::from(raw_data);
-                    let frame = EthFrame::from(data.frame);
-                    let pid = data.pid;
-
-                    let mut app_packets = app_packets.write().unwrap();
-
-                    let app_packet = AppPacket {
-                        frame,
-                        direction,
-                        pid,
-                        timestamp: Utc::now(),
-                    };
-                    app_packets.push(app_packet);
-                }
-            }
-        });
 
         let (interface_name, transport_protocols, network_protocols, link_protocols, direction) = {
             if let Some(interface) = cli_args.get_one::<String>("interface") {
@@ -193,7 +153,6 @@ impl App {
             app_packets: app_packets.clone(),
             notifications: Vec::new(),
             section: Section::new(app_packets.clone(), firewall_channels.clone()),
-            data_channel_sender: sender,
             is_editing: false,
             active_popup: None,
             start_from_cli: interface_name.is_some(),

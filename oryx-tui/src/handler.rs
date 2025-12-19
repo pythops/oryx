@@ -23,7 +23,7 @@ pub fn handle_key_events(
                 if app.filter.focused_block == FocusedBlock::Apply {
                     app.section.stats = Some(Stats::new(app.app_packets.clone()));
                     app.filter
-                        .start(event_sender.clone(), app.data_channel_sender.clone())?;
+                        .start(event_sender.clone(), app.app_packets.clone())?;
 
                     sleep(Duration::from_millis(10));
                     app.start_sniffing = true;

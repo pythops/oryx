@@ -1,4 +1,4 @@
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::{Arc, Mutex};
 
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
@@ -23,21 +23,23 @@ use crate::{
         eth_frame::EthFrameHeader,
         network::{IpPacket, ip::IpProto},
     },
+    packet_store::PacketStore,
 };
 
 #[derive(Debug)]
 pub struct Inspection {
-    pub packets: Arc<RwLock<Vec<AppPacket>>>,
+    pub packets: PacketStore,
     pub state: TableState,
     pub fuzzy: Arc<Mutex<Fuzzy>>,
     pub manual_scroll: bool,
     pub packet_end_index: usize,
     pub packet_window_size: usize,
     pub packet_index: Option<usize>,
+    pub packets_display_buffer: Vec<AppPacket>,
 }
 
 impl Inspection {
-    pub fn new(packets: Arc<RwLock<Vec<AppPacket>>>) -> Self {
+    pub fn new(packets: PacketStore) -> Self {
         Self {
             packets: packets.clone(),
             state: TableState::default(),
@@ -46,17 +48,16 @@ impl Inspection {
             packet_end_index: 0,
             packet_window_size: 0,
             packet_index: None,
+            packets_display_buffer: Vec::with_capacity(128),
         }
     }
 
     pub fn can_show_popup(&mut self) -> bool {
-        let packets = self.packets.read().unwrap();
         let fuzzy = self.fuzzy.lock().unwrap();
-
         if fuzzy.is_enabled() {
             !fuzzy.packets.is_empty()
         } else {
-            !packets.is_empty()
+            !self.packets.is_empty()
         }
     }
 
@@ -135,15 +136,14 @@ impl Inspection {
                 }
 
                 KeyCode::Char('s') => {
-                    let app_packets = self.packets.read().unwrap();
-                    if app_packets.is_empty() {
+                    if self.packets.is_empty() {
                         Notification::send(
                             "There is no packets".to_string(),
                             NotificationLevel::Info,
                             event_sender,
                         )?;
                     } else {
-                        match export::export(&app_packets) {
+                        match export::export(&self.packets) {
                             Ok(_) => {
                                 Notification::send(
                                     "Packets exported to ~/oryx directory".to_string(),
@@ -169,11 +169,10 @@ impl Inspection {
     }
 
     pub fn scroll_up(&mut self) {
-        let app_packets = self.packets.read().unwrap();
         if !self.manual_scroll {
             self.manual_scroll = true;
             // Record the last position. Useful for selecting the packets to display
-            self.packet_end_index = app_packets.len();
+            self.packet_end_index = self.packets.len();
         }
         let i = match self.state.selected() {
             Some(i) => {
@@ -194,19 +193,16 @@ impl Inspection {
     }
 
     pub fn scroll_down(&mut self) {
-        let app_packets = self.packets.read().unwrap();
-
+        let packets_len = self.packets.len();
         if !self.manual_scroll {
             self.manual_scroll = true;
-            self.packet_end_index = app_packets.len();
+            self.packet_end_index = packets_len;
         }
         let i = match self.state.selected() {
             Some(i) => {
                 if i < self.packet_window_size - 1 {
                     i + 1
-                } else if i == self.packet_window_size - 1
-                    && app_packets.len() > self.packet_end_index
-                {
+                } else if i == self.packet_window_size - 1 && packets_len > self.packet_end_index {
                     // shift the window by one
                     self.packet_end_index += 1;
                     i + 1
@@ -214,14 +210,13 @@ impl Inspection {
                     i
                 }
             }
-            None => app_packets.len(),
+            None => packets_len,
         };
 
         self.state.select(Some(i));
     }
 
     pub fn render(&mut self, frame: &mut Frame, block: Rect) {
-        let app_packets = self.packets.read().unwrap();
         let mut fuzzy = self.fuzzy.lock().unwrap();
         let fuzzy_packets = fuzzy.clone().packets.clone();
 
@@ -277,7 +272,10 @@ impl Inspection {
             fuzzy.packet_end_index = window_size;
         }
 
-        let packets_to_display = match self.manual_scroll {
+        let packets_len = self.packets.len();
+        let pdb = &mut self.packets_display_buffer;
+        pdb.clear();
+        match self.manual_scroll {
             true => {
                 if fuzzy.is_enabled() & !fuzzy.filter.value().is_empty() {
                     if fuzzy_packets.len() > window_size {
@@ -286,54 +284,60 @@ impl Inspection {
                                 fuzzy.packet_end_index.saturating_sub(window_size) + selected_index,
                             );
                         }
-                        &fuzzy_packets[fuzzy.packet_end_index.saturating_sub(window_size)
-                            ..fuzzy.packet_end_index]
+                        pdb.extend_from_slice(
+                            &fuzzy_packets[fuzzy.packet_end_index.saturating_sub(window_size)
+                                ..fuzzy.packet_end_index],
+                        );
                     } else {
                         if let Some(selected_index) = fuzzy.scroll_state.selected() {
                             self.packet_index = Some(selected_index);
                         } else {
                             self.packet_index = None;
                         }
-                        &fuzzy_packets
+                        pdb.extend_from_slice(&fuzzy_packets)
                     }
-                } else if app_packets.len() > window_size {
+                } else if packets_len > window_size {
                     if let Some(selected_index) = self.state.selected() {
                         self.packet_index = Some(
                             self.packet_end_index.saturating_sub(window_size) + selected_index,
                         );
                     }
-                    &app_packets
-                        [self.packet_end_index.saturating_sub(window_size)..self.packet_end_index]
+                    self.packets.write_range_into(
+                        self.packet_end_index.saturating_sub(window_size)..self.packet_end_index,
+                        pdb,
+                    );
                 } else {
                     if let Some(selected_index) = self.state.selected() {
                         self.packet_index = Some(selected_index);
                     }
-                    &app_packets
+                    self.packets.write_range_into(0..packets_len, pdb);
                 }
             }
             false => {
                 if fuzzy.is_enabled() & !fuzzy.filter.value().is_empty() {
                     if fuzzy_packets.len() > window_size {
                         self.packet_index = Some(fuzzy_packets.len().saturating_sub(1));
-                        &fuzzy_packets[fuzzy_packets.len().saturating_sub(window_size)..]
+                        pdb.extend_from_slice(
+                            &fuzzy_packets[fuzzy_packets.len().saturating_sub(window_size)..],
+                        )
                     } else {
                         self.packet_index = Some(fuzzy_packets.len().saturating_sub(1));
-                        &fuzzy_packets
+                        pdb.extend_from_slice(&fuzzy_packets);
                     }
-                } else if app_packets.len() > window_size {
-                    self.packet_index = Some(app_packets.len().saturating_sub(1));
-                    &app_packets[app_packets.len().saturating_sub(window_size)..]
+                } else if packets_len > window_size {
+                    let start_index = packets_len.saturating_sub(window_size);
+                    self.packet_index = Some(packets_len.saturating_sub(1));
+                    self.packets.write_range_into(start_index..packets_len, pdb);
                 } else {
-                    self.packet_index = Some(app_packets.len().saturating_sub(1));
-                    &app_packets
+                    self.packet_index = Some(packets_len.saturating_sub(1));
+                    self.packets.write_range_into(0..packets_len, pdb);
                 }
             }
         };
 
         // Style the packets
         let packets: Vec<Row> = if fuzzy.is_enabled() & !fuzzy.filter.value().is_empty() {
-            packets_to_display
-                .iter()
+            pdb.iter()
                 .map(|app_packet| {
                     let pid = match app_packet.pid {
                         Some(pid) => fuzzy::highlight(pattern, pid.to_string()).blue(),
@@ -439,8 +443,7 @@ impl Inspection {
                 })
                 .collect()
         } else {
-            packets_to_display
-                .iter()
+            pdb.iter()
                 .map(|app_packet| {
                     let pid = match app_packet.pid {
                         Some(pid) => Span::from(pid.to_string()).into_centered_line().cyan(),
@@ -594,9 +597,9 @@ impl Inspection {
         // Always select the last packet
         if !self.manual_scroll {
             if fuzzy.is_enabled() {
-                fuzzy.scroll_state.select(Some(packets_to_display.len()));
+                fuzzy.scroll_state.select(Some(pdb.len()));
             } else {
-                self.state.select(Some(packets_to_display.len()));
+                self.state.select(Some(pdb.len()));
             }
         }
 
@@ -638,6 +641,7 @@ impl Inspection {
             .begin_symbol(Some("↑"))
             .end_symbol(Some("↓"));
 
+        let app_packets_len = self.packets.len();
         let mut scrollbar_state = if fuzzy.is_enabled() && fuzzy_packets.len() > window_size {
             ScrollbarState::new(fuzzy_packets.len()).position({
                 if self.manual_scroll {
@@ -650,8 +654,8 @@ impl Inspection {
                     fuzzy.packets.len()
                 }
             })
-        } else if !fuzzy.is_enabled() && app_packets.len() > window_size {
-            ScrollbarState::new(app_packets.len()).position({
+        } else if !fuzzy.is_enabled() && app_packets_len > window_size {
+            ScrollbarState::new(app_packets_len).position({
                 if self.manual_scroll {
                     if self.packet_end_index == window_size {
                         0
@@ -659,7 +663,7 @@ impl Inspection {
                         self.packet_end_index
                     }
                 } else {
-                    app_packets.len()
+                    app_packets_len
                 }
             })
         } else {
@@ -733,12 +737,11 @@ impl Inspection {
             .split(layout[1])[1];
 
         let fuzzy = self.fuzzy.lock().unwrap();
-        let packets = self.packets.read().unwrap();
 
         let app_packet = if fuzzy.is_enabled() {
             fuzzy.packets[self.packet_index.unwrap()]
         } else {
-            packets[self.packet_index.unwrap()]
+            self.packets.get(self.packet_index.unwrap()).unwrap()
         };
 
         frame.render_widget(Clear, block);

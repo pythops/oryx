@@ -95,12 +95,12 @@ impl Bandwidth {
                 }
 
                 loop {
+                    buffer.clear();
                     thread::sleep(Duration::from_secs(1));
                     if fd.seek(std::io::SeekFrom::Start(0)).is_err() {
                         drop(fd);
                         fd = File::open("/proc/net/dev").unwrap();
                     }
-                    let mut buffer = String::new();
                     fd.read_to_string(&mut buffer).unwrap();
 
                     let mut lines = buffer.lines();

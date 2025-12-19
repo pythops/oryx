@@ -8,6 +8,7 @@ use aya_ebpf::{
     maps::{Array, HashMap, RingBuf},
     programs::TcContext,
 };
+use branches::unlikely;
 use core::mem;
 use network_types::{
     arp::ArpHdr,
@@ -194,7 +195,7 @@ fn process(ctx: TcContext) -> Result<i32, ()> {
                         u16::from_be_bytes(unsafe { (*tcp_header).dest })
                     };
 
-                    if block_ipv4(addr, port) {
+                    if unlikely(block_ipv4(addr, port)) {
                         return Ok(TC_ACT_SHOT); //block packet
                     }
 
@@ -227,7 +228,7 @@ fn process(ctx: TcContext) -> Result<i32, ()> {
                         u16::from_be_bytes(unsafe { (*udp_header).dst })
                     };
 
-                    if block_ipv4(addr, port) {
+                    if unlikely(block_ipv4(addr, port)) {
                         return Ok(TC_ACT_SHOT); //block packet
                     }
 
@@ -260,7 +261,7 @@ fn process(ctx: TcContext) -> Result<i32, ()> {
                         u16::from_be_bytes(unsafe { (*sctp_header).dst })
                     };
 
-                    if block_ipv4(addr, port) {
+                    if unlikely(block_ipv4(addr, port)) {
                         return Ok(TC_ACT_SHOT); //block packet
                     }
 
@@ -389,7 +390,7 @@ fn process(ctx: TcContext) -> Result<i32, ()> {
                     }
                 }
                 IpProto::Sctp => {
-                    let sctp_header: *const SctpHdr = ptr_at(&ctx, EthHdr::LEN + Ipv4Hdr::LEN)?;
+                    let sctp_header: *const SctpHdr = ptr_at(&ctx, EthHdr::LEN + Ipv6Hdr::LEN)?;
 
                     let port = if is_ingress() {
                         u16::from_be_bytes(unsafe { (*sctp_header).src })
@@ -401,7 +402,7 @@ fn process(ctx: TcContext) -> Result<i32, ()> {
                         return Ok(TC_ACT_SHOT); //block packet
                     }
 
-                    if filter_packet(Protocol::Network(NetworkProtocol::Ipv4))
+                    if filter_packet(Protocol::Network(NetworkProtocol::Ipv6))
                         || filter_packet(Protocol::Transport(TransportProtocol::SCTP))
                         || filter_direction()
                     {
