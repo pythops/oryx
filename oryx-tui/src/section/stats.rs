@@ -168,7 +168,7 @@ impl Stats {
         addresses: HashMap<IpAddr, (Option<String>, usize)>,
     ) -> Vec<(IpAddr, (Option<String>, usize))> {
         let mut items: Vec<(IpAddr, (Option<String>, usize))> = addresses.into_iter().collect();
-        items.sort_by(|a, b| b.1.1.cmp(&a.1.1));
+        items.sort_by_key(|b| std::cmp::Reverse(b.1.1));
         items.into_iter().take(10).collect()
     }
 
@@ -210,16 +210,24 @@ impl Stats {
                     .label("ARP")
                     .style(Style::new().fg(Color::LightYellow))
                     .value_style(Style::new().fg(Color::Black).bg(Color::LightYellow))
-                    .text_value(if packet_stats.total != 0 {
-                        format!("{}%", packet_stats.link.arp * 100 / packet_stats.total)
-                    } else {
-                        "0%".to_string()
-                    })
-                    .value(if packet_stats.total != 0 {
-                        (packet_stats.link.arp * 100 / packet_stats.total) as u64
-                    } else {
-                        0
-                    })]),
+                    .text_value(
+                        if let Some(val) =
+                            (packet_stats.link.arp * 100).checked_div(packet_stats.total)
+                        {
+                            format!("{val}%")
+                        } else {
+                            "0%".to_string()
+                        },
+                    )
+                    .value(
+                        if let Some(val) =
+                            (packet_stats.link.arp * 100).checked_div(packet_stats.total)
+                        {
+                            val as u64
+                        } else {
+                            0
+                        },
+                    )]),
             )
             .block(Block::new().padding(Padding::horizontal(1)))
             .max(100);
@@ -233,81 +241,112 @@ impl Stats {
                         .label("TCP")
                         .style(Style::new().fg(Color::LightBlue))
                         .value_style(Style::new().fg(Color::Black).bg(Color::LightBlue))
-                        .text_value(if packet_stats.total != 0 {
-                            format!("{}%", packet_stats.transport.tcp * 100 / packet_stats.total)
-                        } else {
-                            "0%".to_string()
-                        })
-                        .value(if packet_stats.total != 0 {
-                            (packet_stats.transport.tcp * 100 / packet_stats.total) as u64
-                        } else {
-                            0
-                        }),
+                        .text_value(
+                            if let Some(val) =
+                                (packet_stats.transport.tcp * 100).checked_div(packet_stats.total)
+                            {
+                                format!("{val}%")
+                            } else {
+                                "0%".to_string()
+                            },
+                        )
+                        .value(
+                            if let Some(val) =
+                                (packet_stats.transport.tcp * 100).checked_div(packet_stats.total)
+                            {
+                                val as u64
+                            } else {
+                                0
+                            },
+                        ),
                     Bar::default()
                         .label("UDP")
                         .style(Style::new().fg(Color::LightGreen))
                         .value_style(Style::new().fg(Color::Black).bg(Color::LightGreen))
-                        .text_value(if packet_stats.total != 0 {
-                            format!("{}%", packet_stats.transport.udp * 100 / packet_stats.total)
-                        } else {
-                            "0%".to_string()
-                        })
-                        .value(if packet_stats.total != 0 {
-                            (packet_stats.transport.udp * 100 / packet_stats.total) as u64
-                        } else {
-                            0
-                        }),
+                        .text_value(
+                            if let Some(val) =
+                                (packet_stats.transport.udp * 100).checked_div(packet_stats.total)
+                            {
+                                format!("{val}%")
+                            } else {
+                                "0%".to_string()
+                            },
+                        )
+                        .value(
+                            if let Some(val) =
+                                (packet_stats.transport.udp * 100).checked_div(packet_stats.total)
+                            {
+                                val as u64
+                            } else {
+                                0
+                            },
+                        ),
                     Bar::default()
                         .label("SCTP")
                         .style(Style::new().fg(Color::LightRed))
                         .value_style(Style::new().fg(Color::Black).bg(Color::LightRed))
-                        .text_value(if packet_stats.total != 0 {
-                            format!(
-                                "{}%",
-                                packet_stats.transport.sctp * 100 / packet_stats.total
-                            )
-                        } else {
-                            "0%".to_string()
-                        })
-                        .value(if packet_stats.total != 0 {
-                            (packet_stats.transport.sctp * 100 / packet_stats.total) as u64
-                        } else {
-                            0
-                        }),
+                        .text_value(
+                            if let Some(val) =
+                                (packet_stats.transport.sctp * 100).checked_div(packet_stats.total)
+                            {
+                                format!("{val}%")
+                            } else {
+                                "0%".to_string()
+                            },
+                        )
+                        .value(
+                            if let Some(val) =
+                                (packet_stats.transport.sctp * 100).checked_div(packet_stats.total)
+                            {
+                                val as u64
+                            } else {
+                                0
+                            },
+                        ),
                     Bar::default()
                         .label("ICMPv4")
                         .style(Style::new().fg(Color::LightCyan))
                         .value_style(Style::new().fg(Color::Black).bg(Color::LightCyan))
-                        .text_value(if packet_stats.total != 0 {
-                            format!(
-                                "{}%",
-                                packet_stats.network.icmpv4 * 100 / packet_stats.total
-                            )
-                        } else {
-                            "0%".to_string()
-                        })
-                        .value(if packet_stats.total != 0 {
-                            (packet_stats.network.icmpv4 * 100 / packet_stats.total) as u64
-                        } else {
-                            0
-                        }),
+                        .text_value(
+                            if let Some(val) =
+                                (packet_stats.network.icmpv4 * 100).checked_div(packet_stats.total)
+                            {
+                                format!("{val}%")
+                            } else {
+                                "0%".to_string()
+                            },
+                        )
+                        .value(
+                            if let Some(val) =
+                                (packet_stats.network.icmpv4 * 100).checked_div(packet_stats.total)
+                            {
+                                val as u64
+                            } else {
+                                0
+                            },
+                        ),
                     Bar::default()
                         .label("ICMPv6")
                         .style(Style::new().fg(Color::LightCyan))
                         .value_style(Style::new().fg(Color::Black).bg(Color::LightCyan))
-                        .text_value(if packet_stats.total != 0 {
-                            format!(
-                                "{}%",
-                                packet_stats.network.icmpv6 * 100 / packet_stats.total
-                            )
-                        } else {
-                            "0%".to_string()
-                        })
-                        .value(if packet_stats.total != 0 {
-                            (packet_stats.network.icmpv6 * 100 / packet_stats.total) as u64
-                        } else {
-                            0
-                        }),
+                        .text_value(
+                            if let Some(val) =
+                                (packet_stats.network.icmpv6 * 100).checked_div(packet_stats.total)
+                            {
+                                format!("{val}%")
+                            } else {
+                                "0%".to_string()
+                            },
+                        )
+                        .value(
+                            if let Some(val) =
+                                (packet_stats.network.icmpv6 * 100).checked_div(packet_stats.total)
+                            {
+                                val as u64
+                            } else {
+                                0
+                            },
+                        ),
                 ]),
             )
             .block(Block::new().padding(Padding::horizontal(1)))
@@ -322,30 +361,46 @@ impl Stats {
                         .label("IPv4")
                         .style(Style::new().fg(Color::LightRed))
                         .value_style(Style::new().fg(Color::Black).bg(Color::LightRed))
-                        .text_value(if packet_stats.total != 0 {
-                            format!("{}%", packet_stats.network.ipv4 * 100 / packet_stats.total)
-                        } else {
-                            "0%".to_string()
-                        })
-                        .value(if packet_stats.total != 0 {
-                            (packet_stats.network.ipv4 * 100 / packet_stats.total) as u64
-                        } else {
-                            0
-                        }),
+                        .text_value(
+                            if let Some(val) =
+                                (packet_stats.network.ipv4 * 100).checked_div(packet_stats.total)
+                            {
+                                format!("{val}%")
+                            } else {
+                                "0%".to_string()
+                            },
+                        )
+                        .value(
+                            if let Some(val) =
+                                (packet_stats.network.ipv4 * 100).checked_div(packet_stats.total)
+                            {
+                                val as u64
+                            } else {
+                                0
+                            },
+                        ),
                     Bar::default()
                         .label("IPv6")
                         .style(Style::new().fg(Color::LightCyan))
                         .value_style(Style::new().fg(Color::Black).bg(Color::LightCyan))
-                        .text_value(if packet_stats.total != 0 {
-                            format!("{}%", packet_stats.network.ipv6 * 100 / packet_stats.total)
-                        } else {
-                            "0%".to_string()
-                        })
-                        .value(if packet_stats.total != 0 {
-                            (packet_stats.network.ipv6 * 100 / packet_stats.total) as u64
-                        } else {
-                            0
-                        }),
+                        .text_value(
+                            if let Some(val) =
+                                (packet_stats.network.ipv6 * 100).checked_div(packet_stats.total)
+                            {
+                                format!("{val}%")
+                            } else {
+                                "0%".to_string()
+                            },
+                        )
+                        .value(
+                            if let Some(val) =
+                                (packet_stats.network.ipv6 * 100).checked_div(packet_stats.total)
+                            {
+                                val as u64
+                            } else {
+                                0
+                            },
+                        ),
                 ]),
             )
             .block(Block::new().padding(Padding::horizontal(1)))

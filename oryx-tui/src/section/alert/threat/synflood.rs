@@ -24,7 +24,7 @@ impl ratatui::widgets::WidgetRef for SynFlood {
     fn render_ref(&self, area: Rect, buf: &mut Buffer) {
         let mut ips: Vec<(IpAddr, usize)> = { self.map.clone().into_iter().collect() };
 
-        ips.sort_by(|a, b| b.1.cmp(&a.1));
+        ips.sort_by_key(|b| std::cmp::Reverse(b.1));
 
         ips.retain(|(_, count)| *count > 10_000);
 
