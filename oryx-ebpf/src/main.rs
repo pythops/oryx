@@ -14,7 +14,7 @@ use network_types::{
     arp::ArpHdr,
     eth::{EthHdr, EtherType},
     icmp::{Icmp, IcmpHdr, IcmpV6Hdr},
-    igmp::IGMPv1Hdr,
+    igmp::{IGMPv1Hdr, IGMPv2Hdr},
     ip::{IpHdr, IpProto, Ipv4Hdr, Ipv6Hdr},
     sctp::SctpHdr,
     tcp::TcpHdr,
@@ -344,15 +344,61 @@ fn process(ctx: TcContext) -> Result<i32, ()> {
                                     }
                                 } else {
                                     // v2
+                                    let igmp_header: *const IGMPv2Hdr =
+                                        ptr_at(&ctx, EthHdr::LEN + Ipv4Hdr::LEN)?;
+
+                                    unsafe {
+                                        submit(RawData {
+                                            frame: RawFrame {
+                                                header: *eth_header,
+                                                payload: RawPacket::Ip(
+                                                    IpHdr::V4(*ipv4_header),
+                                                    ProtoHdr::Igmp(IgmpHdr::V2(*igmp_header)),
+                                                ),
+                                            },
+                                            pid,
+                                        });
+                                    }
                                 }
                             } else {
                                 // v3
                             }
                         }
-                        0x12 => {}
-                        0x16 => {}
+                        0x12 => {
+                            let igmp_header: *const IGMPv1Hdr =
+                                ptr_at(&ctx, EthHdr::LEN + Ipv4Hdr::LEN)?;
+
+                            unsafe {
+                                submit(RawData {
+                                    frame: RawFrame {
+                                        header: *eth_header,
+                                        payload: RawPacket::Ip(
+                                            IpHdr::V4(*ipv4_header),
+                                            ProtoHdr::Igmp(IgmpHdr::V1(*igmp_header)),
+                                        ),
+                                    },
+                                    pid,
+                                });
+                            }
+                        }
+                        0x16 | 0x17 => {
+                            let igmp_header: *const IGMPv2Hdr =
+                                ptr_at(&ctx, EthHdr::LEN + Ipv4Hdr::LEN)?;
+
+                            unsafe {
+                                submit(RawData {
+                                    frame: RawFrame {
+                                        header: *eth_header,
+                                        payload: RawPacket::Ip(
+                                            IpHdr::V4(*ipv4_header),
+                                            ProtoHdr::Igmp(IgmpHdr::V2(*igmp_header)),
+                                        ),
+                                    },
+                                    pid,
+                                });
+                            }
+                        }
                         0x22 => {}
-                        0x17 => {}
                         _ => {}
                     }
                 }

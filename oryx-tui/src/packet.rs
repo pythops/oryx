@@ -16,7 +16,7 @@ use transport::{SctpPacket, TcpPacket, UdpPacket};
 
 use crate::packet::network::{
     icmp::{icmpv4::Icmpv4Packet, icmpv6::Icmpv6Packet},
-    igmp::{IgmpPacket, IgmpType, igmpv1::IGMPv1Packet},
+    igmp::{IgmpPacket, IgmpType, igmpv1::IGMPv1Packet, igmpv2::IGMPv2Packet},
     ip::{ipv4::Ipv4Packet, ipv6::Ipv6Packet},
 };
 
@@ -107,6 +107,16 @@ impl From<RawFrame> for EthFrame {
                                     igmp_type,
                                     checksum: igmpv1_hdr.checksum(),
                                     group_address: Ipv4Addr::from_bits(igmpv1_hdr.group_address()),
+                                }))
+                            }
+                            IgmpHdr::V2(igmpv2_hdr) => {
+                                let igmp_type =
+                                    IgmpType::try_from(igmpv2_hdr.message_type).unwrap();
+                                IpProto::Igmp(IgmpPacket::V2(IGMPv2Packet {
+                                    igmp_type,
+                                    max_response_time: igmpv2_hdr.max_response_time,
+                                    checksum: igmpv2_hdr.checksum(),
+                                    group_address: Ipv4Addr::from_bits(igmpv2_hdr.group_address()),
                                 }))
                             }
                         },

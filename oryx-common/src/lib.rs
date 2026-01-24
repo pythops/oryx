@@ -4,7 +4,13 @@
 use core::mem;
 
 use network_types::{
-    arp::ArpHdr, eth::EthHdr, icmp::Icmp, igmp::IGMPv1Hdr, ip::IpHdr, sctp::SctpHdr, tcp::TcpHdr,
+    arp::ArpHdr,
+    eth::EthHdr,
+    icmp::Icmp,
+    igmp::{IGMPv1Hdr, IGMPv2Hdr},
+    ip::IpHdr,
+    sctp::SctpHdr,
+    tcp::TcpHdr,
     udp::UdpHdr,
 };
 
@@ -73,4 +79,5 @@ pub enum ProtoHdr {
 #[repr(C)]
 pub enum IgmpHdr {
     V1(IGMPv1Hdr),
+    V2(IGMPv2Hdr),
 }

@@ -4,12 +4,12 @@ pub mod igmpv3;
 
 use std::fmt::Display;
 
-use crate::packet::network::igmp::igmpv1::IGMPv1Packet;
+use crate::packet::network::igmp::{igmpv1::IGMPv1Packet, igmpv2::IGMPv2Packet};
 
 #[derive(Debug, Copy, Clone)]
 pub enum IgmpPacket {
     V1(IGMPv1Packet),
-    // V2(IGMPv2Packet),
+    V2(IGMPv2Packet),
     // V3(IGMPv3),
 }
 
