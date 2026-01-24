@@ -2,6 +2,8 @@ pub mod igmpv1;
 pub mod igmpv2;
 pub mod igmpv3;
 
+use std::fmt::Display;
+
 use crate::packet::network::igmp::igmpv1::IGMPv1Packet;
 
 #[derive(Debug, Copy, Clone)]
@@ -11,7 +13,7 @@ pub enum IgmpPacket {
     // V3(IGMPv3),
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum IgmpType {
     MembershipQuery = 0x11,
     IGMPv1MembershipReport = 0x12,
@@ -19,19 +21,6 @@ pub enum IgmpType {
     IGMPv3MembershipReport = 0x22,
     LeaveGroup = 0x17,
 }
-
-// impl From<u8> for IgmpType {
-//     fn from(value: u8) -> Self {
-//         match value {
-//             0x11 => IgmpType::MembershipQuery,
-//             0x12 => IgmpType::IGMPv1MembershipReport,
-//             0x16 => IgmpType::IGMPv2MembershipReport,
-//             0x22 => IgmpType::IGMPv3MembershipReport,
-//             0x17 => IgmpType::LeaveGroup,
-//             _ => unreachable!(),
-//         }
-//     }
-// }
 
 impl TryFrom<u8> for IgmpType {
     type Error = &'static str;
@@ -43,6 +32,28 @@ impl TryFrom<u8> for IgmpType {
             0x22 => Ok(IgmpType::IGMPv3MembershipReport),
             0x17 => Ok(IgmpType::LeaveGroup),
             _ => Err("Unknown igmp type"),
+        }
+    }
+}
+
+impl Display for IgmpType {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            IgmpType::MembershipQuery => {
+                write!(f, "Membership Query")
+            }
+            IgmpType::IGMPv1MembershipReport => {
+                write!(f, "IGMPv1 Membership Report")
+            }
+            IgmpType::IGMPv2MembershipReport => {
+                write!(f, "IGMPv2 Membership Report")
+            }
+            IgmpType::IGMPv3MembershipReport => {
+                write!(f, "IGMPv3 Membership Report")
+            }
+            IgmpType::LeaveGroup => {
+                write!(f, "Leave Group")
+            }
         }
     }
 }

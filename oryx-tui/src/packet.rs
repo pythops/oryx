@@ -11,12 +11,13 @@ use direction::TrafficDirection;
 use link::{ArpPacket, ArpType, MacAddr};
 use network::{IpPacket, icmp::IcmpPacket, icmp::icmpv4, icmp::icmpv6, ip::IpProto};
 use network_types::{eth::EthHdr, icmp::Icmp, ip::IpHdr};
-use oryx_common::{ProtoHdr, RawFrame, RawPacket};
+use oryx_common::{IgmpHdr, ProtoHdr, RawFrame, RawPacket};
 use transport::{SctpPacket, TcpPacket, UdpPacket};
 
 use crate::packet::network::{
-    icmp::icmpv4::Icmpv4Packet, icmp::icmpv6::Icmpv6Packet, ip::ipv4::Ipv4Packet,
-    ip::ipv6::Ipv6Packet,
+    icmp::{icmpv4::Icmpv4Packet, icmpv6::Icmpv6Packet},
+    igmp::{IgmpPacket, IgmpType, igmpv1::IGMPv1Packet},
+    ip::{ipv4::Ipv4Packet, ipv6::Ipv6Packet},
 };
 
 #[derive(Debug, Copy, Clone)]
@@ -98,6 +99,17 @@ impl From<RawFrame> for EthFrame {
                                 checksum: u16::from_be_bytes(icmp_header.check),
                             }))
                         }
+                        ProtoHdr::Igmp(igmp_header) => match igmp_header {
+                            IgmpHdr::V1(igmpv1_hdr) => {
+                                let igmp_type =
+                                    IgmpType::try_from(igmpv1_hdr.type_() | 1 << 1).unwrap();
+                                IpProto::Igmp(IgmpPacket::V1(IGMPv1Packet {
+                                    igmp_type,
+                                    checksum: igmpv1_hdr.checksum(),
+                                    group_address: Ipv4Addr::from_bits(igmpv1_hdr.group_address()),
+                                }))
+                            }
+                        },
                         _ => unreachable!(),
                     };
 

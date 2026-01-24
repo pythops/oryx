@@ -318,36 +318,42 @@ fn process(ctx: TcContext) -> Result<i32, ()> {
                     let igmp_type: *const u8 = ptr_at(&ctx, EthHdr::LEN + Ipv4Hdr::LEN)?;
                     let igmp_type = unsafe { *igmp_type };
 
-                    if igmp_type == 0x11 {
-                        if payload_length == 8 {
-                            // v1 or v2
-                            let max_response_time: *const u8 =
-                                ptr_at(&ctx, EthHdr::LEN + Ipv4Hdr::LEN + 1)?;
+                    match igmp_type {
+                        0x11 => {
+                            if payload_length == 8 {
+                                // v1 or v2
+                                let max_response_time: *const u8 =
+                                    ptr_at(&ctx, EthHdr::LEN + Ipv4Hdr::LEN + 1)?;
 
-                            if unsafe { *max_response_time } == 0 {
-                                //v1
-                                let igmp_header: *const IGMPv1Hdr =
-                                    ptr_at(&ctx, EthHdr::LEN + Ipv4Hdr::LEN)?;
+                                if unsafe { *max_response_time } == 0 {
+                                    //v1
+                                    let igmp_header: *const IGMPv1Hdr =
+                                        ptr_at(&ctx, EthHdr::LEN + Ipv4Hdr::LEN)?;
 
-                                unsafe {
-                                    submit(RawData {
-                                        frame: RawFrame {
-                                            header: *eth_header,
-                                            payload: RawPacket::Ip(
-                                                IpHdr::V4(*ipv4_header),
-                                                ProtoHdr::Igmp(IgmpHdr::V1(*igmp_header)),
-                                            ),
-                                        },
-                                        pid,
-                                    });
+                                    unsafe {
+                                        submit(RawData {
+                                            frame: RawFrame {
+                                                header: *eth_header,
+                                                payload: RawPacket::Ip(
+                                                    IpHdr::V4(*ipv4_header),
+                                                    ProtoHdr::Igmp(IgmpHdr::V1(*igmp_header)),
+                                                ),
+                                            },
+                                            pid,
+                                        });
+                                    }
+                                } else {
+                                    // v2
                                 }
                             } else {
-                                // v2
+                                // v3
                             }
-                        } else {
-                            // v3
                         }
-                    } else {
+                        0x12 => {}
+                        0x16 => {}
+                        0x22 => {}
+                        0x17 => {}
+                        _ => {}
                     }
                 }
                 _ => {}

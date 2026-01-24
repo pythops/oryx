@@ -1,4 +1,3 @@
-use core::fmt::Display;
 use ratatui::{
     Frame,
     layout::{Constraint, Direction, Layout, Rect},
@@ -6,18 +5,15 @@ use ratatui::{
     text::Span,
     widgets::{Block, Borders, Padding, Paragraph, Row, Table},
 };
+use std::net::Ipv4Addr;
 
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub enum Igmpv1Type {
-    HostMembershipQuery = 0x1,
-    HostMembershipReport = 0x2,
-}
+use crate::packet::network::igmp::IgmpType;
 
 #[derive(Debug, Copy, Clone)]
 pub struct IGMPv1Packet {
-    pub igmp_type: Igmpv1Type,
-    pub checksum: u8,
-    pub group_address: u32,
+    pub igmp_type: IgmpType,
+    pub checksum: u16,
+    pub group_address: Ipv4Addr,
 }
 
 impl IGMPv1Packet {
@@ -54,7 +50,7 @@ impl IGMPv1Packet {
             Row::new(vec![
                 Span::styled("Group Address", Style::new().bold()),
                 Span::from({
-                    if self.igmp_type == Igmpv1Type::HostMembershipReport {
+                    if self.igmp_type == IgmpType::IGMPv1MembershipReport {
                         self.group_address.to_string()
                     } else {
                         "-".to_string()
@@ -73,18 +69,5 @@ impl IGMPv1Packet {
 
         frame.render_widget(table, data_block);
         frame.render_widget(title, title_block);
-    }
-}
-
-impl Display for Igmpv1Type {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        match self {
-            Igmpv1Type::HostMembershipQuery => {
-                write!(f, "Host Membership Query")
-            }
-            Igmpv1Type::HostMembershipReport => {
-                write!(f, "Host Membership Report")
-            }
-        }
     }
 }
