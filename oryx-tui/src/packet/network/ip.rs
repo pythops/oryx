@@ -2,7 +2,7 @@ pub mod ipv4;
 pub mod ipv6;
 
 use crate::packet::{
-    network::icmp::IcmpPacket,
+    network::{icmp::IcmpPacket, igmp::IgmpPacket},
     transport::{SctpPacket, TcpPacket, UdpPacket},
 };
 
@@ -12,4 +12,5 @@ pub enum IpProto {
     Udp(UdpPacket),
     Sctp(SctpPacket),
     Icmp(IcmpPacket),
+    Igmp(IgmpPacket),
 }

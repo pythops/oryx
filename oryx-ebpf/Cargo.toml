@@ -10,8 +10,8 @@ homepage = "https://github.com/pythops/oryx"
 [dependencies]
 aya-ebpf = "0.1.1"
 oryx-common = { path = "../oryx-common" }
-network-types = { git = "https://github.com/vadorovsky/network-types", rev = "b78424c" }
-branches = { version = "0.3", default-features = false }
+network-types = { git = "https://github.com/vadorovsky/network-types", rev = "e0384d8" }
+branches = { version = "0.4", default-features = false }
 
 [[bin]]
 name = "oryx"

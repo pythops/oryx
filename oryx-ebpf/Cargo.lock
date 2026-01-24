@@ -9,12 +9,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a23eb6b1614318a8071c9b2521f36b424b2c83db5eb3a0fead4a6c0809af6e61"
 
 [[package]]
-name = "autocfg"
-version = "1.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c08606f8c3cbf4ce6ec8e28fb0014a2c086708fe954eaa885384a6165172e7e8"
-
-[[package]]
 name = "aya-build"
 version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -69,9 +63,9 @@ dependencies = [
 
 [[package]]
 name = "branches"
-version = "0.3.0"
+version = "0.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f11502672c5570f77f6bdf573332483f8475bab6a7fda00f1fae8ddb5a6245c0"
+checksum = "e426eb5cc1900033930ec955317b302e68f19f326cc7bb0c8a86865a826cdf0c"
 dependencies = [
  "rustc_version",
 ]
@@ -128,21 +122,9 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f52b00d39961fc5b2736ea853c9cc86238e165017a493d1d5c8eac6bdc4cc273"
 
 [[package]]
-name = "memoffset"
-version = "0.9.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "488016bfae457b036d996092f6cb448677611ce4449e970ceaf42695203f218a"
-dependencies = [
- "autocfg",
-]
-
-[[package]]
 name = "network-types"
 version = "0.1.0"
-source = "git+https://github.com/vadorovsky/network-types?rev=b78424c#b78424c582951ac0af4392bce595d0cb236280e8"
-dependencies = [
- "memoffset",
-]
+source = "git+https://github.com/vadorovsky/network-types?rev=e0384d8#e0384d8ee39ce7b78110a8303d0ca4e2452d586b"
 
 [[package]]
 name = "oryx-common"

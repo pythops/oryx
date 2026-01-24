@@ -4,7 +4,8 @@
 use core::mem;
 
 use network_types::{
-    arp::ArpHdr, eth::EthHdr, icmp::Icmp, ip::IpHdr, sctp::SctpHdr, tcp::TcpHdr, udp::UdpHdr,
+    arp::ArpHdr, eth::EthHdr, icmp::Icmp, igmp::IGMPv1Hdr, ip::IpHdr, sctp::SctpHdr, tcp::TcpHdr,
+    udp::UdpHdr,
 };
 
 pub mod protocols;
@@ -65,4 +66,11 @@ pub enum ProtoHdr {
     Udp(UdpHdr),
     Sctp(SctpHdr),
     Icmp(Icmp),
+    Igmp(IgmpHdr),
+}
+
+#[derive(Copy, Clone)]
+#[repr(C)]
+pub enum IgmpHdr {
+    V1(IGMPv1Hdr),
 }

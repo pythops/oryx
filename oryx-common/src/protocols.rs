@@ -40,7 +40,7 @@ impl TransportProtocol {
 
 // Network Protocols
 
-pub const NB_NETWORK_PROTOCOL: u16 = 4;
+pub const NB_NETWORK_PROTOCOL: u16 = 5;
 
 #[derive(Debug, Copy, Clone, PartialEq, AsRefStr, Display, EnumString)]
 #[repr(C)]
@@ -56,15 +56,19 @@ pub enum NetworkProtocol {
 
     #[strum(ascii_case_insensitive)]
     Icmpv6 = 3,
+
+    #[strum(ascii_case_insensitive)]
+    Igmp = 4,
 }
 
 impl NetworkProtocol {
-    pub fn all() -> [NetworkProtocol; 4] {
+    pub fn all() -> [NetworkProtocol; 5] {
         [
             NetworkProtocol::Ipv4,
             NetworkProtocol::Ipv6,
             NetworkProtocol::Icmpv4,
             NetworkProtocol::Icmpv6,
+            NetworkProtocol::Igmp,
         ]
     }
 }

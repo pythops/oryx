@@ -136,6 +136,13 @@ pub fn export(packets: &PacketStore) -> Result<()> {
                             ipv4_packet.src_ip, "-", ipv4_packet.dst_ip, "-", "ICMPv4", pid, date
                         )?;
                     }
+                    IpProto::Igmp(_) => {
+                        writeln!(
+                            file,
+                            "{:39}  {:^11}  {:39}  {:^11}  {:10}  {:10}  {:10}",
+                            ipv4_packet.src_ip, "-", ipv4_packet.dst_ip, "-", "IGMP", pid, date
+                        )?;
+                    }
                 },
                 IpPacket::V6(ipv6_packet) => match ipv6_packet.proto {
                     IpProto::Tcp(p) => {
@@ -183,6 +190,10 @@ pub fn export(packets: &PacketStore) -> Result<()> {
                             "{:39}  {:^11}  {:39}  {:^11}  {:10}  {:10}  {:10}",
                             ipv6_packet.src_ip, "-", ipv6_packet.dst_ip, "-", "ICMPv6", pid, date
                         )?;
+                    }
+                    IpProto::Igmp(_) => {
+                        //IGMP is for IPv4 only
+                        unreachable!()
                     }
                 },
             },

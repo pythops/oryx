@@ -1,0 +1,90 @@
+use core::fmt::Display;
+use ratatui::{
+    Frame,
+    layout::{Constraint, Direction, Layout, Rect},
+    style::{Style, Stylize},
+    text::Span,
+    widgets::{Block, Borders, Padding, Paragraph, Row, Table},
+};
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum Igmpv1Type {
+    HostMembershipQuery = 0x1,
+    HostMembershipReport = 0x2,
+}
+
+#[derive(Debug, Copy, Clone)]
+pub struct IGMPv1Packet {
+    pub igmp_type: Igmpv1Type,
+    pub checksum: u8,
+    pub group_address: u32,
+}
+
+impl IGMPv1Packet {
+    pub fn render(self, block: Rect, frame: &mut Frame) {
+        let (title_block, data_block) = {
+            let chunks = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([Constraint::Length(10), Constraint::Fill(1)])
+                .margin(2)
+                .split(block);
+
+            (chunks[0], chunks[1])
+        };
+        let title = Paragraph::new("IGMPv1")
+            .bold()
+            .block(Block::new().padding(Padding::top({
+                if title_block.height.is_multiple_of(2) {
+                    (title_block.height / 2).saturating_sub(1)
+                } else {
+                    title_block.height / 2
+                }
+            })));
+
+        let widths = [Constraint::Length(23), Constraint::Fill(1)];
+        let infos = [
+            Row::new(vec![
+                Span::styled("Type", Style::new().bold()),
+                Span::from(self.igmp_type.to_string()),
+            ]),
+            Row::new(vec![
+                Span::styled("Checksum", Style::new().bold()),
+                Span::from(format!("{:#0x}", self.checksum)),
+            ]),
+            Row::new(vec![
+                Span::styled("Group Address", Style::new().bold()),
+                Span::from({
+                    if self.igmp_type == Igmpv1Type::HostMembershipReport {
+                        self.group_address.to_string()
+                    } else {
+                        "-".to_string()
+                    }
+                }),
+            ]),
+        ];
+
+        let table = Table::new(infos, widths).column_spacing(2).block(
+            Block::default()
+                .borders(Borders::LEFT)
+                .border_style(Style::new().bold().yellow())
+                .border_type(ratatui::widgets::BorderType::Thick)
+                .style(Style::default()),
+        );
+
+        frame.render_widget(table, data_block);
+        frame.render_widget(title, title_block);
+    }
+}
+
+impl Display for Igmpv1Type {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Igmpv1Type::HostMembershipQuery => {
+                write!(f, "Host Membership Query")
+            }
+            Igmpv1Type::HostMembershipReport => {
+                write!(f, "Host Membership Report")
+            }
+        }
+    }
+}

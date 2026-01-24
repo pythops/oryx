@@ -14,13 +14,14 @@ use network_types::{
     arp::ArpHdr,
     eth::{EthHdr, EtherType},
     icmp::{Icmp, IcmpHdr, IcmpV6Hdr},
+    igmp::IGMPv1Hdr,
     ip::{IpHdr, IpProto, Ipv4Hdr, Ipv6Hdr},
     sctp::SctpHdr,
     tcp::TcpHdr,
     udp::UdpHdr,
 };
 use oryx_common::{
-    MAX_FIREWALL_RULES, MAX_RULES_PORT, ProtoHdr, RawData, RawFrame, RawPacket,
+    IgmpHdr, MAX_FIREWALL_RULES, MAX_RULES_PORT, ProtoHdr, RawData, RawFrame, RawPacket,
     protocols::{LinkProtocol, NetworkProtocol, Protocol, TransportProtocol},
 };
 
@@ -302,6 +303,51 @@ fn process(ctx: TcContext) -> Result<i32, ()> {
                             },
                             pid,
                         });
+                    }
+                }
+
+                IpProto::Igmp => {
+                    if filter_packet(Protocol::Network(NetworkProtocol::Igmp)) {
+                        return Ok(TC_ACT_PIPE);
+                    }
+
+                    let payload_length = unsafe {
+                        u16::from_be_bytes((*ipv4_header).tot_len) - (*ipv4_header).ihl() as u16
+                    };
+
+                    let igmp_type: *const u8 = ptr_at(&ctx, EthHdr::LEN + Ipv4Hdr::LEN)?;
+                    let igmp_type = unsafe { *igmp_type };
+
+                    if igmp_type == 0x11 {
+                        if payload_length == 8 {
+                            // v1 or v2
+                            let max_response_time: *const u8 =
+                                ptr_at(&ctx, EthHdr::LEN + Ipv4Hdr::LEN + 1)?;
+
+                            if unsafe { *max_response_time } == 0 {
+                                //v1
+                                let igmp_header: *const IGMPv1Hdr =
+                                    ptr_at(&ctx, EthHdr::LEN + Ipv4Hdr::LEN)?;
+
+                                unsafe {
+                                    submit(RawData {
+                                        frame: RawFrame {
+                                            header: *eth_header,
+                                            payload: RawPacket::Ip(
+                                                IpHdr::V4(*ipv4_header),
+                                                ProtoHdr::Igmp(IgmpHdr::V1(*igmp_header)),
+                                            ),
+                                        },
+                                        pid,
+                                    });
+                                }
+                            } else {
+                                // v2
+                            }
+                        } else {
+                            // v3
+                        }
+                    } else {
                     }
                 }
                 _ => {}

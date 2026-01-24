@@ -150,6 +150,16 @@ impl NetworkFilter {
                 },
                 "ICMPv6",
             ]),
+            Row::new(vec![
+                {
+                    if self.selected_protocols.contains(&NetworkProtocol::Igmp) {
+                        " "
+                    } else {
+                        ""
+                    }
+                },
+                "IGMP",
+            ]),
         ];
 
         let network_filters_table = Table::new(network_filters, widths)

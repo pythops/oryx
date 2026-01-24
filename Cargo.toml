@@ -13,7 +13,7 @@ repository = "https://github.com/pythops/oryx"
 homepage = "https://github.com/pythops/oryx"
 
 [workspace.dependencies]
-network-types = { git = "https://github.com/vadorovsky/network-types", rev = "b78424c" }
+network-types = { git = "https://github.com/vadorovsky/network-types", rev = "e0384d8" }
 
 [profile.release]
 opt-level = 3

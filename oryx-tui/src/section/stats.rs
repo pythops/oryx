@@ -100,6 +100,9 @@ impl Stats {
                                             IpProto::Icmp(_) => {
                                                 packet_stats.network.icmpv4 += 1;
                                             }
+                                            IpProto::Igmp(_) => {
+                                                packet_stats.network.igmp += 1;
+                                            }
                                         }
                                     }
                                     IpPacket::V6(ipv6_packet) => {
@@ -138,6 +141,10 @@ impl Stats {
                                             }
                                             IpProto::Icmp(_) => {
                                                 packet_stats.network.icmpv6 += 1;
+                                            }
+                                            IpProto::Igmp(_) => {
+                                                // IGMP is for IPv4 only
+                                                unreachable!()
                                             }
                                         }
                                     }
@@ -389,6 +396,7 @@ pub struct NetworkStats {
     pub ipv6: usize,
     pub icmpv4: usize,
     pub icmpv6: usize,
+    pub igmp: usize,
 }
 
 #[derive(Debug, Default)]

@@ -1059,10 +1059,7 @@ dependencies = [
 [[package]]
 name = "network-types"
 version = "0.1.0"
-source = "git+https://github.com/vadorovsky/network-types?rev=b78424c#b78424c582951ac0af4392bce595d0cb236280e8"
-dependencies = [
- "memoffset",
-]
+source = "git+https://github.com/vadorovsky/network-types?rev=e0384d8#e0384d8ee39ce7b78110a8303d0ca4e2452d586b"
 
 [[package]]
 name = "nix"

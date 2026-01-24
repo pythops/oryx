@@ -395,6 +395,16 @@ impl Inspection {
                                     fuzzy::highlight(pattern, "ICMPv4".to_string()).cyan(),
                                     pid,
                                 ]),
+                                IpProto::Igmp(_) => Row::new(vec![
+                                    fuzzy::highlight(pattern, ipv4_packet.src_ip.to_string())
+                                        .blue(),
+                                    Cell::from(Line::from("-").centered()).yellow(),
+                                    fuzzy::highlight(pattern, ipv4_packet.dst_ip.to_string())
+                                        .blue(),
+                                    Cell::from(Line::from("-").centered()).yellow(),
+                                    fuzzy::highlight(pattern, "IGMP".to_string()).cyan(),
+                                    pid,
+                                ]),
                             },
                             IpPacket::V6(ipv6_packet) => match ipv6_packet.proto {
                                 IpProto::Tcp(p) => Row::new(vec![
@@ -437,6 +447,10 @@ impl Inspection {
                                     fuzzy::highlight(pattern, "ICMPv6".to_string()).cyan(),
                                     pid,
                                 ]),
+                                IpProto::Igmp(_) => {
+                                    // IGMP is for Ipv4 only
+                                    unreachable!()
+                                }
                             },
                         },
                     }
@@ -525,6 +539,18 @@ impl Inspection {
                                     Span::from("ICMPv4".to_string()).into_centered_line().cyan(),
                                     pid,
                                 ]),
+                                IpProto::Igmp(_) => Row::new(vec![
+                                    Span::from(ipv4_packet.src_ip.to_string())
+                                        .into_centered_line()
+                                        .blue(),
+                                    Span::from("-").into_centered_line().yellow(),
+                                    Span::from(ipv4_packet.dst_ip.to_string())
+                                        .into_centered_line()
+                                        .blue(),
+                                    Span::from("-").into_centered_line().yellow(),
+                                    Span::from("IGMP".to_string()).into_centered_line().cyan(),
+                                    pid,
+                                ]),
                             },
                             IpPacket::V6(ipv6_packet) => match ipv6_packet.proto {
                                 IpProto::Tcp(p) => Row::new(vec![
@@ -587,6 +613,10 @@ impl Inspection {
                                     Span::from("ICMPv6".to_string()).into_centered_line().cyan(),
                                     pid,
                                 ]),
+                                IpProto::Igmp(_) => {
+                                    // IGMP is for IPv4 only
+                                    unreachable!()
+                                }
                             },
                         },
                     }
