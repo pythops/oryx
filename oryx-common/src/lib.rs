@@ -7,7 +7,7 @@ use network_types::{
     arp::ArpHdr,
     eth::EthHdr,
     icmp::Icmp,
-    igmp::{IGMPv1Hdr, IGMPv2Hdr},
+    igmp::{IGMPv1Hdr, IGMPv2Hdr, IGMPv3MembershipQueryHdr, IGMPv3MembershipReportHdr},
     ip::IpHdr,
     sctp::SctpHdr,
     tcp::TcpHdr,
@@ -80,4 +80,12 @@ pub enum ProtoHdr {
 pub enum IgmpHdr {
     V1(IGMPv1Hdr),
     V2(IGMPv2Hdr),
+    V3(IGMPv3Hdr),
+}
+
+#[derive(Copy, Clone)]
+#[repr(C)]
+pub enum IGMPv3Hdr {
+    Query(IGMPv3MembershipQueryHdr),
+    Report(IGMPv3MembershipReportHdr),
 }

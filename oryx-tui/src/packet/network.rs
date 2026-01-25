@@ -79,6 +79,20 @@ impl IpPacket {
                     ip_packet.render(network_block, frame);
                     icmp_packet.render(transport_block, frame);
                 }
+                IpProto::Igmp(igmp_packet) => {
+                    let (transport_block, network_block) = {
+                        let chunks = Layout::default()
+                            .direction(Direction::Vertical)
+                            .constraints([Constraint::Length(7), Constraint::Length(13)])
+                            .flex(ratatui::layout::Flex::SpaceAround)
+                            .margin(2)
+                            .split(block);
+
+                        (chunks[0], chunks[1])
+                    };
+                    ip_packet.render(network_block, frame);
+                    igmp_packet.render(transport_block, frame);
+                }
                 _ => unreachable!(),
             },
             IpPacket::V6(ip_packet) => match ip_packet.proto {

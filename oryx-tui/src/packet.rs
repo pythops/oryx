@@ -11,12 +11,17 @@ use direction::TrafficDirection;
 use link::{ArpPacket, ArpType, MacAddr};
 use network::{IpPacket, icmp::IcmpPacket, icmp::icmpv4, icmp::icmpv6, ip::IpProto};
 use network_types::{eth::EthHdr, icmp::Icmp, ip::IpHdr};
-use oryx_common::{IgmpHdr, ProtoHdr, RawFrame, RawPacket};
+use oryx_common::{IGMPv3Hdr, IgmpHdr, ProtoHdr, RawFrame, RawPacket};
 use transport::{SctpPacket, TcpPacket, UdpPacket};
 
 use crate::packet::network::{
     icmp::{icmpv4::Icmpv4Packet, icmpv6::Icmpv6Packet},
-    igmp::{IgmpPacket, IgmpType, igmpv1::IGMPv1Packet, igmpv2::IGMPv2Packet},
+    igmp::{
+        IgmpPacket, IgmpType,
+        igmpv1::IGMPv1Packet,
+        igmpv2::IGMPv2Packet,
+        igmpv3::{IGMPv3MembershipQueryPacket, IGMPv3MembershipReportPacket, IGMPv3Packet},
+    },
     ip::{ipv4::Ipv4Packet, ipv6::Ipv6Packet},
 };
 
@@ -119,6 +124,21 @@ impl From<RawFrame> for EthFrame {
                                     group_address: Ipv4Addr::from_bits(igmpv2_hdr.group_address()),
                                 }))
                             }
+                            IgmpHdr::V3(igmpv3_hdr) => match igmpv3_hdr {
+                                IGMPv3Hdr::Query(query) => IpProto::Igmp(IgmpPacket::V3(
+                                    IGMPv3Packet::Query(IGMPv3MembershipQueryPacket {
+                                        max_response_code: query.max_response_time,
+                                        checksum: query.checksum(),
+                                        group_address: Ipv4Addr::from_bits(query.group_address()),
+                                    }),
+                                )),
+                                IGMPv3Hdr::Report(report) => IpProto::Igmp(IgmpPacket::V3(
+                                    IGMPv3Packet::Report(IGMPv3MembershipReportPacket {
+                                        checksum: report.checksum(),
+                                        nb_group_records: report.nb_group_records(),
+                                    }),
+                                )),
+                            },
                         },
                         _ => unreachable!(),
                     };

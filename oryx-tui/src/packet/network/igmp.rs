@@ -4,13 +4,33 @@ pub mod igmpv3;
 
 use std::fmt::Display;
 
-use crate::packet::network::igmp::{igmpv1::IGMPv1Packet, igmpv2::IGMPv2Packet};
+use ratatui::{Frame, layout::Rect};
+
+use crate::packet::network::igmp::{
+    igmpv1::IGMPv1Packet, igmpv2::IGMPv2Packet, igmpv3::IGMPv3Packet,
+};
 
 #[derive(Debug, Copy, Clone)]
 pub enum IgmpPacket {
     V1(IGMPv1Packet),
     V2(IGMPv2Packet),
-    // V3(IGMPv3),
+    V3(IGMPv3Packet),
+}
+
+impl IgmpPacket {
+    pub fn render(self, block: Rect, frame: &mut Frame) {
+        match self {
+            IgmpPacket::V1(packet) => {
+                packet.render(block, frame);
+            }
+            IgmpPacket::V2(packet) => {
+                packet.render(block, frame);
+            }
+            IgmpPacket::V3(packet) => {
+                packet.render(block, frame);
+            }
+        }
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]

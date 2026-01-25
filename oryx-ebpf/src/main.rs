@@ -14,14 +14,14 @@ use network_types::{
     arp::ArpHdr,
     eth::{EthHdr, EtherType},
     icmp::{Icmp, IcmpHdr, IcmpV6Hdr},
-    igmp::{IGMPv1Hdr, IGMPv2Hdr},
+    igmp::{IGMPv1Hdr, IGMPv2Hdr, IGMPv3MembershipQueryHdr, IGMPv3MembershipReportHdr},
     ip::{IpHdr, IpProto, Ipv4Hdr, Ipv6Hdr},
     sctp::SctpHdr,
     tcp::TcpHdr,
     udp::UdpHdr,
 };
 use oryx_common::{
-    IgmpHdr, MAX_FIREWALL_RULES, MAX_RULES_PORT, ProtoHdr, RawData, RawFrame, RawPacket,
+    IGMPv3Hdr, IgmpHdr, MAX_FIREWALL_RULES, MAX_RULES_PORT, ProtoHdr, RawData, RawFrame, RawPacket,
     protocols::{LinkProtocol, NetworkProtocol, Protocol, TransportProtocol},
 };
 
@@ -316,7 +316,7 @@ fn process(ctx: TcContext) -> Result<i32, ()> {
                     };
 
                     let igmp_type: *const u8 = ptr_at(&ctx, EthHdr::LEN + Ipv4Hdr::LEN)?;
-                    let igmp_type = unsafe { *igmp_type };
+                    let igmp_type = unsafe { u8::from_be(*igmp_type) };
 
                     match igmp_type {
                         0x11 => {
@@ -362,6 +362,23 @@ fn process(ctx: TcContext) -> Result<i32, ()> {
                                 }
                             } else {
                                 // v3
+                                let igmp_header: *const IGMPv3MembershipQueryHdr =
+                                    ptr_at(&ctx, EthHdr::LEN + Ipv4Hdr::LEN)?;
+
+                                unsafe {
+                                    submit(RawData {
+                                        frame: RawFrame {
+                                            header: *eth_header,
+                                            payload: RawPacket::Ip(
+                                                IpHdr::V4(*ipv4_header),
+                                                ProtoHdr::Igmp(IgmpHdr::V3(IGMPv3Hdr::Query(
+                                                    *igmp_header,
+                                                ))),
+                                            ),
+                                        },
+                                        pid,
+                                    });
+                                }
                             }
                         }
                         0x12 => {
@@ -398,7 +415,25 @@ fn process(ctx: TcContext) -> Result<i32, ()> {
                                 });
                             }
                         }
-                        0x22 => {}
+                        0x22 => {
+                            let igmp_header: *const IGMPv3MembershipReportHdr =
+                                ptr_at(&ctx, EthHdr::LEN + Ipv4Hdr::LEN)?;
+
+                            unsafe {
+                                submit(RawData {
+                                    frame: RawFrame {
+                                        header: *eth_header,
+                                        payload: RawPacket::Ip(
+                                            IpHdr::V4(*ipv4_header),
+                                            ProtoHdr::Igmp(IgmpHdr::V3(IGMPv3Hdr::Report(
+                                                *igmp_header,
+                                            ))),
+                                        ),
+                                    },
+                                    pid,
+                                });
+                            }
+                        }
                         _ => {}
                     }
                 }
