@@ -315,20 +315,22 @@ fn process(ctx: TcContext) -> Result<i32, ()> {
                         u16::from_be_bytes((*ipv4_header).tot_len) - (*ipv4_header).ihl() as u16
                     };
 
-                    let igmp_type: *const u8 = ptr_at(&ctx, EthHdr::LEN + Ipv4Hdr::LEN)?;
-                    let igmp_type = unsafe { u8::from_be(*igmp_type) };
+                    let ihl: u8 = ctx.load(EthHdr::LEN).map_err(|_| ())?;
+                    let ihl = (ihl & 0x0F) * 4;
+
+                    let igmp_type: u8 = ctx.load(EthHdr::LEN + ihl as usize).map_err(|_| ())?;
 
                     match igmp_type {
                         0x11 => {
                             if payload_length == 8 {
                                 // v1 or v2
-                                let max_response_time: *const u8 =
-                                    ptr_at(&ctx, EthHdr::LEN + Ipv4Hdr::LEN + 1)?;
+                                let max_response_time: u8 =
+                                    ctx.load(EthHdr::LEN + ihl as usize + 1).map_err(|_| ())?;
 
-                                if unsafe { *max_response_time } == 0 {
+                                if max_response_time == 0 {
                                     //v1
                                     let igmp_header: *const IGMPv1Hdr =
-                                        ptr_at(&ctx, EthHdr::LEN + Ipv4Hdr::LEN)?;
+                                        ptr_at(&ctx, EthHdr::LEN + ihl as usize)?;
 
                                     unsafe {
                                         submit(RawData {
@@ -345,7 +347,7 @@ fn process(ctx: TcContext) -> Result<i32, ()> {
                                 } else {
                                     // v2
                                     let igmp_header: *const IGMPv2Hdr =
-                                        ptr_at(&ctx, EthHdr::LEN + Ipv4Hdr::LEN)?;
+                                        ptr_at(&ctx, EthHdr::LEN + ihl as usize)?;
 
                                     unsafe {
                                         submit(RawData {
@@ -363,7 +365,7 @@ fn process(ctx: TcContext) -> Result<i32, ()> {
                             } else {
                                 // v3
                                 let igmp_header: *const IGMPv3MembershipQueryHdr =
-                                    ptr_at(&ctx, EthHdr::LEN + Ipv4Hdr::LEN)?;
+                                    ptr_at(&ctx, EthHdr::LEN + ihl as usize)?;
 
                                 unsafe {
                                     submit(RawData {
@@ -383,7 +385,7 @@ fn process(ctx: TcContext) -> Result<i32, ()> {
                         }
                         0x12 => {
                             let igmp_header: *const IGMPv1Hdr =
-                                ptr_at(&ctx, EthHdr::LEN + Ipv4Hdr::LEN)?;
+                                ptr_at(&ctx, EthHdr::LEN + ihl as usize)?;
 
                             unsafe {
                                 submit(RawData {
@@ -400,7 +402,7 @@ fn process(ctx: TcContext) -> Result<i32, ()> {
                         }
                         0x16 | 0x17 => {
                             let igmp_header: *const IGMPv2Hdr =
-                                ptr_at(&ctx, EthHdr::LEN + Ipv4Hdr::LEN)?;
+                                ptr_at(&ctx, EthHdr::LEN + ihl as usize)?;
 
                             unsafe {
                                 submit(RawData {
@@ -417,7 +419,7 @@ fn process(ctx: TcContext) -> Result<i32, ()> {
                         }
                         0x22 => {
                             let igmp_header: *const IGMPv3MembershipReportHdr =
-                                ptr_at(&ctx, EthHdr::LEN + Ipv4Hdr::LEN)?;
+                                ptr_at(&ctx, EthHdr::LEN + ihl as usize)?;
 
                             unsafe {
                                 submit(RawData {
