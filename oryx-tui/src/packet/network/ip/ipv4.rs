@@ -58,7 +58,7 @@ impl Ipv4Packet {
             ]),
             Row::new(vec![
                 Span::styled("Internet Header Length", Style::new().bold()),
-                Span::from(format!("{} bytes", self.ihl * 4)),
+                Span::from(format!("{} bytes", self.ihl)),
             ]),
             Row::new(vec![
                 Span::styled("Type Of Service", Style::new().bold()),
