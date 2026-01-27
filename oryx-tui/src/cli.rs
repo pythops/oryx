@@ -54,7 +54,7 @@ pub fn cli() -> Command {
                 .value_delimiter(',')
                 .num_args(1..)
                 .default_value("all")
-                .value_parser(["ipv4", "ipv6", "icmp", "all"]),
+                .value_parser(["ipv4", "ipv6", "icmpv4", "icmpv6", "igmp", "all"]),
         )
         .arg(
             arg!(--link <link>)
