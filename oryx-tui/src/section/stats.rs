@@ -189,7 +189,7 @@ impl Stats {
                     [
                         Constraint::Max(60),
                         Constraint::Length(12),
-                        Constraint::Length(38),
+                        Constraint::Length(44),
                         Constraint::Length(10),
                     ]
                     .as_ref(),
@@ -341,6 +341,28 @@ impl Stats {
                         .value(
                             if let Some(val) =
                                 (packet_stats.network.icmpv6 * 100).checked_div(packet_stats.total)
+                            {
+                                val as u64
+                            } else {
+                                0
+                            },
+                        ),
+                    Bar::default()
+                        .label("IGMP")
+                        .style(Style::new().fg(Color::LightCyan))
+                        .value_style(Style::new().fg(Color::Black).bg(Color::LightCyan))
+                        .text_value(
+                            if let Some(val) =
+                                (packet_stats.network.igmp * 100).checked_div(packet_stats.total)
+                            {
+                                format!("{val}%")
+                            } else {
+                                "0%".to_string()
+                            },
+                        )
+                        .value(
+                            if let Some(val) =
+                                (packet_stats.network.igmp * 100).checked_div(packet_stats.total)
                             {
                                 val as u64
                             } else {
