@@ -130,6 +130,10 @@ impl From<RawFrame> for EthFrame {
                                         max_response_code: query.max_response_time,
                                         checksum: query.checksum(),
                                         group_address: Ipv4Addr::from_bits(query.group_address()),
+                                        s: query.s(),
+                                        qrv: query.qrv(),
+                                        qqic: query.qqic,
+                                        nb_source_addr: query.nb_sources() as u16,
                                     }),
                                 )),
                                 IGMPv3Hdr::Report(report) => IpProto::Igmp(IgmpPacket::V3(

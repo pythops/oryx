@@ -37,6 +37,10 @@ pub struct IGMPv3MembershipQueryPacket {
     pub max_response_code: u8,
     pub checksum: u16,
     pub group_address: Ipv4Addr,
+    pub s: u8,
+    pub qrv: u8,
+    pub qqic: u8,
+    pub nb_source_addr: u16,
 }
 
 impl IGMPv3MembershipQueryPacket {
@@ -77,6 +81,22 @@ impl IGMPv3MembershipQueryPacket {
             Row::new(vec![
                 Span::styled("Group Address", Style::new().bold()),
                 Span::from(self.group_address.to_string()),
+            ]),
+            Row::new(vec![
+                Span::styled("S", Style::new().bold()),
+                Span::from(self.s.to_string()),
+            ]),
+            Row::new(vec![
+                Span::styled("QRV", Style::new().bold()),
+                Span::from(self.qrv.to_string()),
+            ]),
+            Row::new(vec![
+                Span::styled("QQIC", Style::new().bold()),
+                Span::from(self.qqic.to_string()),
+            ]),
+            Row::new(vec![
+                Span::styled("Number of Sources", Style::new().bold()),
+                Span::from(self.nb_source_addr.to_string()),
             ]),
         ];
 
