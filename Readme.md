@@ -15,7 +15,7 @@
 - Metrics explorer.
 - Fuzzy search.
 
-## Supported protocols
+## 🚀 Supported protocols
 
 #### Transport Layer
 
