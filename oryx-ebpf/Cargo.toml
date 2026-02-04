@@ -1,6 +1,6 @@
 [package]
 name = "oryx-ebpf"
-version = "0.7.2"
+version = "0.8.0"
 description = "oryx eBPF"
 license = "GPL-3.0"
 edition = "2024"

@@ -5,7 +5,7 @@ members = ["xtask", "oryx-tui", "oryx-common"]
 [workspace.package]
 description = "TUI for sniffing network traffic using eBPF"
 authors = ["Badr Badri <contact@pythops.com>"]
-version = "0.7.2"
+version = "0.8.0"
 readme = "Readme.md"
 license = "GPL-3.0"
 edition = "2024"

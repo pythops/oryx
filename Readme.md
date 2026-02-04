@@ -15,6 +15,24 @@
 - Metrics explorer.
 - Fuzzy search.
 
+## Supported protocols
+
+#### Transport Layer
+
+- [x] TCP
+- [x] UDP
+- [x] SCTP
+
+#### Network Layer
+
+- [x] IP (v4, v6)
+- [x] ICMP (v4, v6)
+- [x] IGMP (v1, v2, v3)
+
+#### Link Layer
+
+- [x] ARP
+
 ## 💡 Prerequisites
 
 #### A Linux based OS.
