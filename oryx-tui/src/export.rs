@@ -28,10 +28,10 @@ pub fn export(packets: &PacketStore) -> Result<()> {
     };
 
     let (uid, gid) = unsafe {
-        let user = CString::new(user.clone()).unwrap();
+        let user = CString::new(user.clone())?;
         let passwd_ptr = libc::getpwnam(user.as_ptr());
         if passwd_ptr.is_null() {
-            bail!("");
+            bail!("Error: Can not get Passwd struct infos");
         } else {
             ((*passwd_ptr).pw_uid, (*passwd_ptr).pw_gid)
         }
@@ -53,8 +53,8 @@ pub fn export(packets: &PacketStore) -> Result<()> {
         .create(true)
         .write(true)
         .truncate(true)
-        .open(&oryx_export_file)
-        .unwrap();
+        .open(&oryx_export_file)?;
+
     chown(oryx_export_file, Some(uid), Some(uid))?;
 
     let headers = (
