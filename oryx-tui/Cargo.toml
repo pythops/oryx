@@ -14,10 +14,10 @@ ratatui = { version = "0.30", features = ["unstable-widget-ref"] }
 tui-big-text = "0.8"
 tui-input = "0.15"
 libc = "0.2"
-aya = "0.13"
+aya = "0.14"
 oryx-common = { path = "../oryx-common" }
 mio = { version = "1", features = ["os-poll", "os-ext"] }
-itertools = "0.14"
+itertools = "0.15"
 dirs = "6"
 kanal = { version = "0.1", default-features = false }
 mimalloc = "0.1"

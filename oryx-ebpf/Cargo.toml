@@ -8,7 +8,7 @@ repository = "https://github.com/pythops/oryx"
 homepage = "https://github.com/pythops/oryx"
 
 [dependencies]
-aya-ebpf = "0.1.1"
+aya-ebpf = "0.2.1"
 oryx-common = { path = "../oryx-common" }
 network-types = { version = "0.2", default-features = false }
 branches = { version = "0.4", default-features = false }

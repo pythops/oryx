@@ -100,7 +100,7 @@ fn is_ingress() -> bool {
 
 #[inline]
 fn block_ipv4(addr: u32, port: u16) -> bool {
-    if let Some(blocked_ports) = unsafe { BLOCKLIST_IPV4.get(&addr) } {
+    if let Some(blocked_ports) = unsafe { BLOCKLIST_IPV4.get(addr) } {
         for (idx, blocked_port) in blocked_ports.iter().enumerate() {
             if *blocked_port == 0 {
                 if idx == 0 {
@@ -118,7 +118,7 @@ fn block_ipv4(addr: u32, port: u16) -> bool {
 
 #[inline]
 fn block_ipv6(addr: u128, port: u16) -> bool {
-    if let Some(blocked_ports) = unsafe { BLOCKLIST_IPV6.get(&addr) } {
+    if let Some(blocked_ports) = unsafe { BLOCKLIST_IPV6.get(addr) } {
         for (idx, blocked_port) in blocked_ports.iter().enumerate() {
             if *blocked_port == 0 {
                 if idx == 0 {

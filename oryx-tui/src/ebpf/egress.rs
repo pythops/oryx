@@ -63,8 +63,8 @@ pub fn load_egress(
 
             #[cfg(debug_assertions)]
             let mut bpf = match EbpfLoader::new()
-                .set_global("TRAFFIC_DIRECTION", &traffic_direction, true)
-                .set_global(
+                .override_global("TRAFFIC_DIRECTION", &traffic_direction, true)
+                .override_global(
                     "PID_HELPER_AVAILABILITY",
                     &(is_pid_helper_available() as u8),
                     true,

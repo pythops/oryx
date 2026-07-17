@@ -54,7 +54,7 @@ pub fn load_ingress(
 
             #[cfg(debug_assertions)]
             let mut bpf = match EbpfLoader::new()
-                .set_global("TRAFFIC_DIRECTION", &traffic_direction, true)
+                .override_global("TRAFFIC_DIRECTION", &traffic_direction, true)
                 .load(include_bytes_aligned!(env!("ORYX_BIN_PATH")))
             {
                 Ok(v) => v,
