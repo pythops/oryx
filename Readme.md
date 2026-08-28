@@ -96,45 +96,11 @@ sudo oryx
 > [!NOTE]
 > You can start `oryx` with args as well. Check `oryx --help` to see the available options
 
-## ⌨️ Key Bindings
+## 🤝 Contributing
 
-`?`: Show help.
-
-`Tab` or `Shift + Tab`: Switch between different sections.
-
-`j` or `Down` : Scroll down.
-
-`k` or `Up`: Scroll up.
-
-`esc`: Dismiss the different pop-ups and modes.
-
-`q` or `ctrl + c`: Quit the app.
-
-`Space`: Select/Deselect interface or filter.
-
-`f`: Update the applied filters.
-
-`ctrl + r`: Reset the app.
-
-`ctrl + s`: Export the capture to `~/oryx/capture` file.
-
-#### Inspection Section
-
-`i`: Show more infos about the selected packet.
-
-`/`: Start fuzzy search.
-
-#### Firewall Section
-
-`Space`: Toggle firewall rules status.
-
-`n` : Add new firewall rule.
-
-`e`: Edit a firewall rule.
-
-`s`: Save firewall rules to `~/oryx/firewall.json`
-
-`Enter`: Create or Save a firewall rule.
+- Strict No LLM.
+- Only submit a PR after having a prior issue or discussion.
+- Keep PRs small and focused.
 
 ## ✍️ Credits
 
