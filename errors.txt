@@ -1,0 +1,10 @@
+```
+➜  sudo oryx
+
+thread '<unnamed>' (116737) panicked at oryx-tui/src/ebpf/egress.rs:228:22:
+called `Result::unwrap()` on an `Err` value: Os { code: 4, kind: Interrupted, message: "Interrupted system call" }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+thread '<unnamed>' (116736) panicked at oryx-tui/src/ebpf/ingress.rs:210:22:
+called `Result::unwrap()` on an `Err` value: Os { code: 4, kind: Interrupted, message: "Interrupted system call" }
+`

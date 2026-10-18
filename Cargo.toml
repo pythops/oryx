@@ -6,11 +6,9 @@ members = ["xtask", "oryx-tui", "oryx-common"]
 description = "TUI for sniffing network traffic using eBPF"
 authors = ["Badr Badri <contact@pythops.com>"]
 version = "0.8.0"
-readme = "Readme.md"
 license = "GPL-3.0"
 edition = "2024"
 repository = "https://github.com/pythops/oryx"
-homepage = "https://github.com/pythops/oryx"
 
 [workspace.dependencies]
 network-types = { version = "0.2", default-features = false }

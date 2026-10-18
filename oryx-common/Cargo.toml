@@ -5,7 +5,6 @@ version.workspace = true
 authors.workspace = true
 license.workspace = true
 repository.workspace = true
-homepage.workspace = true
 edition.workspace = true
 
 
@@ -14,4 +13,4 @@ path = "src/lib.rs"
 
 [dependencies]
 network-types = { workspace = true }
-strum = { version = "0.27", default-features = false, features = ["derive"] }
+strum = { version = "0.28", default-features = false, features = ["derive"] }
